@@ -72,3 +72,25 @@ Sau khi chạy lệnh `/api/seed` ở Backend, bạn có thể đăng nhập b�
 - **Tài khoản (SĐT)**: `0900000001`
 - **Mật khẩu**: `demo_hash`
 - **Vai trò (Role)**: ADMIN
+
+---
+
+## 🌿 Quy tắc làm việc nhóm (Git Flow)
+Dự án áp dụng mô hình **Git Flow**, trong đó **`develop`** là nhánh hội tụ code của cả team. Tuyệt đối không ai được code trực tiếp vào nhánh `main` (chỉ dùng để deploy) hay nhánh `develop`.
+
+**1. Cú pháp đặt tên nhánh (nhánh con):**
+Tất cả các nhánh mới phải được rẽ ra từ nhánh `develop`.
+Cấu trúc: `<loại>/<tên-chức-năng>`
+- `feature/...`: Phát triển tính năng mới (VD: `feature/login-customer`).
+- `fix/...`: Chữa lỗi (VD: `fix/cart-error`).
+- `refactor/...`: Cấu trúc lại code cũ.
+
+**2. Quy trình làm việc cơ bản:**
+```bash
+git checkout develop                 # 1. Chuyển về nhánh develop
+git pull origin develop              # 2. Kéo code hội tụ mới nhất của team về
+git checkout -b feature/tên-task     # 3. Tạo nhánh mới TỪ DEVELOP để code
+# -> (Tiến hành viết code & commit)
+git push origin feature/tên-task     # 4. Đẩy nhánh lên Github
+# 5. Lên Github tạo Pull Request (PR), yêu cầu gộp từ nhánh feature/... vào nhánh develop
+```
