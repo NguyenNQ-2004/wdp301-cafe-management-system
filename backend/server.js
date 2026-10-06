@@ -26,78 +26,61 @@ const User = require('./models/User');
 const Category = require('./models/Category');
 const Product = require('./models/Product');
 const Order = require('./models/Order');
+const Voucher = require('./models/Voucher');
+const Supplier = require('./models/Supplier');
+const Ingredient = require('./models/Ingredient');
+const RewardItem = require('./models/RewardItem');
 
 // ==========================================
-// DANH SÁCH CÁC API CƠ BẢN ĐỂ TEST POSTMAN
+// DANH SÁCH TOÀN BỘ CÁC API ĐỂ TEST POSTMAN
 // ==========================================
 
-// 1. API ĐỂ TEST TẠO DỮ LIỆU ADMIN ĐẦU TIÊN (SEED)
-app.get('/api/seed', async (req, res) => {
-  try {
-    const adminExists = await User.findOne({ role: 'ADMIN' });
-    if (adminExists) {
-      return res.status(200).json({ message: 'Admin đã tồn tại, hãy kiểm tra lại MongoDB Compass nhé!' });
-    }
-
-    const createdUser = await User.create({
-      fullName: 'Aura Admin',
-      phone: '0900000001',
-      email: 'admin@auracafe.vn',
-      passwordHash: 'demo_hash', 
-      role: 'ADMIN',
-      position: 'MANAGER',
-      baseSalary: 15000000
-    });
-
-    res.status(201).json({ message: '✅ Đã tạo tài khoản Admin!', user: createdUser });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 2. NHÓM API NGƯỜI DÙNG (USERS)
+// 1. NHÓM API NGƯỜI DÙNG (USERS)
 app.get('/api/users', async (req, res) => {
-  try {
-    const users = await User.find({});
-    res.status(200).json(users);
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  try { res.status(200).json(await User.find({})); }
+  catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// 3. NHÓM API DANH MỤC (CATEGORIES)
+// 2. NHÓM API DANH MỤC (CATEGORIES)
 app.get('/api/categories', async (req, res) => {
-  try {
-    const categories = await Category.find({});
-    res.status(200).json(categories);
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-app.post('/api/categories', async (req, res) => {
-  try {
-    // Body mẫu: { "name": "Cà phê máy", "icon": "coffee_maker" }
-    const newCategory = await Category.create(req.body);
-    res.status(201).json(newCategory);
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  try { res.status(200).json(await Category.find({})); }
+  catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// 4. NHÓM API SẢN PHẨM (PRODUCTS)
+// 3. NHÓM API SẢN PHẨM (PRODUCTS)
 app.get('/api/products', async (req, res) => {
-  try {
-    const products = await Product.find({}).populate('category', 'name'); // Kéo theo tên danh mục
-    res.status(200).json(products);
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-app.post('/api/products', async (req, res) => {
-  try {
-    const newProduct = await Product.create(req.body);
-    res.status(201).json(newProduct);
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  try { res.status(200).json(await Product.find({}).populate('category', 'name')); }
+  catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-// 5. NHÓM API ĐƠN HÀNG (ORDERS)
+// 4. NHÓM API ĐƠN HÀNG (ORDERS)
 app.get('/api/orders', async (req, res) => {
-  try {
-    const orders = await Order.find({});
-    res.status(200).json(orders);
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  try { res.status(200).json(await Order.find({})); }
+  catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// 5. NHÓM API VOUCHER (MÃ GIẢM GIÁ)
+app.get('/api/vouchers', async (req, res) => {
+  try { res.status(200).json(await Voucher.find({})); }
+  catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// 6. NHÓM API NHÀ CUNG CẤP (SUPPLIERS)
+app.get('/api/suppliers', async (req, res) => {
+  try { res.status(200).json(await Supplier.find({})); }
+  catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// 7. NHÓM API NGUYÊN LIỆU KHO (INGREDIENTS)
+app.get('/api/ingredients', async (req, res) => {
+  try { res.status(200).json(await Ingredient.find({}).populate('supplier', 'name')); }
+  catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// 8. NHÓM API QUÀ TẶNG (REWARD ITEMS)
+app.get('/api/rewards', async (req, res) => {
+  try { res.status(200).json(await RewardItem.find({})); }
+  catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 // 6. Khởi chạy Server
