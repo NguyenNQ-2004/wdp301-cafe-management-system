@@ -21,10 +21,17 @@ app.get('/', (req, res) => {
   res.send('API của hệ thống Aura Cafe ERP đang hoạt động...');
 });
 
-// Load Model User
+// Load Models
 const User = require('./models/User');
+const Category = require('./models/Category');
+const Product = require('./models/Product');
+const Order = require('./models/Order');
 
-// --- ĐƯỜNG DẪN ĐỂ TẠO DỮ LIỆU MẪU ĐẦU TIÊN ---
+// ==========================================
+// DANH SÁCH CÁC API CƠ BẢN ĐỂ TEST POSTMAN
+// ==========================================
+
+// 1. API ĐỂ TEST TẠO DỮ LIỆU ADMIN ĐẦU TIÊN (SEED)
 app.get('/api/seed', async (req, res) => {
   try {
     const adminExists = await User.findOne({ role: 'ADMIN' });
@@ -42,13 +49,55 @@ app.get('/api/seed', async (req, res) => {
       baseSalary: 15000000
     });
 
-    res.status(201).json({ 
-      message: '✅ Đã tạo thành công tài khoản Admin. Hãy Refresh MongoDB Compass!',
-      user: createdUser
-    });
+    res.status(201).json({ message: '✅ Đã tạo tài khoản Admin!', user: createdUser });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// 2. NHÓM API NGƯỜI DÙNG (USERS)
+app.get('/api/users', async (req, res) => {
+  try {
+    const users = await User.find({});
+    res.status(200).json(users);
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// 3. NHÓM API DANH MỤC (CATEGORIES)
+app.get('/api/categories', async (req, res) => {
+  try {
+    const categories = await Category.find({});
+    res.status(200).json(categories);
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+app.post('/api/categories', async (req, res) => {
+  try {
+    // Body mẫu: { "name": "Cà phê máy", "icon": "coffee_maker" }
+    const newCategory = await Category.create(req.body);
+    res.status(201).json(newCategory);
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// 4. NHÓM API SẢN PHẨM (PRODUCTS)
+app.get('/api/products', async (req, res) => {
+  try {
+    const products = await Product.find({}).populate('category', 'name'); // Kéo theo tên danh mục
+    res.status(200).json(products);
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+app.post('/api/products', async (req, res) => {
+  try {
+    const newProduct = await Product.create(req.body);
+    res.status(201).json(newProduct);
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// 5. NHÓM API ĐƠN HÀNG (ORDERS)
+app.get('/api/orders', async (req, res) => {
+  try {
+    const orders = await Order.find({});
+    res.status(200).json(orders);
+  } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 // 6. Khởi chạy Server
