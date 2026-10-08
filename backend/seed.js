@@ -31,14 +31,18 @@ const importData = async () => {
     await Ingredient.deleteMany();
     await RewardItem.deleteMany();
 
+    const bcrypt = require('bcryptjs');
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash('123456', salt);
+
     // 1. Users
     await User.insertMany([
-      { fullName: 'Aura Admin', phone: '0900000001', email: 'admin@auracafe.vn', passwordHash: 'demo_hash', role: 'ADMIN', position: 'MANAGER', baseSalary: 15000000 },
-      { fullName: 'Nguyen Van An', phone: '0900000002', email: 'an@auracafe.vn', passwordHash: 'demo_hash', role: 'STAFF', position: 'BARISTA', baseSalary: 8000000 },
-      { fullName: 'Tran Thi Binh', phone: '0900000003', email: 'binh@auracafe.vn', passwordHash: 'demo_hash', role: 'STAFF', position: 'CASHIER', baseSalary: 8500000 },
-      { fullName: 'Le Minh Anh', phone: '0900000004', email: 'anh@gmail.com', passwordHash: 'demo_hash', role: 'CUSTOMER', tierName: 'SILVER', totalPoints: 120 },
-      { fullName: 'Pham Quang Huy', phone: '0900000005', email: 'huy@gmail.com', passwordHash: 'demo_hash', role: 'CUSTOMER', tierName: 'BRONZE', totalPoints: 50 },
-      { fullName: 'Hoang Van Nam', phone: '0900000006', email: 'nam@auracafe.vn', passwordHash: 'demo_hash', role: 'STAFF', position: 'SHIPPER', baseSalary: 7500000 }
+      { fullName: 'Aura Admin', phone: '0900000001', email: 'admin@auracafe.vn', passwordHash, role: 'ADMIN', position: 'MANAGER', baseSalary: 15000000 },
+      { fullName: 'Nguyen Van An', phone: '0900000002', email: 'an@auracafe.vn', passwordHash, role: 'STAFF', position: 'BARISTA', baseSalary: 8000000 },
+      { fullName: 'Tran Thi Binh', phone: '0900000003', email: 'binh@auracafe.vn', passwordHash, role: 'STAFF', position: 'CASHIER', baseSalary: 8500000 },
+      { fullName: 'Le Minh Anh', phone: '0900000004', email: 'anh@gmail.com', passwordHash, role: 'CUSTOMER', tierName: 'SILVER', totalPoints: 120 },
+      { fullName: 'Pham Quang Huy', phone: '0900000005', email: 'huy@gmail.com', passwordHash, role: 'CUSTOMER', tierName: 'BRONZE', totalPoints: 50 },
+      { fullName: 'Hoang Van Nam', phone: '0900000006', email: 'nam@auracafe.vn', passwordHash, role: 'STAFF', position: 'SHIPPER', baseSalary: 7500000 }
     ]);
 
     // 2. Categories
