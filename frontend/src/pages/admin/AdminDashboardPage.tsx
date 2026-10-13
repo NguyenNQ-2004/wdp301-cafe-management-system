@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useAuthStore from '../store/authStore';
-import './Auth.css';
+import useAuthStore from '../../store/authStore';
 import axios from 'axios';
 
-const CustomerDashboard: React.FC = () => {
+const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
-
+  
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [msg, setMsg] = useState({ text: '', type: '' });
@@ -26,7 +25,7 @@ const CustomerDashboard: React.FC = () => {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg({ text: '', type: '' });
-
+    
     try {
       await axios.put(
         'http://localhost:5000/api/auth/change-password',
@@ -46,14 +45,14 @@ const CustomerDashboard: React.FC = () => {
     <div className="auth-container" style={{ alignItems: 'flex-start', paddingTop: '10vh' }}>
       <div className="auth-card" style={{ maxWidth: '600px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 className="auth-title" style={{ marginBottom: 0 }}>Customer Dashboard</h2>
+          <h2 className="auth-title" style={{ marginBottom: 0 }}>Admin Portal</h2>
           <button onClick={handleLogout} className="auth-button" style={{ width: 'auto', background: '#ef4444', padding: '8px 16px' }}>
             Logout
           </button>
         </div>
 
         <div style={{ marginBottom: '24px', background: '#f3f4f6', padding: '20px', borderRadius: '8px' }}>
-          <h3 style={{ marginTop: 0, color: '#111827' }}>My Profile</h3>
+          <h3 style={{ marginTop: 0, color: '#111827' }}>Admin Profile</h3>
           <p style={{ color: '#4b5563', margin: '8px 0' }}><strong>Name:</strong> {user.fullName}</p>
           <p style={{ color: '#4b5563', margin: '8px 0' }}><strong>Phone:</strong> {user.phone}</p>
           <p style={{ color: '#4b5563', margin: '8px 0' }}>
@@ -109,4 +108,4 @@ const CustomerDashboard: React.FC = () => {
   );
 };
 
-export default CustomerDashboard;
+export default AdminDashboard;
