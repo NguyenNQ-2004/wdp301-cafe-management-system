@@ -48,7 +48,9 @@ npm run dev
 ```
 > 👉 Server Backend sẽ khởi chạy tại: **http://localhost:5000**
 > 
-> **Lưu ý quan trọng**: Ở lần đầu tiên khởi chạy, hãy mở trình duyệt và truy cập vào đường link [http://localhost:5000/api/seed](http://localhost:5000/api/seed). Hệ thống sẽ tự động tạo cơ sở dữ liệu `aura_cafe_erp` và tài khoản Admin mẫu để hiển thị trên MongoDB Compass.
+> **Lưu ý:** Không có API `/api/seed`. Chỉ khi cần tạo lại dữ liệu mẫu, chạy `node seed.js` trong thư mục `backend`. Script này xóa dữ liệu người dùng, danh mục và sản phẩm hiện có; không cần chạy lại để dùng giỏ hàng hoặc đặt hàng.
+
+> Khi triển khai backend lên môi trường production, đặt biến môi trường `JWT_SECRET` bằng một chuỗi bí mật dài, ngẫu nhiên. Ở máy phát triển, backend tự tạo khóa cục bộ trong `backend/.jwt-secret`.
 
 ### Bước 2: Khởi chạy Frontend (Giao diện React)
 Mở Terminal 2 (đứng ở thư mục gốc dự án) và chạy các lệnh sau:
@@ -68,10 +70,24 @@ npm run dev
 ---
 
 ## 👤 Tài khoản mặc định (Dữ liệu mẫu)
-Sau khi chạy lệnh `/api/seed` ở Backend, bạn có thể đăng nhập bằng tài khoản Quản trị viên sau:
+Sau khi chạy `node seed.js` ở Backend, bạn có thể đăng nhập bằng tài khoản Quản trị viên sau:
 - **Tài khoản (SĐT)**: `0900000001`
-- **Mật khẩu**: `demo_hash`
+- **Mật khẩu**: `123456`
 - **Vai trò (Role)**: ADMIN
+
+Giỏ hàng được lưu trong MongoDB khi đăng nhập. Khách chưa đăng nhập có thể thêm món vào giỏ trên trình duyệt, sau đó đăng nhập để đồng bộ và đặt hàng. Đơn giao tận nơi thanh toán khi nhận hàng; đơn mang đi thanh toán tại quầy.
+
+### Phân quyền tài khoản mẫu
+
+| Số điện thoại | Vai trò | Quyền sử dụng |
+| --- | --- | --- |
+| `0900000001` | Quản trị (`ADMIN`) | Trang quản trị, thu ngân, pha chế; quản lý danh mục và sản phẩm; xem tài khoản và tất cả đơn. |
+| `0900000002` | Pha chế (`STAFF/BARISTA`) | Trang pha chế. |
+| `0900000003` | Thu ngân (`STAFF/CASHIER`) | Trang thu ngân. |
+| `0900000004`, `0900000005` | Khách hàng (`CUSTOMER`) | Giỏ hàng, đặt món, xem đơn của mình. |
+| `0900000006` | Giao hàng (`STAFF/SHIPPER`) | Tài khoản nhân viên; giao diện giao hàng riêng chưa có trong dự án. |
+
+Mọi người có thể xem thực đơn và thêm món vào giỏ trước khi đăng nhập. API tạo đơn yêu cầu token đăng nhập hợp lệ; đăng ký công khai luôn tạo tài khoản khách hàng. Các tài khoản bị khóa hoặc vô hiệu hóa không đăng nhập hay gọi API được.
 
 ---
 

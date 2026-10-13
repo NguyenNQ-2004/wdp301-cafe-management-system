@@ -35,10 +35,9 @@ const Login: React.FC = () => {
       });
       login(data);
       if (data.role === 'ADMIN') navigate('/admin');
-      else if (data.position === 'CASHIER') navigate('/cashier');
-      else if (data.position === 'BARISTA') navigate('/barista');
-      else if (data.role === 'CUSTOMER') navigate('/customer');
-      else navigate('/dashboard');
+      else if (data.role === 'STAFF' && data.position === 'CASHIER') navigate('/cashier');
+      else if (data.role === 'STAFF' && data.position === 'BARISTA') navigate('/barista');
+      else navigate('/profile');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed. Please check credentials.');
     } finally {

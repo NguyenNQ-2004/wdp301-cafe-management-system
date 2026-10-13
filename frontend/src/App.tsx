@@ -2,6 +2,9 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import useAuthStore from './store/authStore';
+import useCartStore from './store/cartStore';
+import useCartSync from './hooks/useCartSync';
+import { shopApi, ShopApiError } from './lib/shopApi';
 import AdminDashboard from './pages/admin/AdminDashboardPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
 import BaristaDashboard from './pages/kds/KdsTerminalPage';
@@ -22,8 +25,24 @@ import type { PageRoute } from './types';
 const AppLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, login } = useAuthStore();
+  const { user, login, logout } = useAuthStore();
+  const cartCount = useCartStore((state) => state.items.reduce((count, item) => count + item.quantity, 0));
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  useCartSync(user);
+
+  useEffect(() => {
+    if (!user?.token) return;
+    const token = user.token;
+    let active = true;
+    shopApi<{ _id: string; fullName: string; phone: string; role: string; position?: string }>('/api/auth/me', { token })
+      .then((account) => {
+        if (active && useAuthStore.getState().user?.token === token) login({ ...account, token });
+      })
+      .catch((error: unknown) => {
+        if (active && error instanceof ShopApiError && [401, 403].includes(error.status) && useAuthStore.getState().user?.token === token) logout();
+      });
+    return () => { active = false; };
+  }, [user?.token, login, logout]);
 
   const getRouteFromPath = (path: string): PageRoute => {
     const cleanPath = path.replace('/', '') || 'home';
@@ -52,13 +71,14 @@ const AppLayout = () => {
       <Header
         currentRoute={getRouteFromPath(location.pathname)}
         onNavigate={handleNavigate}
-        cartCount={0}
+        cartCount={cartCount}
+        onSearch={(query) => navigate(query ? `/menu?search=${encodeURIComponent(query)}` : '/menu')}
         onOpenAuth={() => {
           if (user) {
             // Navigate to respective dashboard if already logged in
             if (user.role === 'ADMIN') navigate('/admin');
-            else if (user.position === 'CASHIER') navigate('/cashier');
-            else if (user.position === 'BARISTA') navigate('/barista');
+            else if (user.role === 'STAFF' && user.position === 'CASHIER') navigate('/cashier');
+            else if (user.role === 'STAFF' && user.position === 'BARISTA') navigate('/barista');
             else navigate('/profile');
           } else {
             setIsAuthOpen(true);
@@ -73,16 +93,16 @@ const AppLayout = () => {
           {/* Main User Routes */}
           <Route path="/menu" element={<MenuPage />} />
           <Route path="/cart" element={<CartPage />} />
-          <Route path="/orders" element={<OrdersPage />} />
-          <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/orders" element={<OrdersPage onRequestAuth={() => setIsAuthOpen(true)} />} />
+          <Route path="/checkout" element={<CheckoutPage onRequestAuth={() => setIsAuthOpen(true)} />} />
           <Route path="/payment" element={<PaymentPage />} />
           <Route path="/feedback" element={<FeedbackPage />} />
           <Route path="/profile" element={user ? <CustomerDashboard /> : <Navigate to="/" />} />
 
           {/* Role Dashboards */}
           <Route path="/admin" element={user?.role === 'ADMIN' ? <AdminDashboard /> : <Navigate to="/" />} />
-          <Route path="/cashier" element={user?.position === 'CASHIER' || user?.role === 'ADMIN' ? <CashierDashboard /> : <Navigate to="/" />} />
-          <Route path="/barista" element={user?.position === 'BARISTA' || user?.role === 'ADMIN' ? <BaristaDashboard /> : <Navigate to="/" />} />
+          <Route path="/cashier" element={user?.role === 'ADMIN' || (user?.role === 'STAFF' && user.position === 'CASHIER') ? <CashierDashboard /> : <Navigate to="/" />} />
+          <Route path="/barista" element={user?.role === 'ADMIN' || (user?.role === 'STAFF' && user.position === 'BARISTA') ? <BaristaDashboard /> : <Navigate to="/" />} />
           
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -104,10 +124,11 @@ const AppLayout = () => {
           
           setIsAuthOpen(false);
           
-          // Role-based navigation
+          // Keep customers in the ordering flow after they sign in.
+          if (['/cart', '/checkout', '/orders'].includes(location.pathname)) return;
           if (userData.role === 'ADMIN') navigate('/admin');
-          else if (userData.role === 'CASHIER' || userData.position === 'CASHIER') navigate('/cashier');
-          else if (userData.role === 'BARISTA' || userData.position === 'BARISTA') navigate('/barista');
+          else if (userData.role === 'STAFF' && userData.position === 'CASHIER') navigate('/cashier');
+          else if (userData.role === 'STAFF' && userData.position === 'BARISTA') navigate('/barista');
           else navigate('/profile');
         }}
       />

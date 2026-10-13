@@ -7,7 +7,6 @@ const Register: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('CUSTOMER'); // 'CUSTOMER', 'STAFF', 'ADMIN'
 
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -25,17 +24,11 @@ const Register: React.FC = () => {
         fullName,
         phone,
         password,
-        role: role === 'BARISTA' || role === 'CASHIER' ? 'STAFF' : role,
-        position: (role === 'BARISTA' || role === 'CASHIER') ? role : undefined,
       };
 
       const { data } = await axios.post('http://localhost:5000/api/auth/register', payload);
       login(data);
-      if (data.role === 'ADMIN') navigate('/admin');
-      else if (data.position === 'CASHIER') navigate('/cashier');
-      else if (data.position === 'BARISTA') navigate('/barista');
-      else if (data.role === 'CUSTOMER') navigate('/customer');
-      else navigate('/dashboard');
+      navigate('/profile');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Registration failed.');
     } finally {
@@ -83,20 +76,6 @@ const Register: React.FC = () => {
             />
           </div>
           
-          <div className="auth-form-group">
-            <label className="auth-label">Register As</label>
-            <select 
-              className="auth-select" 
-              value={role} 
-              onChange={(e) => setRole(e.target.value)}
-            >
-              <option value="CUSTOMER">Customer</option>
-              <option value="CASHIER">Cashier (Staff)</option>
-              <option value="BARISTA">Barista (Staff)</option>
-              <option value="ADMIN">Admin</option>
-            </select>
-          </div>
-
           <button type="submit" className="auth-button" disabled={isLoading}>
             {isLoading ? 'Creating Account...' : 'Register'}
           </button>

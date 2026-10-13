@@ -544,10 +544,16 @@ const HomeContainer: React.FC = () => {
         if (route === 'profile') navigate('/profile');
       }}
       onSelectProduct={(productId) => {
-        console.log('Selected product:', productId);
+        const search: Record<string, string> = {
+          'ca-phe-muoi': 'muối',
+          'tra-dao-cam-sa': 'trà',
+          'coldbrew-300ml': 'cold brew',
+          'nau-sai-gon': 'sữa đá'
+        };
+        navigate(`/menu?search=${encodeURIComponent(search[productId] || '')}`);
       }}
       onQuickAdd={(product) => {
-        console.log('Added product to cart:', product);
+        navigate(`/menu?search=${encodeURIComponent(product.name)}`);
       }}
     />
   );
