@@ -2,6 +2,7 @@ const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const { protect, adminOnly } = require('./middlewares/authMiddleware');
 
 dotenv.config();
 connectDB();
@@ -21,23 +22,20 @@ app.get('/', (req, res) => {
 app.use('/api/categories', require('./routes/categoryRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/cart', require('./routes/cartRoutes'));
+app.use('/api/orders', require('./routes/orderRoutes'));
 
 // ==========================================
 // CÁC API GET CƠ BẢN CÒN LẠI (SẼ ĐƯỢC TÁCH SAU NÀY)
 // ==========================================
 const User = require('./models/User');
-const Order = require('./models/Order');
 const Voucher = require('./models/Voucher');
 const Supplier = require('./models/Supplier');
 const Ingredient = require('./models/Ingredient');
 const RewardItem = require('./models/RewardItem');
 
-app.get('/api/users', async (req, res) => {
-  try { res.status(200).json(await User.find({})); } 
-  catch (error) { res.status(500).json({ error: error.message }); }
-});
-app.get('/api/orders', async (req, res) => {
-  try { res.status(200).json(await Order.find({})); } 
+app.get('/api/users', protect, adminOnly, async (req, res) => {
+  try { res.status(200).json(await User.find({}).select('-passwordHash')); }
   catch (error) { res.status(500).json({ error: error.message }); }
 });
 app.get('/api/vouchers', async (req, res) => {

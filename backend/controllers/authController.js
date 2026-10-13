@@ -1,13 +1,14 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const getJwtSecret = require('../config/jwtSecret');
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
 // @access  Public
 const register = async (req, res) => {
   try {
-    const { fullName, phone, email, password, role, position } = req.body;
+    const { fullName, phone, email, password } = req.body;
 
     // Check if user exists
     const userExists = await User.findOne({ phone });
@@ -25,8 +26,7 @@ const register = async (req, res) => {
       phone,
       email,
       passwordHash,
-      role: role || 'CUSTOMER',
-      position: position || undefined,
+      role: 'CUSTOMER',
     });
 
     if (user) {
@@ -57,6 +57,9 @@ const login = async (req, res) => {
     const user = await User.findOne({ phone });
 
     if (user && (await bcrypt.compare(password, user.passwordHash))) {
+      if (user.status !== 'ACTIVE') {
+        return res.status(403).json({ message: 'Tài khoản đã bị vô hiệu hóa hoặc khóa.' });
+      }
       res.json({
         _id: user._id,
         fullName: user.fullName,
@@ -107,7 +110,7 @@ const changePassword = async (req, res) => {
 
 // Generate JWT
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'secret123', {
+  return jwt.sign({ id }, getJwtSecret(), {
     expiresIn: '30d',
   });
 };
