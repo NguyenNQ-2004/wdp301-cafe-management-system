@@ -18,6 +18,18 @@ import { Footer } from './components/Footer';
 import { AuthModal } from './components/AuthModal';
 import type { PageRoute } from './types';
 
+/** Trả về đường dẫn phù hợp sau khi đăng nhập */
+const getRoleRedirectPath = (user: { role: string; position?: string } | null, currentPath: string = '/'): string => {
+  if (!user) return '/';
+  if (user.role === 'ADMIN') return '/admin';
+  if (user.role === 'STAFF') {
+    if (user.position === 'CASHIER' || user.position === 'MANAGER') return '/cashier';
+    if (user.position === 'BARISTA') return '/barista';
+  }
+  // CUSTOMER: Không chuyển sang trang profile đơn độc, ở lại trang hiện tại hoặc về Trang chủ để tiếp tục mua hàng
+  return currentPath && currentPath !== '/login' ? currentPath : '/';
+};
+
 // Wrapper component to provide Header and AuthModal context to all routes
 const AppLayout = () => {
   const location = useLocation();
@@ -35,12 +47,11 @@ const AppLayout = () => {
     else navigate(`/${route}`);
   };
 
-  // Redirect unauthenticated users if they try to access protected roles directly
+  // Chặn truy cập trực tiếp vào các route bảo vệ khi chưa đăng nhập
   useEffect(() => {
     const path = location.pathname;
     if (!user) {
-      // If not logged in and trying to access dashboards, redirect to home and open auth
-      if (['/admin', '/cashier', '/barista', '/profile'].includes(path)) {
+      if (['/admin', '/cashier', '/barista', '/delivery', '/profile'].includes(path)) {
         navigate('/');
         setIsAuthOpen(true);
       }
@@ -55,7 +66,7 @@ const AppLayout = () => {
         cartCount={0}
         onOpenAuth={() => {
           if (user) {
-            // Navigate to respective dashboard if already logged in
+            // Nếu đã đăng nhập thì mở profile hoặc dashboard tương ứng
             if (user.role === 'ADMIN') navigate('/admin');
             else if (user.position === 'CASHIER') navigate('/cashier');
             else if (user.position === 'BARISTA') navigate('/barista');
@@ -79,10 +90,27 @@ const AppLayout = () => {
           <Route path="/feedback" element={<FeedbackPage />} />
           <Route path="/profile" element={user ? <CustomerDashboard /> : <Navigate to="/" />} />
 
-          {/* Role Dashboards */}
-          <Route path="/admin" element={user?.role === 'ADMIN' ? <AdminDashboard /> : <Navigate to="/" />} />
-          <Route path="/cashier" element={user?.position === 'CASHIER' || user?.role === 'ADMIN' ? <CashierDashboard /> : <Navigate to="/" />} />
-          <Route path="/barista" element={user?.position === 'BARISTA' || user?.role === 'ADMIN' ? <BaristaDashboard /> : <Navigate to="/" />} />
+          {/* Role Dashboards - phân quyền frontend */}
+          <Route
+            path="/admin"
+            element={user?.role === 'ADMIN' ? <AdminDashboard /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/cashier"
+            element={
+              user?.role === 'ADMIN' || user?.position === 'CASHIER' || user?.position === 'MANAGER'
+                ? <CashierDashboard />
+                : <Navigate to="/" />
+            }
+          />
+          <Route
+            path="/barista"
+            element={
+              user?.role === 'ADMIN' || user?.position === 'BARISTA'
+                ? <BaristaDashboard />
+                : <Navigate to="/" />
+            }
+          />
           
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -92,23 +120,19 @@ const AppLayout = () => {
         isOpen={isAuthOpen} 
         onClose={() => setIsAuthOpen(false)} 
         onLoginSuccess={(userData) => {
-          // Commit to global store
-          login({
+          // Lưu vào global store
+          const userPayload = {
             _id: userData._id,
             fullName: userData.fullName,
             phone: userData.phone,
             role: userData.role,
             position: userData.position,
             token: userData.token
-          });
-          
+          };
+          login(userPayload);
           setIsAuthOpen(false);
-          
-          // Role-based navigation
-          if (userData.role === 'ADMIN') navigate('/admin');
-          else if (userData.role === 'CASHIER' || userData.position === 'CASHIER') navigate('/cashier');
-          else if (userData.role === 'BARISTA' || userData.position === 'BARISTA') navigate('/barista');
-          else navigate('/profile');
+          // Điều hướng mượt mà: Customer giữ nguyên trang hoặc về Trang chủ; Staff/Admin vào dashboard
+          navigate(getRoleRedirectPath(userPayload, location.pathname));
         }}
       />
     </div>

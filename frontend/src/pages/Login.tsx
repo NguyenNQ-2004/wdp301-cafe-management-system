@@ -10,6 +10,17 @@ const testAccounts = [
   { role: 'Customer', phone: '0900000004' },
 ];
 
+/** Trả về đường dẫn đúng theo role/position */
+const getRoleRedirectPath = (user: { role: string; position?: string }): string => {
+  if (user.role === 'ADMIN') return '/admin';
+  if (user.role === 'STAFF') {
+    if (user.position === 'CASHIER' || user.position === 'MANAGER') return '/cashier';
+    if (user.position === 'BARISTA') return '/barista';
+    if (user.position === 'SHIPPER') return '/delivery';
+  }
+  return '/profile';
+};
+
 const Login: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('123456');
@@ -34,11 +45,8 @@ const Login: React.FC = () => {
         password,
       });
       login(data);
-      if (data.role === 'ADMIN') navigate('/admin');
-      else if (data.position === 'CASHIER') navigate('/cashier');
-      else if (data.position === 'BARISTA') navigate('/barista');
-      else if (data.role === 'CUSTOMER') navigate('/customer');
-      else navigate('/dashboard');
+      // Redirect đến đúng dashboard theo role/position
+      navigate(getRoleRedirectPath(data));
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed. Please check credentials.');
     } finally {

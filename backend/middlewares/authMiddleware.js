@@ -1,6 +1,10 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+/**
+ * Middleware xác thực JWT token
+ * Gán req.user từ token hợp lệ
+ */
 const protect = async (req, res, next) => {
   let token;
 
@@ -9,24 +13,81 @@ const protect = async (req, res, next) => {
     req.headers.authorization.startsWith('Bearer')
   ) {
     try {
-      // Get token from header
+      // Lấy token từ header
       token = req.headers.authorization.split(' ')[1];
 
-      // Verify token
+      // Xác thực token
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
 
-      // Get user from the token
+      // Gán user vào request (bỏ passwordHash)
       req.user = await User.findById(decoded.id).select('-passwordHash');
 
-      next();
+      if (!req.user) {
+        return res.status(401).json({ message: 'Tài khoản không tồn tại' });
+      }
+
+      if (req.user.status === 'LOCKED' || req.user.status === 'INACTIVE') {
+        return res.status(403).json({ message: 'Tài khoản đã bị khóa hoặc vô hiệu hóa' });
+      }
+
+      return next();
     } catch (error) {
-      res.status(401).json({ message: 'Not authorized' });
+      return res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn' });
     }
   }
 
   if (!token) {
-    res.status(401).json({ message: 'Not authorized, no token' });
+    return res.status(401).json({ message: 'Không có token xác thực' });
   }
 };
 
-module.exports = { protect };
+/**
+ * Middleware phân quyền theo role
+ * Sử dụng SAU protect middleware
+ * Ví dụ: router.get('/admin', protect, authorize('ADMIN'), handler)
+ * @param {...string} roles - Danh sách các role được phép truy cập
+ */
+const authorize = (...roles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Chưa đăng nhập' });
+    }
+
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        message: `Bạn không có quyền truy cập. Yêu cầu role: ${roles.join(' hoặc ')}. Role hiện tại: ${req.user.role}`,
+      });
+    }
+
+    return next();
+  };
+};
+
+/**
+ * Middleware phân quyền theo position (chức vụ nhân viên)
+ * Sử dụng SAU protect middleware
+ * Ví dụ: router.get('/cashier', protect, authorizePosition('CASHIER', 'MANAGER'), handler)
+ * @param {...string} positions - Danh sách các position được phép
+ */
+const authorizePosition = (...positions) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Chưa đăng nhập' });
+    }
+
+    // ADMIN luôn có quyền truy cập mọi position
+    if (req.user.role === 'ADMIN') {
+      return next();
+    }
+
+    if (!req.user.position || !positions.includes(req.user.position)) {
+      return res.status(403).json({
+        message: `Bạn không có chức vụ phù hợp. Yêu cầu: ${positions.join(' hoặc ')}. Chức vụ hiện tại: ${req.user.position || 'Không có'}`,
+      });
+    }
+
+    return next();
+  };
+};
+
+module.exports = { protect, authorize, authorizePosition };

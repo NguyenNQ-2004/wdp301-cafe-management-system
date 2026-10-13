@@ -1,4 +1,4 @@
-export type PageRoute = 'home' | 'menu' | 'profile' | 'cart' | 'login' | 'orders' | 'feedback' | 'checkout' | 'payment';
+export type PageRoute = 'home' | 'menu' | 'profile' | 'cart' | 'login' | 'orders' | 'feedback' | 'checkout' | 'payment' | 'admin' | 'cashier' | 'barista';
 
 export interface Product {
   id: string;

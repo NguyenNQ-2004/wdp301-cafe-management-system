@@ -4,29 +4,51 @@ const jwt = require('jsonwebtoken');
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
-// @access  Public
+// @access  Public (chỉ tạo CUSTOMER) | Private/Admin (tạo STAFF và ADMIN)
 const register = async (req, res) => {
   try {
     const { fullName, phone, email, password, role, position } = req.body;
 
-    // Check if user exists
+    // Kiểm tra user đã tồn tại
     const userExists = await User.findOne({ phone });
     if (userExists) {
-      return res.status(400).json({ message: 'User with this phone number already exists' });
+      return res.status(400).json({ message: 'Số điện thoại này đã được đăng ký' });
     }
 
-    // Hash password
+    // Phân quyền role:
+    // - Không có token -> chỉ được đăng ký CUSTOMER
+    // - ADMIN đăng nhập -> có thể tạo bất kỳ role nào
+    let assignedRole = 'CUSTOMER';
+    let assignedPosition = undefined;
+
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
+        const requestingUser = await User.findById(decoded.id).select('role');
+        if (requestingUser && requestingUser.role === 'ADMIN') {
+          // Chỉ ADMIN mới được gán role và position tùy chọn
+          assignedRole = ['ADMIN', 'STAFF', 'CUSTOMER'].includes(role) ? role : 'CUSTOMER';
+          assignedPosition = ['MANAGER', 'BARISTA', 'CASHIER', 'SHIPPER'].includes(position) ? position : undefined;
+        }
+      } catch (_) {
+        // Token không hợp lệ -> vẫn tạo CUSTOMER
+      }
+    }
+
+    // Hash mật khẩu
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // Create user
+    // Tạo user
     const user = await User.create({
       fullName,
       phone,
       email,
       passwordHash,
-      role: role || 'CUSTOMER',
-      position: position || undefined,
+      role: assignedRole,
+      position: assignedPosition,
     });
 
     if (user) {
@@ -39,7 +61,7 @@ const register = async (req, res) => {
         token: generateToken(user._id),
       });
     } else {
-      res.status(400).json({ message: 'Invalid user data' });
+      res.status(400).json({ message: 'Dữ liệu không hợp lệ' });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });

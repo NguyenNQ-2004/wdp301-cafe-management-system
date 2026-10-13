@@ -17,8 +17,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   // Form states
-  const [loginIdentifier, setLoginIdentifier] = useState('barista@auracafe.vn');
-  const [loginPassword, setLoginPassword] = useState('password123');
+  const [loginIdentifier, setLoginIdentifier] = useState('0900000001');
+  const [loginPassword, setLoginPassword] = useState('123456');
   const [regName, setRegName] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regEmail, setRegEmail] = useState('');
@@ -44,7 +44,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const data = await response.json();
       
       if (!response.ok) {
-        triggerToast(data.message || 'Đăng nhập thất bại. Kiểm tra lại SĐT/Mật khẩu.');
+        triggerToast(data.message || 'Login failed. Check your phone and password.');
         return;
       }
 
@@ -74,23 +74,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           role: 'CUSTOMER'
         }),
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
-        triggerToast(data.message || 'Đăng ký thất bại. SĐT có thể đã tồn tại.');
+        triggerToast(data.message || 'Registration failed. Phone may already exist.');
         return;
       }
 
-      triggerToast('Tạo tài khoản thành công! Đã chuyển tiếp vào hệ thống.');
-      setTimeout(() => {
-        if (onLoginSuccess) {
-          onLoginSuccess({ name: data.fullName, role: data.role, ...data });
-        }
-        onClose();
-      }, 800);
+      triggerToast('Registration successful! Please log in.');
+      setLoginIdentifier(regPhone);
+      setLoginPassword('');
+      setActiveTab('login');
     } catch (error) {
-      triggerToast('Lỗi kết nối đến máy chủ. Vui lòng thử lại sau.');
+      triggerToast('Cannot connect to server. Please try again.');
     }
   };
 
