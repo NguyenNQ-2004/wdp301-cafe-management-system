@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const getJwtSecret = require('../config/jwtSecret');
 
 /**
  * Middleware xác thực JWT token
@@ -17,17 +18,17 @@ const protect = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
 
       // Xác thực token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
+      const decoded = jwt.verify(token, getJwtSecret());
 
       // Gán user vào request (bỏ passwordHash)
       req.user = await User.findById(decoded.id).select('-passwordHash');
 
       if (!req.user) {
-        return res.status(401).json({ message: 'Tài khoản không tồn tại' });
+        return res.status(401).json({ message: 'Tài khoản không tồn tại.' });
       }
 
-      if (req.user.status === 'LOCKED' || req.user.status === 'INACTIVE') {
-        return res.status(403).json({ message: 'Tài khoản đã bị khóa hoặc vô hiệu hóa' });
+      if (req.user.status !== 'ACTIVE') {
+        return res.status(403).json({ message: 'Tài khoản đã bị vô hiệu hóa hoặc khóa.' });
       }
 
       return next();
@@ -39,6 +40,11 @@ const protect = async (req, res, next) => {
   if (!token) {
     return res.status(401).json({ message: 'Không có token xác thực' });
   }
+};
+
+const adminOnly = (req, res, next) => {
+  if (req.user?.role !== 'ADMIN') return res.status(403).json({ message: 'Chỉ quản trị viên được phép thực hiện thao tác này.' });
+  return next();
 };
 
 /**
@@ -90,4 +96,4 @@ const authorizePosition = (...positions) => {
   };
 };
 
-module.exports = { protect, authorize, authorizePosition };
+module.exports = { protect, adminOnly, authorize, authorizePosition };

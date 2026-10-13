@@ -48,7 +48,7 @@ npm run dev
 ```
 > 👉 Server Backend sẽ khởi chạy tại: **http://localhost:5000**
 > 
-> **Lưu ý quan trọng**: Ở lần đầu tiên khởi chạy, hãy mở trình duyệt và chạy lệnh `node seed.js` trong thư mục `backend` để tạo dữ liệu mẫu. Lưu ý: seed sẽ xóa dữ liệu hiện có trong các collection liên quan trước khi tạo lại các tài khoản mẫu.
+> **Lưu ý quan trọng**: Ở lần đầu tiên khởi chạy, hãy mở trình duyệt và truy cập vào đường link [http://localhost:5000/api/seed](http://localhost:5000/api/seed). Hệ thống sẽ tự động tạo cơ sở dữ liệu `aura_cafe_erp` và tài khoản Admin mẫu để hiển thị trên MongoDB Compass.
 
 ### Bước 2: Khởi chạy Frontend (Giao diện React)
 Mở Terminal 2 (đứng ở thư mục gốc dự án) và chạy các lệnh sau:
@@ -67,20 +67,13 @@ npm run dev
 
 ---
 
-## Tài khoản mẫu
+## 👤 Tài khoản mặc định (Dữ liệu mẫu)
+Sau khi chạy lệnh `/api/seed` ở Backend, bạn có thể đăng nhập bằng tài khoản Quản trị viên sau:
+- **Tài khoản (SĐT)**: `0900000001`
+- **Mật khẩu**: `demo_hash`
+- **Vai trò (Role)**: ADMIN
 
-Sau khi khởi tạo dữ liệu mẫu, có thể đăng nhập bằng số điện thoại và mật khẩu chung `123456`:
-
-| Họ tên | Số điện thoại | Email | Vai trò |
-|---|---|---|---|
-| Aura Admin | `0900000001` | `admin@auracafe.vn` | ADMIN |
-| Nguyen Van An | `0900000002` | `an@auracafe.vn` | STAFF |
-| Tran Thi Binh | `0900000003` | `binh@auracafe.vn` | STAFF |
-| Le Minh Anh | `0900000004` | `anh@gmail.com` | CUSTOMER |
-| Pham Quang Huy | `0900000005` | `huy@gmail.com` | CUSTOMER |
-| Hoang Van Nam | `0900000006` | `nam@auracafe.vn` | STAFF |
-
-Mật khẩu được lưu dưới dạng băm trong cơ sở dữ liệu; dùng mật khẩu `123456` để đăng nhập, không dùng chuỗi băm làm mật khẩu.
+---
 
 ## 🌿 Quy tắc làm việc nhóm (Git Flow)
 Dự án áp dụng mô hình **Git Flow**, trong đó **`develop`** là nhánh hội tụ code của cả team. Tuyệt đối không ai được code trực tiếp vào nhánh `main` (chỉ dùng để deploy) hay nhánh `develop`.

@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const getJwtSecret = require('../config/jwtSecret');
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -25,7 +26,7 @@ const register = async (req, res) => {
     if (authHeader && authHeader.startsWith('Bearer')) {
       try {
         const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
+        const decoded = jwt.verify(token, getJwtSecret());
         const requestingUser = await User.findById(decoded.id).select('role');
         if (requestingUser && requestingUser.role === 'ADMIN') {
           // Chỉ ADMIN mới được gán role và position tùy chọn
@@ -79,6 +80,9 @@ const login = async (req, res) => {
     const user = await User.findOne({ phone });
 
     if (user && (await bcrypt.compare(password, user.passwordHash))) {
+      if (user.status !== 'ACTIVE') {
+        return res.status(403).json({ message: 'Tài khoản đã bị vô hiệu hóa hoặc khóa.' });
+      }
       res.json({
         _id: user._id,
         fullName: user.fullName,
@@ -129,7 +133,7 @@ const changePassword = async (req, res) => {
 
 // Generate JWT
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'secret123', {
+  return jwt.sign({ id }, getJwtSecret(), {
     expiresIn: '30d',
   });
 };

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Product = require('../models/Product');
+const { protect, adminOnly } = require('../middlewares/authMiddleware');
 
 // 1. GET ALL
 router.get('/', async (req, res) => {
@@ -15,19 +16,19 @@ router.get('/:id', async (req, res) => {
 });
 
 // 3. POST - Create
-router.post('/', async (req, res) => {
+router.post('/', protect, adminOnly, async (req, res) => {
   try { res.status(201).json(await Product.create(req.body)); } 
   catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 // 4. PUT - Update
-router.put('/:id', async (req, res) => {
+router.put('/:id', protect, adminOnly, async (req, res) => {
   try { res.json(await Product.findByIdAndUpdate(req.params.id, req.body, { new: true })); } 
   catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 // 5. DELETE
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', protect, adminOnly, async (req, res) => {
   try { 
     await Product.findByIdAndDelete(req.params.id);
     res.json({ message: 'Đã xóa sản phẩm thành công!' }); 

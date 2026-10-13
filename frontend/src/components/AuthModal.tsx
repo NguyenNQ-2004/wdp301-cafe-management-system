@@ -16,9 +16,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  // Form states
-  const [loginIdentifier, setLoginIdentifier] = useState('0900000001');
-  const [loginPassword, setLoginPassword] = useState('123456');
+  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [regName, setRegName] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regEmail, setRegEmail] = useState('');
@@ -35,7 +34,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(`${(import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '')}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: loginIdentifier, password: loginPassword }),
@@ -63,7 +62,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      const response = await fetch(`${(import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '')}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -71,7 +70,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           phone: regPhone,
           email: regEmail,
           password: regPassword,
-          role: 'CUSTOMER'
         }),
       });
 
@@ -225,7 +223,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   Chào mừng trở lại
                 </h2>
                 <p className="font-body-sm text-body-sm text-secondary">
-                  Vui lòng nhập định danh tài khoản vận hành Aura Café
+                  Nhập số điện thoại và mật khẩu để tiếp tục
                 </p>
               </div>
 
@@ -312,7 +310,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div className="relative flex items-center justify-center my-space-xs">
                 <div className="w-full h-px bg-surface-container-highest" />
                 <span className="absolute px-space-md bg-surface-container-lowest font-label-sm text-label-sm text-secondary uppercase tracking-wider">
-                  Hoặc tiếp tục với
+                  Hình thức khác (chưa hỗ trợ)
                 </span>
               </div>
 
@@ -321,11 +319,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    triggerToast('Đã liên kết phiên xác thực Google Workspace!');
-                    setTimeout(() => {
-                      if (onLoginSuccess) onLoginSuccess({ name: 'Google User', role: 'CUSTOMER' });
-                      onClose();
-                    }, 600);
+                    triggerToast('Đăng nhập Google chưa được hỗ trợ. Vui lòng dùng số điện thoại và mật khẩu.');
                   }}
                   className="h-11 px-space-md bg-surface-container-low hover:bg-surface-container rounded flex items-center justify-center gap-space-sm font-label-md text-label-md text-on-surface transition-all cursor-pointer"
                 >
@@ -347,15 +341,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       fill="#EA4335"
                     />
                   </svg>
-                  <span>Đăng nhập với Google</span>
+                  <span>Google (chưa hỗ trợ)</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => triggerToast('Mã OTP 6 số đã được gửi qua SMS tới 0908 123 456!')}
+                  onClick={() => triggerToast('Đăng nhập OTP chưa được hỗ trợ. Vui lòng dùng số điện thoại và mật khẩu.')}
                   className="h-11 px-space-md bg-surface-container-low hover:bg-surface-container rounded flex items-center justify-center gap-space-sm font-label-md text-label-md text-on-surface transition-all cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[20px] text-primary">sms</span>
-                  <span>Mã OTP SMS</span>
+                  <span>OTP SMS (chưa hỗ trợ)</span>
                 </button>
               </div>
             </form>
@@ -369,7 +363,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   Tạo tài khoản Aura
                 </h2>
                 <p className="font-body-sm text-body-sm text-secondary">
-                  Đăng ký tài khoản nội bộ chi nhánh hoặc khách hàng thành viên
+                  Đăng ký tài khoản khách hàng để lưu giỏ hàng và theo dõi đơn
                 </p>
               </div>
 
