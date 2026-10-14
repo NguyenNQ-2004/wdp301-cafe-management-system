@@ -83,11 +83,14 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { phone, password } = req.body;
+    if (typeof phone !== 'string' || !phone.trim() || typeof password !== 'string' || !password) {
+      return res.status(400).json({ message: 'Vui lòng nhập số điện thoại và mật khẩu.' });
+    }
 
     // Find user by phone
     const user = await User.findOne({ phone });
 
-    if (user && (password === 'demo_hash' || (await bcrypt.compare(password, user.passwordHash)))) {
+    if (user && (await bcrypt.compare(password, user.passwordHash))) {
       if (user.status !== 'ACTIVE') {
         return res.status(403).json({ message: 'Tài khoản đã bị vô hiệu hóa hoặc khóa.' });
       }

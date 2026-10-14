@@ -10,10 +10,16 @@ const Cart = require('../models/Cart');
 const RewardItem = require('../models/RewardItem');
 const { protect } = require('../middlewares/authMiddleware');
 const { normalizeCartItems } = require('../utils/cartItems');
+const { demoPaymentsEnabled } = require('../utils/paymentMode');
 
 const router = express.Router();
 router.use(protect);
 const orderError = (message, status = 400) => Object.assign(new Error(message), { status });
+const validPhone = (value) => typeof value === 'string'
+  && value.trim().length <= 30
+  && /^\+?[0-9 .()-]+$/.test(value.trim())
+  && (value.match(/\d/g) || []).length >= 9
+  && (value.match(/\d/g) || []).length <= 15;
 
 // 1. GET ALL ORDERS (Phân quyền theo Role)
 router.get('/', async (req, res) => {
@@ -86,31 +92,29 @@ router.post('/', async (req, res) => {
     const isStaffOrAdmin = ['ADMIN', 'STAFF'].includes(req.user.role);
 
     // Chuẩn hóa danh sách món
-    const items = await normalizeCartItems(rawItems);
-    if (!items.length) throw new Error('Vui lòng chọn ít nhất một món.');
+    let items;
+    try { items = await normalizeCartItems(rawItems); }
+    catch (error) { throw orderError(error.message); }
+    if (!items.length) throw orderError('Vui lòng chọn ít nhất một món.');
     if (!['DINE_IN', 'TAKEAWAY', 'ONLINE'].includes(orderType)) {
-      throw new Error('Loại đơn hàng không hợp lệ (DINE_IN, TAKEAWAY, ONLINE).');
-    }
-
-    let finalRecipientName = recipientName;
-    let finalRecipientPhone = recipientPhone;
-    let finalDeliveryAddress = deliveryAddress;
-
-    if (orderType === 'ONLINE') {
-      if (!finalRecipientName?.trim()) throw new Error('Vui lòng nhập tên người nhận.');
-      if (!finalRecipientPhone?.trim() || !/^[0-9+ .()-]{9,20}$/.test(finalRecipientPhone.trim())) {
-        throw new Error('Số điện thoại nhận hàng không hợp lệ.');
-      }
-      if (!finalDeliveryAddress?.trim()) throw new Error('Vui lòng nhập địa chỉ giao hàng.');
-    } else if (orderType === 'DINE_IN') {
-      if (!tableNumber?.trim() && !isStaffOrAdmin) {
-        // Cho phép để trống nếu là khách tự quét mã tại bàn sau
-      }
+      throw orderError('Loại đơn hàng không hợp lệ (DINE_IN, TAKEAWAY, ONLINE).');
     }
 
     if (req.user.role === 'CUSTOMER' && orderType === 'DINE_IN') throw orderError('Phương thức nhận hàng không hợp lệ.');
-    if (req.user.role === 'CUSTOMER' && (typeof recipientName !== 'string' || !recipientName.trim() || recipientName.length > 100 || typeof recipientPhone !== 'string' || !/^[0-9+ .()-]{9,20}$/.test(recipientPhone.trim()))) throw orderError('Thông tin người nhận không hợp lệ.');
+    const needsContact = req.user.role === 'CUSTOMER' || orderType === 'ONLINE';
+    const finalRecipientName = typeof recipientName === 'string' ? recipientName.trim() : '';
+    const finalRecipientPhone = typeof recipientPhone === 'string' ? recipientPhone.trim() : '';
+    const finalDeliveryAddress = typeof deliveryAddress === 'string' ? deliveryAddress.trim() : '';
+    if (needsContact && (!finalRecipientName || finalRecipientName.length > 100)) throw orderError('Tên người nhận phải từ 1 đến 100 ký tự.');
+    if (needsContact && !validPhone(finalRecipientPhone)) throw orderError('Số điện thoại nhận hàng không hợp lệ.');
+    if (orderType === 'ONLINE' && (finalDeliveryAddress.length < 5 || finalDeliveryAddress.length > 300)) throw orderError('Địa chỉ giao hàng phải từ 5 đến 300 ký tự.');
     if (orderNote != null && (typeof orderNote !== 'string' || orderNote.length > 500)) throw orderError('Ghi chú không hợp lệ.');
+    if (tableNumber != null && (typeof tableNumber !== 'string' || tableNumber.length > 20)) throw orderError('Số bàn không hợp lệ.');
+    const finalPaymentMethod = isStaffOrAdmin
+      ? (paymentMethod || (orderType === 'ONLINE' ? 'COD' : 'CASH'))
+      : (orderType === 'ONLINE' ? (paymentMethod === 'DEMO_ONLINE' ? 'DEMO_ONLINE' : 'COD') : 'PAY_AT_COUNTER');
+    if (!['COD', 'PAY_AT_COUNTER', 'CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER', 'DEMO_ONLINE'].includes(finalPaymentMethod)) throw orderError('Phương thức thanh toán không hợp lệ.');
+    if (finalPaymentMethod === 'DEMO_ONLINE' && (orderType !== 'ONLINE' || req.user.role !== 'CUSTOMER' || !demoPaymentsEnabled())) throw orderError('Thanh toán mô phỏng hiện không khả dụng.', 403);
 
     const totalAmount = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
     let reward = null;
@@ -133,7 +137,7 @@ router.post('/', async (req, res) => {
     const finalAmount = totalAmount + deliveryFee - discountAmount;
     if (req.user.role === 'CUSTOMER' && (!Number.isInteger(req.body.expectedTotal) || req.body.expectedTotal !== finalAmount)) return res.status(409).json({ message: 'Giá món, ưu đãi điểm hoặc phí giao hàng đã thay đổi. Vui lòng kiểm tra lại giỏ hàng trước khi đặt.', finalAmount });
     if (reward) {
-      const customer = await User.findOneAndUpdate({ _id: req.user._id, role: 'CUSTOMER', totalPoints: { $gte: reward.pointsCost } }, { $inc: { totalPoints: -reward.pointsCost } }, { new: true });
+      const customer = await User.findOneAndUpdate({ _id: req.user._id, role: 'CUSTOMER', totalPoints: { $gte: reward.pointsCost } }, { $inc: { totalPoints: -reward.pointsCost } }, { returnDocument: 'after' });
       if (!customer) throw orderError('Bạn không còn đủ điểm để đổi ưu đãi này.', 409);
       pointsReserved = reward.pointsCost;
       if (reward.stock !== -1) {
@@ -144,8 +148,7 @@ router.post('/', async (req, res) => {
     }
 
     // Sinh mã đơn AURA
-    const randomHex = randomBytes(2).toString('hex').toUpperCase();
-    const orderCode = `AURA-${Date.now().toString().slice(-4)}${randomHex}`;
+    const orderCode = `AURA-${Date.now().toString(36).toUpperCase()}-${randomBytes(4).toString('hex').toUpperCase()}`;
 
     const orderData = {
       orderCode,
@@ -168,12 +171,12 @@ router.post('/', async (req, res) => {
       discountAmount,
       deliveryFee,
       finalAmount,
-      recipientName: finalRecipientName?.trim(),
-      recipientPhone: finalRecipientPhone?.trim(),
-      deliveryAddress: orderType === 'ONLINE' ? finalDeliveryAddress?.trim() : undefined,
+      recipientName: finalRecipientName || undefined,
+      recipientPhone: finalRecipientPhone || undefined,
+      deliveryAddress: orderType === 'ONLINE' ? finalDeliveryAddress : undefined,
       tableNumber: orderType === 'DINE_IN' ? tableNumber?.trim() : undefined,
       orderNote: orderNote?.trim() || undefined,
-      paymentMethod: paymentMethod || (orderType === 'ONLINE' ? 'COD' : 'CASH')
+      paymentMethod: finalPaymentMethod
     };
 
     const order = await Order.create(orderData);
@@ -194,14 +197,12 @@ router.post('/', async (req, res) => {
     }
 
     // Tự động tạo payment ban đầu
-    const initialPaymentStatus = (orderType === 'DINE_IN' && isStaffOrAdmin) ? 'SUCCESS' : 'PENDING';
     await Payment.create({
       order: order._id,
-      paymentMethod: ['CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER'].includes(paymentMethod) ? paymentMethod : 'CASH',
+      paymentMethod: finalPaymentMethod === 'DEMO_ONLINE' ? 'DEMO_ONLINE' : ['CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER'].includes(finalPaymentMethod) ? finalPaymentMethod : 'CASH',
       amount: finalAmount,
-      status: initialPaymentStatus,
-      paidAt: initialPaymentStatus === 'SUCCESS' ? new Date() : undefined,
-      paymentNote: orderType === 'ONLINE' ? 'Đơn đặt online' : 'Thanh toán tại quầy'
+      status: 'PENDING',
+      paymentNote: finalPaymentMethod === 'DEMO_ONLINE' ? 'Giao dịch mô phỏng, không thu tiền thật' : orderType === 'ONLINE' ? 'Đơn đặt online' : 'Thanh toán tại quầy'
     });
 
     if (reward) await LoyaltyTransaction.create({ customer: req.user._id, order: order._id, pointsChange: -pointsReserved, transactionType: 'REDEEM' });
@@ -248,6 +249,7 @@ router.post('/', async (req, res) => {
 // 4. UPDATE ORDER STATUS (Dành cho Thu ngân, Pha chế, Shipper, Quản lý)
 router.put('/:id/status', async (req, res) => {
   try {
+    if (!['ADMIN', 'STAFF'].includes(req.user.role)) return res.status(403).json({ message: 'Chỉ nhân viên được cập nhật trạng thái đơn hàng.' });
     const { status, cancelReason, shipperId } = req.body;
     const validStatuses = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'DELIVERING', 'COMPLETED', 'CANCELLED'];
     
@@ -262,13 +264,15 @@ router.put('/:id/status', async (req, res) => {
     if (cancelReason !== undefined) order.cancelReason = cancelReason;
     if (shipperId) order.shipper = shipperId;
 
-    // Khi đơn COMPLETED: cập nhật thanh toán và cộng điểm tích lũy
+    // COD được thu khi giao xong; đơn tại quầy và demo có bước xác nhận riêng.
     if (status === 'COMPLETED') {
-      await Payment.findOneAndUpdate(
-        { order: order._id },
-        { status: 'SUCCESS', paidAt: new Date() },
-        { new: true }
-      );
+      if (order.orderType === 'ONLINE' && order.paymentMethod === 'COD') {
+        await Payment.findOneAndUpdate(
+          { order: order._id, status: 'PENDING', paymentMethod: 'CASH' },
+          { $set: { status: 'SUCCESS', paidAt: new Date(), paymentNote: 'Thu tiền COD khi giao hàng hoàn tất' } },
+          { returnDocument: 'after' }
+        );
+      }
 
       // Nếu có khách hàng và chưa cộng điểm cho đơn này: cộng điểm (1.000đ = 1 điểm)
       if (order.customer) {

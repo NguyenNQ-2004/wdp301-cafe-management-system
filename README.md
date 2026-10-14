@@ -2,6 +2,16 @@
 
 Aura Cafe ERP là một hệ thống quản lý toàn diện (Enterprise Resource Planning) dành cho chuỗi cửa hàng cà phê. Dự án bao gồm các phân hệ chính hỗ trợ Khách hàng (đặt món, tích điểm), Nhân viên cửa hàng (Máy POS thu ngân, màn hình bếp KDS, xử lý đơn) và Quản trị viên (Quản lý kho nguyên liệu, nhân sự, báo cáo doanh thu).
 
+## Thanh toán online mô phỏng (UC12)
+
+Khách hàng chọn **Thanh toán online mô phỏng** khi đặt đơn giao hàng. Sau khi tạo đơn, trang `/payment?orderId=...` hiển thị số tiền và nút xác nhận; API kiểm tra chủ đơn, số tiền và trạng thái trước khi đánh dấu giao dịch thành công. Mã giao dịch bắt đầu bằng `DEMO-`. Có thể mở lại trang thanh toán từ danh sách đơn hàng.
+
+Đây là chế độ phục vụ bài tập, **không kết nối ngân hàng và không thu tiền thật**. Chế độ này bật mặc định khi chạy local, tắt mặc định khi `NODE_ENV=production`. Đặt `PAYMENT_DEMO_ENABLED=true` để bật rõ ràng hoặc `PAYMENT_DEMO_ENABLED=false` để tắt. COD vẫn là lựa chọn mặc định. Thay luồng mô phỏng bằng cổng thanh toán có callback xác thực trên server trước khi dùng cho giao dịch thật.
+
+## Thanh toán tại quầy (UC13)
+
+Thu ngân, quản lý hoặc admin mở `/cashier/payments` từ trang thu ngân. Danh sách hiển thị đơn mang về và dùng tại quán đang chờ thu tiền. Sau khi nhận tiền, chọn **Tiền mặt** hoặc **Chuyển khoản**; với chuyển khoản phải nhập mã giao dịch đã kiểm tra thủ công. Chỉ các tài khoản này được xác nhận thanh toán, đơn đã hủy hoặc sai số tiền bị từ chối. Đơn dùng tại quán được tạo với payment chờ thu; thay đổi trạng thái đơn sang hoàn tất không tự đánh dấu payment tại quầy là đã trả.
+
 ## 🚀 Công nghệ sử dụng (MERN Stack)
 - **Frontend**: ReactJS (Vite, TypeScript), React Router DOM, Zustand (Quản lý State), Axios.
 - **Backend**: Node.js, Express.js.
@@ -74,6 +84,10 @@ Sau khi chạy lệnh `/api/seed` ở Backend, bạn có thể đăng nhập b�
 - **Vai trò (Role)**: ADMIN
 
 Giỏ hàng được lưu trong MongoDB khi đăng nhập. Khách chưa đăng nhập có thể thêm món vào giỏ trên trình duyệt, sau đó đăng nhập để đồng bộ và đặt hàng. Đơn giao tận nơi thanh toán khi nhận hàng; đơn mang đi thanh toán tại quầy.
+
+### Đặt hàng online (UC11)
+
+Từ giỏ hàng, chọn món rồi vào trang xác nhận đơn. Khách hàng cần đăng nhập, nhập tên và số điện thoại người nhận; đơn giao tận nơi cần thêm địa chỉ. Server tính lại giá món, mức giảm điểm và phí giao hàng trước khi tạo đơn, lưu thông tin nhận hàng, các món, trạng thái thanh toán chờ xử lý và xóa những món đã đặt khỏi giỏ. Đơn giao tận nơi dùng COD; đơn mang đi thanh toán tại quầy. Có thể chạy `npm run test:online-ordering` trong thư mục `backend` để kiểm tra luồng này bằng database tạm tự dọn sau khi chạy.
 
 Khách hàng đăng nhập có thể chọn tối đa một ưu đãi đổi bằng điểm trong giỏ hàng. Hệ thống dùng `RewardItem.pointsCost`, `discountValue`, `minOrderValue`, `stock` và `User.totalPoints` để kiểm tra; điểm và số lượng ưu đãi chỉ bị trừ khi đơn được tạo thành công. Đơn lưu mức giảm và số điểm đã dùng, đồng thời ghi `LoyaltyTransaction`. Mốc miễn phí giao hàng tính theo tiền món trước giảm điểm. Không có ô nhập mã voucher trong luồng này. Không cần chạy lại `seed.js` để dùng tính năng; chạy seed sẽ xóa dữ liệu mẫu cũ.
 

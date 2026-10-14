@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cartPayload, formatVnd, shopApi } from '../lib/shopApi';
@@ -22,11 +22,14 @@ export default function CheckoutPage({ onRequestAuth }: CheckoutPageProps) {
   const items = cartItems.filter((item) => item.checked);
   const removeSelected = useCartStore((state) => state.removeSelected);
   const [mode, setMode] = useState<'ONLINE' | 'TAKEAWAY'>('ONLINE');
+  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'DEMO_ONLINE'>('COD');
+  const [demoEnabled, setDemoEnabled] = useState(false);
   const [name, setName] = useState(user?.fullName || '');
   const [phone, setPhone] = useState(user?.phone || '');
-  const [address, setAddress] = useState('');
+  const [address, setAddress] = useState(user?.address || '');
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [error, setError] = useState('');
   const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
   const reward = loyalty?.rewards.find((offer) => offer._id === rewardId);
@@ -35,28 +38,52 @@ export default function CheckoutPage({ onRequestAuth }: CheckoutPageProps) {
   const fee = mode === 'ONLINE' && subtotal < 150000 ? 18000 : 0;
 
   useEffect(() => {
-    if (user) { setName((current) => current || user.fullName); setPhone((current) => current || user.phone); }
+    if (user) {
+      setName((current) => current || user.fullName);
+      setPhone((current) => current || user.phone);
+      setAddress((current) => current || user.address || '');
+    }
   }, [user]);
+
+  useEffect(() => {
+    let active = true;
+    shopApi<{ demoEnabled: boolean }>('/api/payments/config')
+      .then((config) => { if (active) setDemoEnabled(config.demoEnabled); })
+      .catch(() => { if (active) setDemoEnabled(false); });
+    return () => { active = false; };
+  }, []);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!items.length) { navigate('/cart'); return; }
     if (!user) { onRequestAuth(); return; }
+    if (user.role !== 'CUSTOMER') { setError('Vui lòng dùng tài khoản khách hàng để đặt món online.'); return; }
     if (!cartReady || cartOwnerId !== user._id) return;
     if (rewardId && !rewardValid) return;
+    if (mode === 'ONLINE' && paymentMethod === 'DEMO_ONLINE' && !demoEnabled) { setError('Thanh toán mô phỏng hiện không khả dụng.'); return; }
+    if (submittingRef.current) return;
+    const recipientName = name.trim();
+    const recipientPhone = phone.trim();
+    const deliveryAddress = address.trim();
+    const digits = (recipientPhone.match(/\d/g) || []).length;
+    if (!recipientName || recipientName.length > 100) { setError('Tên người nhận phải từ 1 đến 100 ký tự.'); return; }
+    if (recipientPhone.length > 30 || !/^\+?[0-9 .()-]+$/.test(recipientPhone) || digits < 9 || digits > 15) { setError('Số điện thoại nhận hàng phải có từ 9 đến 15 chữ số.'); return; }
+    if (mode === 'ONLINE' && (deliveryAddress.length < 5 || deliveryAddress.length > 300)) { setError('Địa chỉ giao hàng phải từ 5 đến 300 ký tự.'); return; }
     setError('');
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const order = await shopApi<OrderRecord>('/api/orders', {
         method: 'POST', token: user.token,
-        body: { items: cartPayload(items), orderType: mode, recipientName: name, recipientPhone: phone, deliveryAddress: address, orderNote: note, rewardId: rewardValid ? rewardId : undefined, expectedTotal: subtotal - discount + fee }
+        body: { items: cartPayload(items), orderType: mode, recipientName, recipientPhone, deliveryAddress: mode === 'ONLINE' ? deliveryAddress : undefined, orderNote: note.trim(), rewardId: rewardValid ? rewardId : undefined, paymentMethod: mode === 'ONLINE' ? paymentMethod : undefined, expectedTotal: subtotal - discount + fee }
       });
       setRewardId(null);
       removeSelected();
-      navigate('/orders', { state: { newOrderCode: order.orderCode } });
+      navigate(mode === 'ONLINE' && paymentMethod === 'DEMO_ONLINE' ? `/payment?orderId=${order._id}` : '/orders', { state: { newOrderCode: order.orderCode } });
     } catch (err) {
       setError((err as Error).message);
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -83,16 +110,24 @@ export default function CheckoutPage({ onRequestAuth }: CheckoutPageProps) {
           <section className="rounded-xl border border-blue-100 bg-white p-5 shadow-sm space-y-4">
             <h2 className="font-bold text-lg flex items-center gap-2"><span className="material-symbols-outlined text-primary">person_pin_circle</span>Thông tin nhận hàng</h2>
             <div className="grid sm:grid-cols-2 gap-4">
-              <label className="text-sm font-semibold text-slate-700">Tên người nhận<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} className="mt-1 block w-full rounded-lg border border-blue-100 bg-slate-50 px-3 py-2.5 outline-none focus:border-primary" /></label>
-              <label className="text-sm font-semibold text-slate-700">Số điện thoại<input value={phone} onChange={(event) => setPhone(event.target.value)} required inputMode="tel" className="mt-1 block w-full rounded-lg border border-blue-100 bg-slate-50 px-3 py-2.5 outline-none focus:border-primary" /></label>
+              <label className="text-sm font-semibold text-slate-700">Tên người nhận<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} autoComplete="name" className="mt-1 block w-full rounded-lg border border-blue-100 bg-slate-50 px-3 py-2.5 outline-none focus:border-primary" /></label>
+              <label className="text-sm font-semibold text-slate-700">Số điện thoại<input value={phone} onChange={(event) => setPhone(event.target.value)} required type="tel" maxLength={30} autoComplete="tel" inputMode="tel" aria-describedby="recipient-phone-hint" className="mt-1 block w-full rounded-lg border border-blue-100 bg-slate-50 px-3 py-2.5 outline-none focus:border-primary" /><span id="recipient-phone-hint" className="mt-1 block text-xs font-normal text-slate-500">Từ 9 đến 15 chữ số.</span></label>
             </div>
-            {mode === 'ONLINE' ? <label className="block text-sm font-semibold text-slate-700">Địa chỉ giao hàng<textarea value={address} onChange={(event) => setAddress(event.target.value)} required maxLength={300} rows={3} placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" className="mt-1 block w-full rounded-lg border border-blue-100 bg-slate-50 px-3 py-2.5 outline-none focus:border-primary" /></label>
+            {mode === 'ONLINE' ? <label className="block text-sm font-semibold text-slate-700">Địa chỉ giao hàng<textarea value={address} onChange={(event) => setAddress(event.target.value)} required maxLength={300} rows={3} autoComplete="street-address" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" className="mt-1 block w-full rounded-lg border border-blue-100 bg-slate-50 px-3 py-2.5 outline-none focus:border-primary" /></label>
               : <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm"><strong className="block text-slate-900">Nhận tại quầy Aura Café</strong><span className="text-slate-600">Chi nhánh 01: 28 Phố Tràng Tiền, Hoàn Kiếm, Hà Nội</span></div>}
           </section>
 
           <section className="rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
             <h2 className="font-bold text-lg flex items-center gap-2"><span className="material-symbols-outlined text-primary">schedule</span>Thời gian nhận hàng</h2>
             <div className="mt-4 rounded-lg border border-primary/30 bg-blue-50 p-4 text-sm"><strong>{mode === 'ONLINE' ? 'Giao sớm nhất có thể' : 'Chuẩn bị sớm nhất có thể'}</strong><p className="text-slate-600 mt-1">Chúng tôi sẽ thông báo khi đơn chuyển sang bước tiếp theo.</p></div>
+          </section>
+
+          <section className="rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
+            <h2 className="font-bold text-lg flex items-center gap-2"><span className="material-symbols-outlined text-primary">payments</span>Phương thức thanh toán</h2>
+            {mode === 'TAKEAWAY' ? <p className="mt-3 text-sm text-slate-700">Thanh toán tại quầy khi đến nhận món.</p> : <div className="mt-4 space-y-3 text-sm">
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-blue-100 p-3"><input type="radio" name="payment-method" checked={paymentMethod === 'COD'} onChange={() => setPaymentMethod('COD')} className="mt-1 accent-primary" /><span><strong>Thanh toán khi nhận hàng (COD)</strong><span className="block text-slate-600">Trả tiền cho nhân viên giao hàng.</span></span></label>
+              {demoEnabled && <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-blue-100 p-3"><input type="radio" name="payment-method" checked={paymentMethod === 'DEMO_ONLINE'} onChange={() => setPaymentMethod('DEMO_ONLINE')} className="mt-1 accent-primary" /><span><strong>Thanh toán online mô phỏng</strong><span className="block text-slate-600">Dành cho bài tập: xác nhận trên trang mô phỏng, không thu tiền thật.</span></span></label>}
+            </div>}
           </section>
 
           <section className="rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
@@ -110,7 +145,7 @@ export default function CheckoutPage({ onRequestAuth }: CheckoutPageProps) {
             <strong className="text-sm">{formatVnd(item.unitPrice * item.quantity)}</strong>
           </div>)}</div>
           <div className="border-t border-blue-100 pt-4 space-y-2 text-sm"><div className="flex justify-between"><span>Tổng tiền món</span><strong>{formatVnd(subtotal)}</strong></div>{discount > 0 && <div className="flex justify-between text-emerald-700"><span>Giảm bằng {reward?.pointsCost} điểm</span><strong>−{formatVnd(discount)}</strong></div>}<div className="flex justify-between"><span>Phí giao hàng</span><strong>{fee ? formatVnd(fee) : 'Miễn phí'}</strong></div></div>
-          <div className="mt-4 border-t border-blue-100 pt-4 flex justify-between items-end gap-3"><div><strong className="text-lg">Tổng thanh toán</strong><p className="text-xs text-slate-500">{mode === 'ONLINE' ? 'Thanh toán khi nhận hàng' : 'Thanh toán tại quầy'}</p></div><strong className="text-2xl md:text-3xl text-primary">{formatVnd(subtotal - discount + fee)}</strong></div>
+          <div className="mt-4 border-t border-blue-100 pt-4 flex justify-between items-end gap-3"><div><strong className="text-lg">Tổng thanh toán</strong><p className="text-xs text-slate-500">{mode === 'ONLINE' ? paymentMethod === 'DEMO_ONLINE' ? 'Thanh toán mô phỏng sau khi đặt đơn' : 'Thanh toán khi nhận hàng' : 'Thanh toán tại quầy'}</p></div><strong className="text-2xl md:text-3xl text-primary">{formatVnd(subtotal - discount + fee)}</strong></div>
           {rewardId && !rewardValid && <div role="alert" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{loyaltyLoading ? 'Đang kiểm tra điểm tích lũy...' : loyaltyError || 'Ưu đãi điểm không còn phù hợp với đơn hàng.'} <button type="button" onClick={() => setRewardId(null)} className="font-bold underline">Bỏ ưu đãi</button></div>}
           {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
           {user && syncError && <p role="alert" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{syncError}</p>}

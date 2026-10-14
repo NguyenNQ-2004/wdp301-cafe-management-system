@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
 import axios from 'axios';
 
+import { AdminLayout, StatCard } from './AdminUi';
+
 const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
@@ -42,56 +44,47 @@ const AdminDashboard: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-      {/* Top Breadcrumb & Quick Nav liên kết với Homepage */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-8 bg-surface-container-lowest p-4 rounded-xl border border-surface-container-high shadow-sm">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface hover:bg-surface-container text-on-surface text-sm font-medium transition-colors cursor-pointer border border-surface-container-high"
-          >
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            <span>Về Trang chủ Aura Café</span>
-          </button>
-          <button
-            onClick={() => navigate('/menu')}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface hover:bg-surface-container text-on-surface text-sm font-medium transition-colors cursor-pointer border border-surface-container-high"
-          >
-            <span className="material-symbols-outlined text-[18px]">restaurant_menu</span>
-            <span>Menu & Đặt hàng</span>
-          </button>
-        </div>
-
-        {/* Chuyển nhanh giữa các phân hệ cho Admin */}
+    <AdminLayout
+      route="admin"
+      table="dashboard"
+      title="Tổng quan hệ thống"
+      subtitle={`Xin chào, ${user.fullName}! Quản lý toàn diện thực đơn, doanh thu ca bán, chuỗi cung ứng và nhân sự.`}
+      actions={
         <div className="flex items-center gap-2">
-          <span className="text-xs text-secondary font-medium hidden sm:inline">Phân hệ:</span>
-          <button
-            onClick={() => navigate('/admin')}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white cursor-pointer shadow-sm"
-          >
-            Quản trị Admin
-          </button>
           <button
             onClick={() => navigate('/cashier')}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 cursor-pointer transition-colors"
+            className="px-3 py-2 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 cursor-pointer transition-colors flex items-center gap-1.5"
           >
-            POS Thu ngân
+            <span className="material-symbols-outlined text-[16px]">point_of_sale</span>
+            <span>POS Thu ngân</span>
           </button>
           <button
             onClick={() => navigate('/barista')}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 cursor-pointer transition-colors"
+            className="px-3 py-2 rounded-xl text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 cursor-pointer transition-colors flex items-center gap-1.5"
           >
-            KDS Pha chế
+            <span className="material-symbols-outlined text-[16px]">soup_kitchen</span>
+            <span>KDS Pha chế</span>
           </button>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 cursor-pointer transition-colors"
+            className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200 cursor-pointer transition-colors"
           >
             <span className="material-symbols-outlined text-[14px]">logout</span>
             <span>Đăng xuất</span>
           </button>
         </div>
-      </div>
+      }
+      stats={
+        <>
+          <StatCard label="PHÂN HỆ ERP" value="16 Bảng" tone="default" />
+          <StatCard label="TRẠNG THÁI CA" value="Đang mở" tone="success" />
+          <StatCard label="CẢNH BÁO KHO" value="0 Mục" tone="default" />
+          <StatCard label="QUẢN TRỊ VIÊN" value={user.fullName || 'Admin'} tone="default" />
+        </>
+      }
+    >
+      <div className="space-y-6">
+
 
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-red-900 to-primary p-6 sm:p-8 rounded-2xl text-white mb-8 shadow-md relative overflow-hidden">
@@ -108,7 +101,24 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Grid: Quick Actions & Operations Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div 
+          onClick={() => navigate('/admin/categories')}
+          className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm hover:shadow-md transition-all cursor-pointer group"
+        >
+          <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+            <span className="material-symbols-outlined text-[24px]">category</span>
+          </div>
+          <h3 className="font-bold text-base text-on-surface mb-1">15. Quản lý Danh mục</h3>
+          <p className="text-secondary text-xs leading-relaxed">
+            Thêm, sửa, xóa, tạm ẩn danh mục thực đơn (đồng bộ POS & KDS).
+          </p>
+          <div className="mt-4 flex items-center text-xs font-semibold text-purple-700 group-hover:underline">
+            <span>Vào màn hình 15</span>
+            <span className="material-symbols-outlined text-[16px] ml-1">east</span>
+          </div>
+        </div>
+
         <div 
           onClick={() => navigate('/menu')}
           className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm hover:shadow-md transition-all cursor-pointer group"
@@ -255,7 +265,8 @@ const AdminDashboard: React.FC = () => {
         </div>
       </div>
     </div>
-  );
+  </AdminLayout>
+);
 };
 
 export default AdminDashboard;
