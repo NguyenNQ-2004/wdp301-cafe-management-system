@@ -12,6 +12,10 @@ Khách hàng chọn **Thanh toán online mô phỏng** khi đặt đơn giao hà
 
 Thu ngân, quản lý hoặc admin mở `/cashier/payments` từ trang thu ngân. Danh sách hiển thị đơn mang về và dùng tại quán đang chờ thu tiền. Sau khi nhận tiền, chọn **Tiền mặt** hoặc **Chuyển khoản**; với chuyển khoản phải nhập mã giao dịch đã kiểm tra thủ công. Chỉ các tài khoản này được xác nhận thanh toán, đơn đã hủy hoặc sai số tiền bị từ chối. Đơn dùng tại quán được tạo với payment chờ thu; thay đổi trạng thái đơn sang hoàn tất không tự đánh dấu payment tại quầy là đã trả.
 
+## Quản lý nhân viên (màn hình 23)
+
+Admin mở `/admin/employees` từ sidebar hoặc dashboard để xem, tìm kiếm, thêm và sửa nhân viên. Màn hình quản lý vị trí (Quản lý, Pha chế, Thu ngân, Giao hàng), lương cơ bản, ngày vào làm và trạng thái tài khoản. Tài khoản mới phải có mật khẩu ít nhất 8 ký tự; để trống ô mật khẩu khi sửa sẽ giữ mật khẩu cũ. Chuyển trạng thái sang **Ngừng hoạt động** hoặc **Bị khóa** sẽ chặn đăng nhập. API `/api/employees` chỉ dành cho Admin và chỉ thao tác với tài khoản `STAFF`; mật khẩu băm không được trả về. Chức năng dùng bảng `users` sẵn có, không cần chạy lại seed. Kiểm tra bằng `cd backend && npm run test:employee-management`.
+
 ## 🚀 Công nghệ sử dụng (MERN Stack)
 - **Frontend**: ReactJS (Vite, TypeScript), React Router DOM, Zustand (Quản lý State), Axios.
 - **Backend**: Node.js, Express.js.
