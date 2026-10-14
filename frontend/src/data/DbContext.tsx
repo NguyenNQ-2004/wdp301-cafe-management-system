@@ -146,7 +146,12 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
         imageUrl: p.imageUrl || p.image_url || '',
         image_url: p.image_url || p.imageUrl || '',
         status: p.status || (p.isAvailable ? 'ACTIVE' : 'INACTIVE'),
-        isAvailable: p.isAvailable !== undefined ? p.isAvailable : true
+        isAvailable: p.isAvailable !== undefined ? p.isAvailable : true,
+        badge: p.badge,
+        subtitle: p.subtitle,
+        description: p.description,
+        variantsConfig: p.variantsConfig,
+        recipe: p.recipe
       };
     });
   };

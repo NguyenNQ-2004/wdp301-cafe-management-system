@@ -58,4 +58,9 @@ export interface Product {
   image_url?: string;
   status?: string;
   isAvailable?: boolean;
+  badge?: string;
+  subtitle?: string;
+  description?: string;
+  variantsConfig?: any;
+  recipe?: any[];
 }
