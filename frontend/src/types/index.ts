@@ -59,9 +59,9 @@ export interface Category {
 }
 
 export interface Product {
-  id: string | number;
+  id: any;
   _id?: string;
-  category_id?: string | number;
+  category_id?: any;
   category?: any;
   name: string;
   price?: number;
@@ -71,9 +71,11 @@ export interface Product {
   image_url?: string;
   status?: string;
   isAvailable?: boolean;
+  is_available?: boolean;
   badge?: string;
   subtitle?: string;
   description?: string;
   variantsConfig?: any;
+  variants_config?: any;
   recipe?: any[];
 }
