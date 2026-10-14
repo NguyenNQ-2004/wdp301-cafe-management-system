@@ -1,16 +1,19 @@
 const express = require('express');
 const { randomBytes } = require('crypto');
+const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const OrderItem = require('../models/OrderItem');
 const Payment = require('../models/Payment');
 const LoyaltyTransaction = require('../models/LoyaltyTransaction');
 const User = require('../models/User');
 const Cart = require('../models/Cart');
+const RewardItem = require('../models/RewardItem');
 const { protect } = require('../middlewares/authMiddleware');
 const { normalizeCartItems } = require('../utils/cartItems');
 
 const router = express.Router();
 router.use(protect);
+const orderError = (message, status = 400) => Object.assign(new Error(message), { status });
 
 // 1. GET ALL ORDERS (Phân quyền theo Role)
 router.get('/', async (req, res) => {
@@ -63,6 +66,10 @@ router.get('/:id', async (req, res) => {
 
 // 3. CREATE ORDER (Khách đặt online / mang về, hoặc Thu ngân POS tạo tại quầy)
 router.post('/', async (req, res) => {
+  let pointsReserved = 0;
+  let reservedRewardId = null;
+  let createdOrder = null;
+  let committed = false;
   try {
     const {
       items: rawItems,
@@ -73,7 +80,7 @@ router.post('/', async (req, res) => {
       orderNote,
       tableNumber,
       paymentMethod,
-      discountAmount = 0
+      rewardId
     } = req.body;
 
     const isStaffOrAdmin = ['ADMIN', 'STAFF'].includes(req.user.role);
@@ -101,9 +108,40 @@ router.post('/', async (req, res) => {
       }
     }
 
+    if (req.user.role === 'CUSTOMER' && orderType === 'DINE_IN') throw orderError('Phương thức nhận hàng không hợp lệ.');
+    if (req.user.role === 'CUSTOMER' && (typeof recipientName !== 'string' || !recipientName.trim() || recipientName.length > 100 || typeof recipientPhone !== 'string' || !/^[0-9+ .()-]{9,20}$/.test(recipientPhone.trim()))) throw orderError('Thông tin người nhận không hợp lệ.');
+    if (orderNote != null && (typeof orderNote !== 'string' || orderNote.length > 500)) throw orderError('Ghi chú không hợp lệ.');
+
     const totalAmount = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+    let reward = null;
+    let discountAmount = 0;
+    if (rewardId != null) {
+      if (req.user.role !== 'CUSTOMER') throw orderError('Chỉ tài khoản khách hàng được sử dụng điểm tích lũy.', 403);
+      if (!mongoose.isValidObjectId(rewardId)) throw orderError('Ưu đãi điểm không hợp lệ.');
+      reward = await RewardItem.findOne({ _id: rewardId, status: 'ACTIVE' });
+      if (!reward || reward.stock === 0) throw orderError('Ưu đãi điểm không còn khả dụng.', 409);
+      if (!Number.isInteger(reward.pointsCost) || reward.pointsCost <= 0 || !Number.isInteger(reward.discountValue) || reward.discountValue <= 0 || !Number.isInteger(reward.minOrderValue) || reward.minOrderValue < 0) throw orderError('Cấu hình ưu đãi điểm không hợp lệ.', 409);
+      if (totalAmount < reward.minOrderValue) throw orderError('Đơn hàng chưa đạt mức tối thiểu để đổi ưu đãi điểm.', 409);
+      discountAmount = Math.min(reward.discountValue, totalAmount);
+    }
+    if (isStaffOrAdmin && req.body.discountAmount != null) {
+      const staffDiscount = Number(req.body.discountAmount);
+      if (!Number.isInteger(staffDiscount) || staffDiscount < 0 || staffDiscount > totalAmount) throw orderError('Số tiền giảm giá không hợp lệ.');
+      discountAmount = staffDiscount;
+    }
     const deliveryFee = orderType === 'ONLINE' && totalAmount < 150000 ? 18000 : 0;
-    const finalAmount = Math.max(0, totalAmount + deliveryFee - Number(discountAmount));
+    const finalAmount = totalAmount + deliveryFee - discountAmount;
+    if (req.user.role === 'CUSTOMER' && (!Number.isInteger(req.body.expectedTotal) || req.body.expectedTotal !== finalAmount)) return res.status(409).json({ message: 'Giá món, ưu đãi điểm hoặc phí giao hàng đã thay đổi. Vui lòng kiểm tra lại giỏ hàng trước khi đặt.', finalAmount });
+    if (reward) {
+      const customer = await User.findOneAndUpdate({ _id: req.user._id, role: 'CUSTOMER', totalPoints: { $gte: reward.pointsCost } }, { $inc: { totalPoints: -reward.pointsCost } }, { new: true });
+      if (!customer) throw orderError('Bạn không còn đủ điểm để đổi ưu đãi này.', 409);
+      pointsReserved = reward.pointsCost;
+      if (reward.stock !== -1) {
+        const claimed = await RewardItem.findOneAndUpdate({ _id: reward._id, status: 'ACTIVE', stock: { $gt: 0 } }, { $inc: { stock: -1 } });
+        if (!claimed) throw orderError('Ưu đãi điểm vừa hết số lượng.', 409);
+        reservedRewardId = reward._id;
+      }
+    }
 
     // Sinh mã đơn AURA
     const randomHex = randomBytes(2).toString('hex').toUpperCase();
@@ -125,7 +163,9 @@ router.post('/', async (req, res) => {
         isPrepared: false
       })),
       totalAmount,
-      discountAmount: Number(discountAmount) || 0,
+      reward: reward?._id,
+      pointsRedeemed: pointsReserved,
+      discountAmount,
       deliveryFee,
       finalAmount,
       recipientName: finalRecipientName?.trim(),
@@ -137,6 +177,7 @@ router.post('/', async (req, res) => {
     };
 
     const order = await Order.create(orderData);
+    createdOrder = order;
 
     // Đồng bộ vào bảng order_items (Table 6)
     for (const it of orderData.items) {
@@ -163,6 +204,9 @@ router.post('/', async (req, res) => {
       paymentNote: orderType === 'ONLINE' ? 'Đơn đặt online' : 'Thanh toán tại quầy'
     });
 
+    if (reward) await LoyaltyTransaction.create({ customer: req.user._id, order: order._id, pointsChange: -pointsReserved, transactionType: 'REDEEM' });
+    committed = true;
+
     // Dọn dẹp giỏ hàng nếu là customer
     if (req.user.role === 'CUSTOMER') {
       try {
@@ -179,7 +223,25 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(order);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    if (!committed && createdOrder) {
+      try {
+        await Promise.all([Order.deleteOne({ _id: createdOrder._id }), OrderItem.deleteMany({ order: createdOrder._id }), Payment.deleteMany({ order: createdOrder._id })]);
+      } catch (deleteError) {
+        console.error('Could not remove incomplete order:', deleteError);
+        return res.status(500).json({ message: 'Không thể hoàn tất đơn hàng. Vui lòng liên hệ cửa hàng.', orderCode: createdOrder.orderCode });
+      }
+    }
+    if (!committed) {
+      const rollbacks = [];
+      if (reservedRewardId) rollbacks.push(RewardItem.updateOne({ _id: reservedRewardId }, { $inc: { stock: 1 } }));
+      if (pointsReserved) rollbacks.push(User.updateOne({ _id: req.user._id }, { $inc: { totalPoints: pointsReserved } }));
+      const results = await Promise.allSettled(rollbacks);
+      if (results.some((result) => result.status === 'rejected')) {
+        console.error('Loyalty reservation rollback failed:', results);
+        return res.status(500).json({ message: 'Không thể hoàn tất đơn hàng. Vui lòng liên hệ cửa hàng.' });
+      }
+    }
+    res.status(error.status || (error.name === 'ValidationError' ? 400 : 500)).json({ message: error.message });
   }
 });
 

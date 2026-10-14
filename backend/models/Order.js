@@ -14,6 +14,8 @@ const orderSchema = new mongoose.Schema({
   customer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   cashier: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   voucher: { type: mongoose.Schema.Types.ObjectId, ref: 'Voucher' },
+  reward: { type: mongoose.Schema.Types.ObjectId, ref: 'RewardItem' },
+  pointsRedeemed: { type: Number, default: 0 },
   orderType: { type: String, enum: ['DINE_IN', 'TAKEAWAY', 'ONLINE'], required: true },
   status: { 
     type: String, 
