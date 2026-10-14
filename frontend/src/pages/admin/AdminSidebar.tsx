@@ -26,10 +26,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentRoute = 'admi
   const { user, logout } = useAuthStore();
 
   const handleNav = (pageRoute: PageRoute, path: string) => {
+    navigate(path);
     if (onNavigate) {
       onNavigate(pageRoute);
-    } else {
-      navigate(path);
     }
   };
 
@@ -43,7 +42,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentRoute = 'admi
     {
       title: 'BÁN HÀNG',
       items: [
-        { route: 'admin-orders', path: '/admin/orders', pageRoute: 'orders', label: 'Đơn hàng', icon: 'receipt_long' },
+        { route: 'admin-orders', path: '/admin/orders', pageRoute: 'admin-orders', label: 'Đơn hàng', icon: 'receipt_long' },
         { route: 'admin-categories', path: '/admin/categories', pageRoute: 'admin-categories', label: 'Danh mục', icon: 'account_tree' },
         { route: 'admin-products', path: '/admin/products', pageRoute: 'admin-products', label: 'Sản phẩm', icon: 'local_cafe' },
         { route: 'admin-recipes', path: '/admin/recipes', pageRoute: 'admin-recipes', label: 'Công thức (BOM)', icon: 'menu_book' },
@@ -54,7 +53,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentRoute = 'admi
       items: [
         { route: 'admin-ingredients', path: '/admin/ingredients', pageRoute: 'admin-ingredients', label: 'Nguyên liệu', icon: 'inventory_2' },
         { route: 'admin-inventory', path: '/admin/inventory', pageRoute: 'admin-inventory', label: 'Tồn kho & Xuất nhập', icon: 'warehouse' },
-        { route: 'admin-restock', path: '/admin/restock', pageRoute: 'admin-inventory', label: 'Đề xuất nhập hàng', icon: 'assignment' },
+        { route: 'admin-restock', path: '/admin/restock', pageRoute: 'admin-restock', label: 'Đề xuất nhập hàng', icon: 'assignment' },
         { route: 'admin-suppliers', path: '/admin/suppliers', pageRoute: 'admin-suppliers', label: 'Nhà cung cấp', icon: 'store' },
         { route: 'admin-purchases', path: '/admin/purchases', pageRoute: 'admin-purchases', label: 'Phiếu nhập hàng', icon: 'receipt' },
       ]
