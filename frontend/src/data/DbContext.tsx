@@ -161,11 +161,13 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
         imageUrl: p.imageUrl || p.image_url || '',
         image_url: p.image_url || p.imageUrl || '',
         status: p.status || (p.isAvailable ? 'ACTIVE' : 'INACTIVE'),
-        isAvailable: p.isAvailable !== undefined ? p.isAvailable : true,
+        isAvailable: p.isAvailable !== undefined ? p.isAvailable : (p.is_available !== undefined ? p.is_available : true),
+        is_available: p.is_available !== undefined ? p.is_available : (p.isAvailable !== undefined ? p.isAvailable : true),
         badge: p.badge,
         subtitle: p.subtitle,
         description: p.description,
-        variantsConfig: p.variantsConfig,
+        variantsConfig: p.variantsConfig || p.variants_config,
+        variants_config: p.variants_config || p.variantsConfig,
         recipe: p.recipe
       };
     });

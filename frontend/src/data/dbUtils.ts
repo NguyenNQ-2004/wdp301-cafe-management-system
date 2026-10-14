@@ -143,3 +143,53 @@ export const paymentOf = (db: any, orderId: any): any => {
   }
   return null;
 };
+
+export const productSizes = (p: any): [string, number][] => {
+  if (!p) return [];
+  const cfg = p.variants_config || p.variantsConfig;
+  if (cfg?.sizes) {
+    if (Array.isArray(cfg.sizes)) {
+      return cfg.sizes.map((s: any) => [s.name || String(s), Number(s.delta || s.price || 0)]);
+    }
+    if (typeof cfg.sizes === 'object') {
+      return Object.entries(cfg.sizes).map(([name, delta]) => [name, Number(delta) || 0]);
+    }
+  }
+  return [['M', 0], ['L', 10000]];
+};
+
+export const productToppings = (p: any): { name: string; price: number }[] => {
+  if (!p) return [];
+  const cfg = p.variants_config || p.variantsConfig;
+  if (cfg?.toppings && Array.isArray(cfg.toppings)) {
+    return cfg.toppings.map((t: any) => ({
+      name: typeof t === 'string' ? t : t.name,
+      price: Number(t.price) || 0
+    }));
+  }
+  return [];
+};
+
+export const productCost = (db: any, productId: any): number | null => {
+  if (!db) return null;
+  const pis = db.product_ingredients?.filter((pi: any) => pi.product_id === productId || pi.productId === productId);
+  if (pis && pis.length > 0) {
+    let total = 0;
+    for (const item of pis) {
+      const ing = db.ingredients?.find((i: any) => i.id === item.ingredient_id || i._id === item.ingredient_id);
+      const unitCost = ing?.cost_per_unit || ing?.price || 5000;
+      total += (Number(item.amount || item.quantity || 1) * unitCost);
+    }
+    return total > 0 ? total : null;
+  }
+  const prod = db.products?.find((p: any) => p.id === productId || p._id === productId);
+  if (prod?.recipe && Array.isArray(prod.recipe) && prod.recipe.length > 0) {
+    let total = 0;
+    for (const r of prod.recipe) {
+      const ingCost = r.ingredient?.costPrice || r.ingredient?.cost_per_unit || 5000;
+      total += (Number(r.quantity || 1) * ingCost);
+    }
+    return total > 0 ? total : null;
+  }
+  return null;
+};

@@ -15,6 +15,7 @@ import AdminStockPage from './pages/admin/AdminStockPage';
 import AdminRestockPage from './pages/admin/AdminRestockPage';
 import AdminSuppliersPage from './pages/admin/AdminSuppliersPage';
 import AdminPurchasesPage from './pages/admin/AdminPurchasesPage';
+import AdminProductsPage from './pages/admin/AdminProductsPage';
 import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage';
 import AdminCustomersPage from './pages/admin/AdminCustomersPage';
 import AdminMembershipsPage from './pages/admin/AdminMembershipsPage';
@@ -144,13 +145,7 @@ const AppLayout = () => {
             path="/admin/products"
             element={
               user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-products"
-                  title="16. Quản lý Sản phẩm & Giá bán"
-                  subtitle="Màn hình quản lý danh sách sản phẩm, giá bán và cấu hình kích cỡ / topping."
-                  table="products"
-                  branch="feature/product-management"
-                />
+                <AdminProductsPage onNavigate={handleNavigate} />
               ) : (
                 <Navigate to="/" />
               )
