@@ -8,6 +8,7 @@ import { shopApi, ShopApiError } from './lib/shopApi';
 import AdminDashboard from './pages/admin/AdminDashboardPage';
 import AdminCategoriesPage from './pages/admin/AdminCategoriesPage';
 import AdminStockPage from './pages/admin/AdminStockPage';
+import AdminRestockPage from './pages/admin/AdminRestockPage';
 import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
 import CounterPaymentsPage from './pages/pos/CounterPaymentsPage';
@@ -207,13 +208,7 @@ const AppLayout = () => {
             path="/admin/restock"
             element={
               user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-restock"
-                  title="20. Đề xuất nhập hàng"
-                  subtitle="Màn hình tạo và duyệt các yêu cầu nhập nguyên liệu từ bộ phận pha chế/kho."
-                  table="restock_requests"
-                  branch="feature/restock-request"
-                />
+                <AdminRestockPage />
               ) : (
                 <Navigate to="/" />
               )

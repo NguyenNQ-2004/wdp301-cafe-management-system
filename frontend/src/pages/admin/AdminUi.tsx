@@ -105,7 +105,7 @@ export const StatCard: React.FC<{
   label: string;
   value: React.ReactNode;
   hint?: React.ReactNode;
-  tone?: 'success' | 'danger' | 'warning' | 'default';
+  tone?: 'success' | 'danger' | 'warning' | 'primary' | 'default';
 }> = ({ label, value, hint, tone = 'default' }) => {
   const toneCls =
     tone === 'success'
@@ -114,6 +114,8 @@ export const StatCard: React.FC<{
       ? 'text-[#991b1b] bg-[#fdf2f2] border-[#fde2e2]'
       : tone === 'warning'
       ? 'text-amber-800 bg-amber-50 border-amber-200'
+      : tone === 'primary'
+      ? 'text-[#800020] bg-[#fff5f6] border-[#efc4cc]'
       : 'text-stone-900 bg-white border-stone-200';
 
   return (
