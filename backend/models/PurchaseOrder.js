@@ -10,6 +10,7 @@ const purchaseOrderSchema = new mongoose.Schema({
   creator: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   totalCost: { type: Number, default: 0 },
   status: { type: String, enum: ['DRAFT', 'ORDERED', 'RECEIVED', 'CANCELLED'], default: 'DRAFT' },
+  note: { type: String },
   items: [poItemSchema] // Nhúng bảng purchase_order_items
 }, { timestamps: true });
 module.exports = mongoose.model('PurchaseOrder', purchaseOrderSchema);

@@ -10,5 +10,8 @@ const workScheduleSchema = new mongoose.Schema({
   endingCashActual: { type: Number },
   status: { type: String, enum: ['SCHEDULED', 'PRESENT', 'ABSENT', 'COMPLETED'], default: 'SCHEDULED' },
   note: { type: String }
-});
+}, { timestamps: true });
+
+workScheduleSchema.index({ user: 1, workDate: 1, shiftName: 1 }, { unique: true });
+
 module.exports = mongoose.model('WorkSchedule', workScheduleSchema);

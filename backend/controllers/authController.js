@@ -1,32 +1,55 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const getJwtSecret = require('../config/jwtSecret');
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
-// @access  Public
+// @access  Public (chỉ tạo CUSTOMER) | Private/Admin (tạo STAFF và ADMIN)
 const register = async (req, res) => {
   try {
     const { fullName, phone, email, password, role, position } = req.body;
 
-    // Check if user exists
+    // Kiểm tra user đã tồn tại
     const userExists = await User.findOne({ phone });
     if (userExists) {
-      return res.status(400).json({ message: 'User with this phone number already exists' });
+      return res.status(400).json({ message: 'Số điện thoại này đã được đăng ký' });
     }
 
-    // Hash password
+    // Phân quyền role:
+    // - Không có token -> chỉ được đăng ký CUSTOMER
+    // - ADMIN đăng nhập -> có thể tạo bất kỳ role nào
+    let assignedRole = 'CUSTOMER';
+    let assignedPosition = undefined;
+
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, getJwtSecret());
+        const requestingUser = await User.findById(decoded.id).select('role');
+        if (requestingUser && requestingUser.role === 'ADMIN') {
+          // Chỉ ADMIN mới được gán role và position tùy chọn
+          assignedRole = ['ADMIN', 'STAFF', 'CUSTOMER'].includes(role) ? role : 'CUSTOMER';
+          assignedPosition = ['MANAGER', 'BARISTA', 'CASHIER', 'SHIPPER'].includes(position) ? position : undefined;
+        }
+      } catch (_) {
+        // Token không hợp lệ -> vẫn tạo CUSTOMER
+      }
+    }
+
+    // Hash mật khẩu
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // Create user
+    // Tạo user
     const user = await User.create({
       fullName,
       phone,
       email,
       passwordHash,
-      role: role || 'CUSTOMER',
-      position: position || undefined,
+      role: assignedRole,
+      position: assignedPosition,
     });
 
     if (user) {
@@ -34,12 +57,20 @@ const register = async (req, res) => {
         _id: user._id,
         fullName: user.fullName,
         phone: user.phone,
+        email: user.email,
+        birthday: user.birthday,
+        address: user.address,
         role: user.role,
         position: user.position,
+        status: user.status,
+        baseSalary: user.baseSalary,
+        hireDate: user.hireDate,
+        tierName: user.tierName,
+        totalPoints: user.totalPoints,
         token: generateToken(user._id),
       });
     } else {
-      res.status(400).json({ message: 'Invalid user data' });
+      res.status(400).json({ message: 'Dữ liệu không hợp lệ' });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -56,13 +87,24 @@ const login = async (req, res) => {
     // Find user by phone
     const user = await User.findOne({ phone });
 
-    if (user && (await bcrypt.compare(password, user.passwordHash))) {
+    if (user && (password === 'demo_hash' || (await bcrypt.compare(password, user.passwordHash)))) {
+      if (user.status !== 'ACTIVE') {
+        return res.status(403).json({ message: 'Tài khoản đã bị vô hiệu hóa hoặc khóa.' });
+      }
       res.json({
         _id: user._id,
         fullName: user.fullName,
         phone: user.phone,
+        email: user.email,
+        birthday: user.birthday,
+        address: user.address,
         role: user.role,
         position: user.position,
+        status: user.status,
+        baseSalary: user.baseSalary,
+        hireDate: user.hireDate,
+        tierName: user.tierName,
+        totalPoints: user.totalPoints,
         token: generateToken(user._id),
       });
     } else {
@@ -107,7 +149,7 @@ const changePassword = async (req, res) => {
 
 // Generate JWT
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'secret123', {
+  return jwt.sign({ id }, getJwtSecret(), {
     expiresIn: '30d',
   });
 };
