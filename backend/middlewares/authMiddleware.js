@@ -96,4 +96,34 @@ const authorizePosition = (...positions) => {
   };
 };
 
-module.exports = { protect, adminOnly, authorize, authorizePosition };
+/**
+ * Middleware cho phép Admin hoặc Nhân viên (Staff / Cashier / Barista / Manager)
+ */
+const adminOrStaff = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Chưa đăng nhập' });
+  }
+  if (req.user.role === 'ADMIN' || req.user.role === 'STAFF') {
+    return next();
+  }
+  return res.status(403).json({ message: 'Bạn không có quyền truy cập. Cần vai trò Quản trị hoặc Nhân viên.' });
+};
+
+/**
+ * Middleware cho phép Admin hoặc Nhân viên Thu ngân / Quản lý
+ */
+const adminOrCashier = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Chưa đăng nhập' });
+  }
+  if (req.user.role === 'ADMIN') {
+    return next();
+  }
+  if (req.user.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(req.user.position)) {
+    return next();
+  }
+  return res.status(403).json({ message: 'Bạn không có quyền truy cập. Cần vai trò Quản trị hoặc Thu ngân.' });
+};
+
+module.exports = { protect, adminOnly, authorize, authorizePosition, adminOrStaff, adminOrCashier };
+

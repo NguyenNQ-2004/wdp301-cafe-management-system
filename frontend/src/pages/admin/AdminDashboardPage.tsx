@@ -161,6 +161,32 @@ const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Grid: Loyalty & Memberships (Screen 29) */}
+      <div className="mb-4">
+        <h2 className="text-sm font-bold text-secondary uppercase tracking-wider mb-3">
+          Chương trình Hội viên & Khách hàng thân thiết (Aura Loyalty)
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div 
+            onClick={() => navigate('/admin/memberships')}
+            className="bg-surface-container-lowest p-6 rounded-xl border-2 border-amber-300 shadow-sm hover:shadow-md transition-all cursor-pointer group bg-gradient-to-br from-white to-amber-50/40"
+          >
+            <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[24px]">loyalty</span>
+            </div>
+            <div className="inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold mb-1">Screen 29</div>
+            <h3 className="font-bold text-base text-on-surface mb-1">Tích điểm & Hạng thẻ hội viên</h3>
+            <p className="text-secondary text-xs leading-relaxed">
+              Cấu hình 4 hạng thẻ Đồng-Bạc-Vàng-Kim Cương, tra cứu điểm theo SĐT và nhật ký tích/đổi điểm.
+            </p>
+            <div className="mt-4 flex items-center text-xs font-semibold text-amber-700 group-hover:underline">
+              <span>Mở quản trị Tích điểm & Hạng thẻ</span>
+              <span className="material-symbols-outlined text-[16px] ml-1">east</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Thông tin tài khoản & Đổi mật khẩu */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm">
