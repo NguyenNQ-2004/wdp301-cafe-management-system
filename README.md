@@ -16,6 +16,10 @@ Thu ngân, quản lý hoặc admin mở `/cashier/payments` từ trang thu ngân
 
 Admin mở `/admin/employees` từ sidebar hoặc dashboard để xem, tìm kiếm, thêm và sửa nhân viên. Màn hình quản lý vị trí (Quản lý, Pha chế, Thu ngân, Giao hàng), lương cơ bản, ngày vào làm và trạng thái tài khoản. Tài khoản mới phải có mật khẩu ít nhất 8 ký tự; để trống ô mật khẩu khi sửa sẽ giữ mật khẩu cũ. Chuyển trạng thái sang **Ngừng hoạt động** hoặc **Bị khóa** sẽ chặn đăng nhập. API `/api/employees` chỉ dành cho Admin và chỉ thao tác với tài khoản `STAFF`; mật khẩu băm không được trả về. Chức năng dùng bảng `users` sẵn có, không cần chạy lại seed. Kiểm tra bằng `cd backend && npm run test:employee-management`.
 
+## Khung giờ ca làm (màn hình 24)
+
+Admin mở `/admin/shifts` để chỉnh giờ bắt đầu và kết thúc của ca sáng, chiều, tối. Hệ thống lưu vào các khóa `shift_morning`, `shift_afternoon`, `shift_evening` trong bảng `shop_settings` hiện có; không cần chạy lại seed. Khi chưa có dữ liệu, màn hình dùng mặc định `07:00-12:00`, `12:00-17:00`, `17:00-22:00`. Admin lưu đủ ba ca cùng lúc; API từ chối giờ sai định dạng, giờ kết thúc không sau giờ bắt đầu hoặc các ca chồng lấn. Nhân viên có thể đọc khung giờ qua `GET /api/work-shifts`; chỉ Admin được cập nhật qua `PUT /api/work-shifts`. Chạy `cd backend && npm run test:work-shifts` để kiểm tra.
+
 ## 🚀 Công nghệ sử dụng (MERN Stack)
 - **Frontend**: ReactJS (Vite, TypeScript), React Router DOM, Zustand (Quản lý State), Axios.
 - **Backend**: Node.js, Express.js.
