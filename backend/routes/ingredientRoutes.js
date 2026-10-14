@@ -53,7 +53,7 @@ router.post('/', adminOnly, async (req, res) => {
 // 4. UPDATE
 router.put('/:id', adminOnly, async (req, res) => {
   try {
-    const item = await Ingredient.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const item = await Ingredient.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
     res.json(item);
   } catch (error) {
     res.status(400).json({ message: error.message });
