@@ -6,6 +6,8 @@ const paymentSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   status: { type: String, enum: ['PENDING', 'SUCCESS', 'FAILED'], default: 'PENDING' },
   paidAt: { type: Date },
+  receivedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   paymentNote: { type: String }
 }, { timestamps: true });
+paymentSchema.index({ status: 1, paymentMethod: 1, paidAt: 1 });
 module.exports = mongoose.model('Payment', paymentSchema);

@@ -23,6 +23,7 @@ app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/employees', require('./routes/employeeRoutes'));
 app.use('/api/work-schedules', require('./routes/workScheduleRoutes'));
 app.use('/api/work-shifts', require('./routes/workShiftRoutes'));
+app.use('/api/shift-handovers', require('./routes/shiftHandoverRoutes'));
 
 // Group B: Products & Sales
 app.use('/api/categories', require('./routes/categoryRoutes'));

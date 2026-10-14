@@ -162,6 +162,17 @@ const CashierDashboard: React.FC = () => {
             <span className="material-symbols-outlined text-[16px] ml-1">east</span>
           </div>
         </div>
+        <div
+          onClick={() => navigate('/cashier/handover')}
+          className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm hover:shadow-md transition-all cursor-pointer group"
+        >
+          <div className="w-12 h-12 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center mb-4">
+            <span className="material-symbols-outlined text-[24px]">receipt_long</span>
+          </div>
+          <h3 className="font-bold text-base text-on-surface mb-1">Bàn giao ca thu ngân</h3>
+          <p className="text-secondary text-xs leading-relaxed">Kiểm đếm két, xem chênh lệch và in phiếu K80 sau khi check-out.</p>
+          <div className="mt-4 flex items-center text-xs font-semibold text-orange-700 group-hover:underline">Mở bàn giao ca →</div>
+        </div>
       </div>
 
       {/* Thông tin nhân viên & Đổi mật khẩu */}

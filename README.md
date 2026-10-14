@@ -28,6 +28,10 @@ Admin mở `/admin/schedules` để xem lịch theo tuần, phân công nhân vi
 
 Nhân viên mở `/my-attendance` để check-in ca của mình từ 60 phút trước giờ bắt đầu đến giờ kết thúc trong ngày được phân, sau đó check-out trong ngày hoặc trước 06:00 sáng hôm sau. Hệ thống ghi giờ thực tế, ngăn chấm lặp và không cho chấm công hộ. Admin mở `/admin/attendance` để lọc lịch sử tối đa 31 ngày, xem giờ dự kiến so với giờ thực tế và đánh dấu vắng mặt cho ca đã qua ngày làm việc mà chưa check-in. Chức năng dùng các trường sẵn có trong bảng `work_schedules`, không cần chạy lại seed. Chạy `cd backend && npm run test:attendance-management` để kiểm tra.
 
+## Bàn giao ca thu ngân (màn hình 27)
+
+Thu ngân hoặc quản lý mở `/cashier/handover` sau khi check-out ca. Nhân viên nhập tiền mặt thực tế trong két; hệ thống lấy tiền đầu ca đã ghi khi check-in, cộng các khoản thanh toán tiền mặt tại quầy do chính nhân viên đó xác nhận trong khoảng ca, rồi lưu chênh lệch. Nếu có chênh lệch, phải ghi lý do. Có thể in biên bản khổ K80 sau khi xác nhận. Admin được xem biên bản nhưng không xác nhận thay nhân viên. Thanh toán cũ không có người thu tiền được báo riêng và không tự cộng vào ca. Chức năng bổ sung trường vào `payments` và `work_schedules` trong MongoDB; không cần chạy lại seed, nhưng các ca cũ thiếu tiền đầu ca phải nhập khi bàn giao. Kiểm tra bằng `cd backend && npm run test:shift-handover`.
+
 ## 🚀 Công nghệ sử dụng (MERN Stack)
 - **Frontend**: ReactJS (Vite, TypeScript), React Router DOM, Zustand (Quản lý State), Axios.
 - **Backend**: Node.js, Express.js.
