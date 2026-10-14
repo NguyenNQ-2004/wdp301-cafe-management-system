@@ -230,7 +230,7 @@ const AdminDashboard: React.FC = () => {
 
             <div 
               onClick={() => navigate('/admin/complaints')}
-              className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm hover:shadow-md transition-all cursor-pointer group"
+              className="bg-surface-container-lowest p-6 rounded-xl border-2 border-purple-300 shadow-sm hover:shadow-md transition-all cursor-pointer group bg-gradient-to-br from-white to-purple-50/40"
             >
               <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
                 <span className="material-symbols-outlined text-[24px]">feedback</span>
