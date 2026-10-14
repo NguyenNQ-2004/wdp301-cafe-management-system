@@ -63,6 +63,17 @@ export interface OrderRecord {
   recipientPhone?: string;
   deliveryAddress?: string;
   orderNote?: string;
-  paymentMethod?: 'COD' | 'PAY_AT_COUNTER';
+  paymentMethod?: 'COD' | 'PAY_AT_COUNTER' | 'DEMO_ONLINE' | 'CASH' | 'VNPAY' | 'MOMO' | 'BANK_TRANSFER';
   createdAt: string;
+}
+
+export interface PaymentRecord {
+  _id: string;
+  order: string;
+  paymentMethod: 'CASH' | 'VNPAY' | 'MOMO' | 'BANK_TRANSFER' | 'DEMO_ONLINE';
+  amount: number;
+  status: 'PENDING' | 'SUCCESS' | 'FAILED';
+  transactionCode?: string;
+  paidAt?: string;
+  paymentNote?: string;
 }

@@ -106,7 +106,7 @@ const AppLayout = () => {
           <Route path="/cart" element={<CartPage />} />
           <Route path="/orders" element={<OrdersPage onRequestAuth={() => setIsAuthOpen(true)} />} />
           <Route path="/checkout" element={<CheckoutPage onRequestAuth={() => setIsAuthOpen(true)} />} />
-          <Route path="/payment" element={<PaymentPage />} />
+          <Route path="/payment" element={<PaymentPage onRequestAuth={() => setIsAuthOpen(true)} />} />
           <Route path="/feedback" element={<FeedbackPage />} />
           <Route path="/profile" element={user ? <CustomerDashboard /> : <Navigate to="/" />} />
 

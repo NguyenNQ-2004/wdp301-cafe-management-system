@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 
 require('dotenv').config();
 process.env.JWT_SECRET = 'uc11-isolated-test-secret';
+process.env.PAYMENT_DEMO_ENABLED = 'true';
 
 const User = require('../models/User');
 const Category = require('../models/Category');
@@ -29,6 +30,7 @@ test('UC11 creates delivery and pickup orders with verified contact and totals',
   app.use(express.json());
   app.use('/api/auth', require('../routes/authRoutes'));
   app.use('/api/orders', require('../routes/orderRoutes'));
+  app.use('/api/payments', require('../routes/paymentRoutes'));
   const server = await new Promise((resolve) => {
     const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
   });
@@ -49,6 +51,10 @@ test('UC11 creates delivery and pickup orders with verified contact and totals',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify(body)
     });
+    return { status: response.status, data: await response.json() };
+  };
+  const get = async (path, token) => {
+    const response = await fetch(`${base}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
     return { status: response.status, data: await response.json() };
   };
 
@@ -115,4 +121,26 @@ test('UC11 creates delivery and pickup orders with verified contact and totals',
   assert.equal((await User.findById(customer._id)).totalPoints, 100);
   assert.equal((await RewardItem.findById(reward._id)).stock, 0);
   assert.equal(await LoyaltyTransaction.countDocuments({ order: redeemed.data._id, transactionType: 'REDEEM' }), 1);
+
+  const otherCustomer = await User.create({ fullName: 'Other Customer', phone: '0999000012', passwordHash: await bcrypt.hash('test-password', 4), role: 'CUSTOMER' });
+  const otherLogin = await request('/api/auth/login', { phone: otherCustomer.phone, password: 'test-password' });
+  assert.equal(otherLogin.status, 200);
+  const otherToken = otherLogin.data.token;
+  assert.equal((await get('/api/payments/config')).data.demoEnabled, true);
+  const demoOrder = await request('/api/orders', { ...delivery, paymentMethod: 'DEMO_ONLINE' }, token);
+  assert.equal(demoOrder.status, 201);
+  assert.equal(demoOrder.data.paymentMethod, 'DEMO_ONLINE');
+  const demoPayment = await Payment.findOne({ order: demoOrder.data._id });
+  assert.equal(demoPayment.paymentMethod, 'DEMO_ONLINE');
+  assert.equal(demoPayment.status, 'PENDING');
+  assert.equal((await get(`/api/payments/order/${demoOrder.data._id}`, otherToken)).status, 403);
+  assert.equal((await request(`/api/payments/${demoPayment._id}/demo-confirm`, {}, otherToken)).status, 403);
+  assert.equal((await request(`/api/payments/${demoPayment._id}/demo-confirm`, {})).status, 401);
+  const confirmed = await request(`/api/payments/${demoPayment._id}/demo-confirm`, {}, token);
+  assert.equal(confirmed.status, 200);
+  assert.equal(confirmed.data.payment.status, 'SUCCESS');
+  assert.match(confirmed.data.payment.transactionCode, /^DEMO-/);
+  assert.equal((await request(`/api/payments/${demoPayment._id}/demo-confirm`, {}, token)).data.payment.transactionCode, confirmed.data.payment.transactionCode);
+  assert.equal((await Payment.findById(demoPayment._id)).amount, demoOrder.data.finalAmount);
+  assert.equal((await get(`/api/payments/order/${demoOrder.data._id}`, token)).data.payment.status, 'SUCCESS');
 });
