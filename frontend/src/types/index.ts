@@ -36,6 +36,17 @@ export type PageRoute =
 
 export type ActiveStatus = 'ACTIVE' | 'INACTIVE';
 
+export type OrderStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'PREPARING'
+  | 'READY'
+  | 'DELIVERING'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export type OrderType = 'DINE_IN' | 'TAKEAWAY' | 'ONLINE';
+
 export interface Category {
   id: string | number;
   _id?: string;
