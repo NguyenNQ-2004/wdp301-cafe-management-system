@@ -112,6 +112,7 @@ router.put('/:id', async (req, res) => {
     if (await Supplier.exists(duplicateFilter(payload, req.params.id))) return res.status(409).json({ message: 'Tên hoặc số điện thoại nhà cung cấp đã tồn tại.' });
     const supplier = await Supplier.findByIdAndUpdate(req.params.id, payload, { returnDocument: 'after', runValidators: true });
     if (!supplier) return res.status(404).json({ message: 'Không tìm thấy nhà cung cấp.' });
+    const supplier = await Supplier.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
     res.json(supplier);
   } catch (error) {
     res.status(500).json({ message: error.message });

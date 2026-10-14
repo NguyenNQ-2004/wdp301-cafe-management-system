@@ -25,7 +25,7 @@ router.put('/', async (req, res) => {
     await Cart.findOneAndUpdate(
       { customer: req.user._id },
       { $set: { items } },
-      { upsert: true, new: true, runValidators: true }
+      { upsert: true, returnDocument: 'after', runValidators: true }
     );
     res.json({ message: 'Đã lưu giỏ hàng.' });
   } catch (error) {
