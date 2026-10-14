@@ -8,6 +8,8 @@
     "dev": "nodemon server.js",
     "test:online-ordering": "node --test tests/onlineOrdering.test.js",
     "test:inventory": "node --test tests/inventory.test.js",
+    "test:restock": "node --test tests/restock.test.js",
+    "test:suppliers": "node --test tests/suppliers.test.js",
     "test:work-shifts": "node --test tests/workShifts.test.js",
     "test:employee-management": "node --test tests/employeeManagement.test.js",
     "test:employee-schedule": "node --test tests/employeeSchedule.test.js",

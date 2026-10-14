@@ -27,7 +27,7 @@ router.put('/', protect, adminOnly, async (req, res) => {
       await ShopSetting.findOneAndUpdate(
         { settingKey: key },
         { settingValue: String(value) },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
     }
     const all = await ShopSetting.find({});
