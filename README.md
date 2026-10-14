@@ -8,6 +8,10 @@ Khách hàng chọn **Thanh toán online mô phỏng** khi đặt đơn giao hà
 
 Đây là chế độ phục vụ bài tập, **không kết nối ngân hàng và không thu tiền thật**. Chế độ này bật mặc định khi chạy local, tắt mặc định khi `NODE_ENV=production`. Đặt `PAYMENT_DEMO_ENABLED=true` để bật rõ ràng hoặc `PAYMENT_DEMO_ENABLED=false` để tắt. COD vẫn là lựa chọn mặc định. Thay luồng mô phỏng bằng cổng thanh toán có callback xác thực trên server trước khi dùng cho giao dịch thật.
 
+## Thanh toán tại quầy (UC13)
+
+Thu ngân, quản lý hoặc admin mở `/cashier/payments` từ trang thu ngân. Danh sách hiển thị đơn mang về và dùng tại quán đang chờ thu tiền. Sau khi nhận tiền, chọn **Tiền mặt** hoặc **Chuyển khoản**; với chuyển khoản phải nhập mã giao dịch đã kiểm tra thủ công. Chỉ các tài khoản này được xác nhận thanh toán, đơn đã hủy hoặc sai số tiền bị từ chối. Đơn dùng tại quán được tạo với payment chờ thu; thay đổi trạng thái đơn sang hoàn tất không tự đánh dấu payment tại quầy là đã trả.
+
 ## 🚀 Công nghệ sử dụng (MERN Stack)
 - **Frontend**: ReactJS (Vite, TypeScript), React Router DOM, Zustand (Quản lý State), Axios.
 - **Backend**: Node.js, Express.js.

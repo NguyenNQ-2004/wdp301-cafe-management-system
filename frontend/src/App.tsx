@@ -7,6 +7,7 @@ import useCartSync from './hooks/useCartSync';
 import { shopApi, ShopApiError } from './lib/shopApi';
 import AdminDashboard from './pages/admin/AdminDashboardPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
+import CounterPaymentsPage from './pages/pos/CounterPaymentsPage';
 import BaristaDashboard from './pages/kds/KdsTerminalPage';
 import CustomerDashboard from './pages/ProfilePage';
 import HomeContainer from './pages/HomePage';
@@ -122,6 +123,10 @@ const AppLayout = () => {
                 ? <CashierDashboard />
                 : <Navigate to="/" />
             }
+          />
+          <Route
+            path="/cashier/payments"
+            element={user?.role === 'ADMIN' || (user?.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user.position || '')) ? <CounterPaymentsPage /> : <Navigate to="/" />}
           />
           <Route
             path="/barista"

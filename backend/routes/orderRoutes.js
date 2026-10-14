@@ -197,13 +197,11 @@ router.post('/', async (req, res) => {
     }
 
     // Tự động tạo payment ban đầu
-    const initialPaymentStatus = (orderType === 'DINE_IN' && isStaffOrAdmin) ? 'SUCCESS' : 'PENDING';
     await Payment.create({
       order: order._id,
       paymentMethod: finalPaymentMethod === 'DEMO_ONLINE' ? 'DEMO_ONLINE' : ['CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER'].includes(finalPaymentMethod) ? finalPaymentMethod : 'CASH',
       amount: finalAmount,
-      status: initialPaymentStatus,
-      paidAt: initialPaymentStatus === 'SUCCESS' ? new Date() : undefined,
+      status: 'PENDING',
       paymentNote: finalPaymentMethod === 'DEMO_ONLINE' ? 'Giao dịch mô phỏng, không thu tiền thật' : orderType === 'ONLINE' ? 'Đơn đặt online' : 'Thanh toán tại quầy'
     });
 
@@ -251,6 +249,7 @@ router.post('/', async (req, res) => {
 // 4. UPDATE ORDER STATUS (Dành cho Thu ngân, Pha chế, Shipper, Quản lý)
 router.put('/:id/status', async (req, res) => {
   try {
+    if (!['ADMIN', 'STAFF'].includes(req.user.role)) return res.status(403).json({ message: 'Chỉ nhân viên được cập nhật trạng thái đơn hàng.' });
     const { status, cancelReason, shipperId } = req.body;
     const validStatuses = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'DELIVERING', 'COMPLETED', 'CANCELLED'];
     
@@ -265,13 +264,15 @@ router.put('/:id/status', async (req, res) => {
     if (cancelReason !== undefined) order.cancelReason = cancelReason;
     if (shipperId) order.shipper = shipperId;
 
-    // Khi đơn COMPLETED: cập nhật thanh toán và cộng điểm tích lũy
+    // COD được thu khi giao xong; đơn tại quầy và demo có bước xác nhận riêng.
     if (status === 'COMPLETED') {
-      await Payment.findOneAndUpdate(
-        { order: order._id },
-        { status: 'SUCCESS', paidAt: new Date() },
-        { new: true }
-      );
+      if (order.orderType === 'ONLINE' && order.paymentMethod === 'COD') {
+        await Payment.findOneAndUpdate(
+          { order: order._id, status: 'PENDING', paymentMethod: 'CASH' },
+          { $set: { status: 'SUCCESS', paidAt: new Date(), paymentNote: 'Thu tiền COD khi giao hàng hoàn tất' } },
+          { returnDocument: 'after' }
+        );
+      }
 
       // Nếu có khách hàng và chưa cộng điểm cho đơn này: cộng điểm (1.000đ = 1 điểm)
       if (order.customer) {

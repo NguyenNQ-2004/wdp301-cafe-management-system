@@ -128,18 +128,18 @@ const CashierDashboard: React.FC = () => {
         </div>
 
         <div 
-          onClick={() => navigate('/orders')}
+          onClick={() => navigate('/cashier/payments')}
           className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
             <span className="material-symbols-outlined text-[24px]">receipt_long</span>
           </div>
-          <h3 className="font-bold text-base text-on-surface mb-1">Hóa Đơn & Đơn Hàng</h3>
+          <h3 className="font-bold text-base text-on-surface mb-1">Thanh Toán Tại Quầy</h3>
           <p className="text-secondary text-xs leading-relaxed">
             Kiểm tra trạng thái các đơn đang chờ thanh toán, đơn đã hoàn thành trong ca.
           </p>
           <div className="mt-4 flex items-center text-xs font-semibold text-emerald-600 group-hover:underline">
-            <span>Xem đơn hàng</span>
+            <span>Xem giao dịch</span>
             <span className="material-symbols-outlined text-[16px] ml-1">east</span>
           </div>
         </div>

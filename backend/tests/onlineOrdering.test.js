@@ -19,7 +19,7 @@ const Payment = require('../models/Payment');
 const RewardItem = require('../models/RewardItem');
 const LoyaltyTransaction = require('../models/LoyaltyTransaction');
 
-test('UC11 creates delivery and pickup orders with verified contact and totals', async (t) => {
+test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t) => {
   const dbName = `aura_cafe_uc11_test_${randomBytes(4).toString('hex')}`;
   await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/aura_cafe_erp', {
     dbName,
@@ -55,6 +55,14 @@ test('UC11 creates delivery and pickup orders with verified contact and totals',
   };
   const get = async (path, token) => {
     const response = await fetch(`${base}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    return { status: response.status, data: await response.json() };
+  };
+  const put = async (path, body, token) => {
+    const response = await fetch(`${base}${path}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body)
+    });
     return { status: response.status, data: await response.json() };
   };
 
@@ -143,4 +151,44 @@ test('UC11 creates delivery and pickup orders with verified contact and totals',
   assert.equal((await request(`/api/payments/${demoPayment._id}/demo-confirm`, {}, token)).data.payment.transactionCode, confirmed.data.payment.transactionCode);
   assert.equal((await Payment.findById(demoPayment._id)).amount, demoOrder.data.finalAmount);
   assert.equal((await get(`/api/payments/order/${demoOrder.data._id}`, token)).data.payment.status, 'SUCCESS');
+
+  const cashier = await User.create({ fullName: 'UC13 Cashier', phone: '0999000013', passwordHash: await bcrypt.hash('test-password', 4), role: 'STAFF', position: 'CASHIER' });
+  const barista = await User.create({ fullName: 'UC13 Barista', phone: '0999000014', passwordHash: await bcrypt.hash('test-password', 4), role: 'STAFF', position: 'BARISTA' });
+  const cashierToken = (await request('/api/auth/login', { phone: cashier.phone, password: 'test-password' })).data.token;
+  const baristaToken = (await request('/api/auth/login', { phone: barista.phone, password: 'test-password' })).data.token;
+  assert.equal((await get('/api/payments', token)).status, 403);
+  assert.equal((await get('/api/payments', baristaToken)).status, 403);
+  assert.equal((await get('/api/payments', cashierToken)).status, 200);
+  const pickupPayment = await Payment.findOne({ order: pickup.data._id });
+  assert.equal(pickupPayment.status, 'PENDING');
+  const pickupPath = `/api/payments/${pickupPayment._id}/counter-confirm`;
+  assert.equal((await request(pickupPath, { paymentMethod: 'CASH' }, token)).status, 403);
+  assert.equal((await request(pickupPath, { paymentMethod: 'CASH' }, baristaToken)).status, 403);
+  assert.equal((await request(pickupPath, { paymentMethod: 'BANK_TRANSFER' }, cashierToken)).status, 400);
+  assert.equal((await request(`/api/payments/${demoPayment._id}/counter-confirm`, { paymentMethod: 'CASH' }, cashierToken)).status, 400);
+  const paidPickup = await request(pickupPath, { paymentMethod: 'BANK_TRANSFER', transactionCode: ' BANK-TEST-001 ' }, cashierToken);
+  assert.equal(paidPickup.status, 200);
+  assert.equal(paidPickup.data.payment.status, 'SUCCESS');
+  assert.equal(paidPickup.data.payment.paymentMethod, 'BANK_TRANSFER');
+  assert.equal(paidPickup.data.payment.transactionCode, 'BANK-TEST-001');
+  assert.equal((await request(pickupPath, { paymentMethod: 'BANK_TRANSFER', transactionCode: 'BANK-TEST-001' }, cashierToken)).data.payment.transactionCode, 'BANK-TEST-001');
+  assert.equal((await request(pickupPath, { paymentMethod: 'CASH' }, cashierToken)).status, 409);
+  assert.equal((await Order.findById(pickup.data._id)).paymentMethod, 'BANK_TRANSFER');
+
+  const dineIn = await request('/api/orders', { items: [item], orderType: 'DINE_IN', tableNumber: 'B01', paymentMethod: 'CASH' }, cashierToken);
+  assert.equal(dineIn.status, 201);
+  const dineInPayment = await Payment.findOne({ order: dineIn.data._id });
+  assert.equal(dineInPayment.status, 'PENDING');
+  assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'COMPLETED' }, token)).status, 403);
+  assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'COMPLETED' }, cashierToken)).status, 200);
+  assert.equal((await Payment.findById(dineInPayment._id)).status, 'PENDING');
+  assert.equal((await request(`/api/payments/${dineInPayment._id}/counter-confirm`, { paymentMethod: 'CASH' }, cashierToken)).status, 200);
+  assert.equal((await Payment.findById(dineInPayment._id)).status, 'SUCCESS');
+
+  const cancelled = await request('/api/orders', { items: [item], orderType: 'DINE_IN', tableNumber: 'B02' }, cashierToken);
+  const cancelledPayment = await Payment.findOne({ order: cancelled.data._id });
+  await Order.updateOne({ _id: cancelled.data._id }, { $set: { status: 'CANCELLED' } });
+  assert.equal((await request(`/api/payments/${cancelledPayment._id}/counter-confirm`, { paymentMethod: 'CASH' }, cashierToken)).status, 409);
+  await Order.updateOne({ _id: cancelled.data._id }, { $set: { status: 'PENDING', finalAmount: 1 } });
+  assert.equal((await request(`/api/payments/${cancelledPayment._id}/counter-confirm`, { paymentMethod: 'CASH' }, cashierToken)).status, 409);
 });
