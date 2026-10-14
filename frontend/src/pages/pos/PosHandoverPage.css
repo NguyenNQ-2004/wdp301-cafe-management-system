@@ -1,0 +1,28 @@
+@media print {
+  @page {
+    size: 80mm 210mm;
+    margin: 2mm;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  #handover-print,
+  #handover-print * {
+    visibility: visible !important;
+  }
+
+  #handover-print {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 76mm !important;
+    margin: 0 !important;
+    padding: 2mm !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    color: #000 !important;
+    background: #fff !important;
+  }
+}

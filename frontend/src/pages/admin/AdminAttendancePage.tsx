@@ -58,6 +58,7 @@ export default function AdminAttendancePage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [openingCash, setOpeningCash] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [clockTick, setClockTick] = useState(Date.now());
@@ -106,12 +107,18 @@ export default function AdminAttendancePage() {
   };
   const changeAttendance = async (record: RecordItem, action: 'CHECK_IN' | 'CHECK_OUT' | 'ABSENT') => {
     if (!token || busyId) return;
+    const recordsCash = action === 'CHECK_IN' && ['CASHIER', 'MANAGER'].includes(user?.position || '');
+    const opening = openingCash[record._id] ?? '0';
+    if (recordsCash && (!/^\d+$/.test(opening) || !Number.isSafeInteger(Number(opening)))) {
+      setError('Tiền đầu ca phải là số nguyên không âm.');
+      return;
+    }
     setBusyId(record._id);
     setError('');
     setNotice('');
     try {
       if (action === 'ABSENT') await shopApi(`/api/work-schedules/${record._id}/absence`, { method: 'PATCH', token });
-      else await shopApi(`/api/work-schedules/${record._id}/shift-action`, { method: 'PUT', token, body: { action } });
+      else await shopApi(`/api/work-schedules/${record._id}/shift-action`, { method: 'PUT', token, body: { action, ...(recordsCash ? { cash: Number(opening) } : {}) } });
       setNotice(action === 'CHECK_IN' ? 'Đã ghi nhận giờ vào ca.' : action === 'CHECK_OUT' ? 'Đã ghi nhận giờ ra ca.' : 'Đã đánh dấu vắng mặt.');
       setReloadKey((key) => key + 1);
     } catch (err) { setError((err as Error).message); }
@@ -158,7 +165,10 @@ export default function AdminAttendancePage() {
             <td className="p-3 text-xs">{late !== null && late > 0 && <span className="block text-amber-700">Vào trễ {late} phút</span>}{early !== null && early < 0 && <span className="block text-amber-700">Ra sớm {-early} phút</span>}{(late === null || late <= 0) && (early === null || early >= 0) && <span className="text-stone-500">—</span>}</td>
             <td className="p-3"><span className={`rounded-lg px-2 py-1 text-xs font-semibold ${record.status === 'ABSENT' ? 'bg-red-50 text-red-700' : record.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>{statusLabels[record.status]}</span>{record.note && <p className="mt-2 text-xs text-stone-500">{record.note}</p>}</td>
             <td className="p-3">
-              {!isAdmin && record.status === 'SCHEDULED' && canCheckIn && <button disabled={busyId === record._id} onClick={() => void changeAttendance(record, 'CHECK_IN')} className="rounded-lg bg-[#800020] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Check-in</button>}
+              {!isAdmin && record.status === 'SCHEDULED' && canCheckIn && <div className="space-y-2">
+                {['CASHIER', 'MANAGER'].includes(user?.position || '') && <label className="block text-xs font-semibold text-stone-600">Tiền đầu ca (đ)<input type="number" min="0" step="1" value={openingCash[record._id] ?? '0'} onChange={(event) => setOpeningCash((current) => ({ ...current, [record._id]: event.target.value }))} className="mt-1 w-28 rounded-lg border border-stone-200 px-2 py-1" /></label>}
+                <button disabled={busyId === record._id} onClick={() => void changeAttendance(record, 'CHECK_IN')} className="rounded-lg bg-[#800020] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Check-in</button>
+              </div>}
               {!isAdmin && record.status === 'PRESENT' && canCheckOut && <button disabled={busyId === record._id} onClick={() => void changeAttendance(record, 'CHECK_OUT')} className="rounded-lg bg-[#800020] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Check-out</button>}
               {isAdmin && record.status === 'SCHEDULED' && workDay < today && <button disabled={busyId === record._id} onClick={() => void changeAttendance(record, 'ABSENT')} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-50">Đánh dấu vắng</button>}
             </td>

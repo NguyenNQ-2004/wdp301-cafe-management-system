@@ -10,7 +10,8 @@
     "test:work-shifts": "node --test tests/workShifts.test.js",
     "test:employee-management": "node --test tests/employeeManagement.test.js",
     "test:employee-schedule": "node --test tests/employeeSchedule.test.js",
-    "test:attendance-management": "node --test tests/attendanceManagement.test.js"
+    "test:attendance-management": "node --test tests/attendanceManagement.test.js",
+    "test:shift-handover": "node --test tests/shiftHandover.test.js"
   },
   "keywords": [],
   "author": "",

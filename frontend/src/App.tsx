@@ -14,6 +14,7 @@ import AdminCategoriesPage from './pages/admin/AdminCategoriesPage';
 import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
 import CounterPaymentsPage from './pages/pos/CounterPaymentsPage';
+import PosHandoverPage from './pages/pos/PosHandoverPage';
 import BaristaDashboard from './pages/kds/KdsTerminalPage';
 import CustomerDashboard from './pages/ProfilePage';
 import HomeContainer from './pages/HomePage';
@@ -326,6 +327,10 @@ const AppLayout = () => {
           <Route
             path="/cashier/payments"
             element={user?.role === 'ADMIN' || (user?.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user.position || '')) ? <CounterPaymentsPage /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/cashier/handover"
+            element={user?.role === 'ADMIN' || (user?.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user.position || '')) ? <PosHandoverPage /> : <Navigate to="/" />}
           />
           <Route
             path="/barista"
