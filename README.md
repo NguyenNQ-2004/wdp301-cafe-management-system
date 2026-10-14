@@ -12,6 +12,10 @@ Khách hàng chọn **Thanh toán online mô phỏng** khi đặt đơn giao hà
 
 Thu ngân, quản lý hoặc admin mở `/cashier/payments` từ trang thu ngân. Danh sách hiển thị đơn mang về và dùng tại quán đang chờ thu tiền. Sau khi nhận tiền, chọn **Tiền mặt** hoặc **Chuyển khoản**; với chuyển khoản phải nhập mã giao dịch đã kiểm tra thủ công. Chỉ các tài khoản này được xác nhận thanh toán, đơn đã hủy hoặc sai số tiền bị từ chối. Đơn dùng tại quán được tạo với payment chờ thu; thay đổi trạng thái đơn sang hoàn tất không tự đánh dấu payment tại quầy là đã trả.
 
+## Khung giờ ca làm (màn hình 24)
+
+Admin mở `/admin/shifts` để chỉnh giờ bắt đầu và kết thúc của ca sáng, chiều, tối. Hệ thống lưu vào các khóa `shift_morning`, `shift_afternoon`, `shift_evening` trong bảng `shop_settings` hiện có; không cần chạy lại seed. Khi chưa có dữ liệu, màn hình dùng mặc định `07:00-12:00`, `12:00-17:00`, `17:00-22:00`. Admin lưu đủ ba ca cùng lúc; API từ chối giờ sai định dạng, giờ kết thúc không sau giờ bắt đầu hoặc các ca chồng lấn. Nhân viên có thể đọc khung giờ qua `GET /api/work-shifts`; chỉ Admin được cập nhật qua `PUT /api/work-shifts`. Chạy `cd backend && npm run test:work-shifts` để kiểm tra.
+
 ## 🚀 Công nghệ sử dụng (MERN Stack)
 - **Frontend**: ReactJS (Vite, TypeScript), React Router DOM, Zustand (Quản lý State), Axios.
 - **Backend**: Node.js, Express.js.

@@ -21,6 +21,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/work-schedules', require('./routes/workScheduleRoutes'));
+app.use('/api/work-shifts', require('./routes/workShiftRoutes'));
 
 // Group B: Products & Sales
 app.use('/api/categories', require('./routes/categoryRoutes'));

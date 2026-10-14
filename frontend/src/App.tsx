@@ -6,6 +6,7 @@ import useCartStore from './store/cartStore';
 import useCartSync from './hooks/useCartSync';
 import { shopApi, ShopApiError } from './lib/shopApi';
 import AdminDashboard from './pages/admin/AdminDashboardPage';
+import AdminShiftsPage from './pages/admin/AdminShiftsPage';
 import AdminCategoriesPage from './pages/admin/AdminCategoriesPage';
 import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
@@ -274,19 +275,7 @@ const AppLayout = () => {
           />
           <Route
             path="/admin/shifts"
-            element={
-              user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-shifts"
-                  title="24. Khung giờ ca làm"
-                  subtitle="Màn hình thiết lập các khung giờ ca sáng, chiều, tối của cửa hàng."
-                  table="work_shifts"
-                  branch="feature/shift-management"
-                />
-              ) : (
-                <Navigate to="/" />
-              )
-            }
+            element={user?.role === 'ADMIN' ? <AdminShiftsPage /> : <Navigate to="/" />}
           />
           <Route
             path="/admin/schedules"
