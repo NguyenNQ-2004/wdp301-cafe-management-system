@@ -9,6 +9,8 @@ import AdminDashboard from './pages/admin/AdminDashboardPage';
 import AdminCategoriesPage from './pages/admin/AdminCategoriesPage';
 import AdminStockPage from './pages/admin/AdminStockPage';
 import AdminRestockPage from './pages/admin/AdminRestockPage';
+import AdminSuppliersPage from './pages/admin/AdminSuppliersPage';
+import AdminPurchasesPage from './pages/admin/AdminPurchasesPage';
 import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
 import CounterPaymentsPage from './pages/pos/CounterPaymentsPage';
@@ -218,13 +220,7 @@ const AppLayout = () => {
             path="/admin/suppliers"
             element={
               user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-suppliers"
-                  title="21. Nhà cung cấp"
-                  subtitle="Màn hình quản lý danh bạ đối tác cung cấp nguyên liệu và thiết bị."
-                  table="suppliers"
-                  branch="feature/supplier-management"
-                />
+                <AdminSuppliersPage />
               ) : (
                 <Navigate to="/" />
               )
@@ -234,13 +230,7 @@ const AppLayout = () => {
             path="/admin/purchases"
             element={
               user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-purchases"
-                  title="22. Phiếu nhập hàng (Purchase Order)"
-                  subtitle="Màn hình quản lý đơn đặt hàng và nhập kho nguyên vật liệu."
-                  table="purchase_orders"
-                  branch="feature/purchase-order"
-                />
+                <AdminPurchasesPage />
               ) : (
                 <Navigate to="/" />
               )

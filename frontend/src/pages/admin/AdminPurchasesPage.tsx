@@ -1,11 +1,47 @@
-import React from 'react';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AdminLayout, Badge, Field, FormActions, GhostButton, Modal, PrimaryButton, StatCard, inputCls } from './AdminUi';
 
-export const AdminPurchasesPage: React.FC = () => {
-  return (
-    <div>
-      <h1>AdminPurchasesPage</h1>
-    </div>
-  );
-};
+type Status = 'DRAFT' | 'ORDERED' | 'RECEIVED' | 'CANCELLED';
+type Item = { ingredient: string; quantity: number; unitPrice: number };
+type Order = { id: number; code: string; supplier: string; creator: string; createdAt: string; status: Status; note: string; items: Item[] };
+const SUPPLIERS = ['Fresh Bean Supplier', 'Dairy and Syrup Co.', 'Bakery Ingredient Supply'];
+const INGREDIENTS = ['Coffee beans', 'Fresh milk', 'Peach syrup', 'Black tea', 'Tapioca pearls', 'Cheesecake slice', 'Orange', 'Lemon'];
+const INITIAL: Order[] = [
+  { id: 3, code: 'PO-0003', supplier: SUPPLIERS[2], creator: 'Aura Admin', createdAt: '03/10/2026 08:00', status: 'DRAFT', note: '', items: [{ ingredient: 'Cheesecake slice', quantity: 20, unitPrice: 40000 }] },
+  { id: 2, code: 'PO-0002', supplier: SUPPLIERS[1], creator: 'Aura Admin', createdAt: '02/10/2026 09:00', status: 'ORDERED', note: '', items: [{ ingredient: 'Fresh milk', quantity: 9000, unitPrice: 150 }, { ingredient: 'Peach syrup', quantity: 1250, unitPrice: 120 }] },
+  { id: 1, code: 'PO-0001', supplier: SUPPLIERS[0], creator: 'Aura Admin', createdAt: '01/10/2026 08:00', status: 'RECEIVED', note: '', items: [{ ingredient: 'Coffee beans', quantity: 5000, unitPrice: 400 }] }
+];
+const META: Record<Status, [string, string]> = { DRAFT: ['Nháp / Đề xuất', 'bg-stone-100 text-stone-700'], ORDERED: ['Đã đặt hàng', 'bg-blue-100 text-blue-700'], RECEIVED: ['Đã nhập kho', 'bg-emerald-100 text-emerald-800'], CANCELLED: ['Đã hủy', 'bg-rose-100 text-rose-700'] };
+const money = (value: number) => `${value.toLocaleString('vi-VN')}đ`;
+const total = (order: Order) => order.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
-export default AdminPurchasesPage;
+export default function AdminPurchasesPage() {
+  const navigate = useNavigate();
+  const [orders, setOrders] = useState(INITIAL);
+  const [filter, setFilter] = useState<'ALL' | Status>('ALL');
+  const [detail, setDetail] = useState<Order | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [supplier, setSupplier] = useState(SUPPLIERS[0]);
+  const [status, setStatus] = useState<Status>('DRAFT');
+  const [note, setNote] = useState('');
+  const [items, setItems] = useState<Item[]>([{ ingredient: INGREDIENTS[0], quantity: 1, unitPrice: 0 }]);
+  const [message, setMessage] = useState('');
+  const visible = filter === 'ALL' ? orders : orders.filter((order) => order.status === filter);
+  const counts = useMemo(() => Object.fromEntries((Object.keys(META) as Status[]).map((key) => [key, orders.filter((order) => order.status === key).length])) as Record<Status, number>, [orders]);
+
+  const changeStatus = (id: number, next: Status) => { setOrders((current) => current.map((order) => order.id === id ? { ...order, status: next } : order)); setMessage(next === 'RECEIVED' ? 'Đã nhập hàng vào kho.' : next === 'ORDERED' ? 'Đã đặt hàng.' : 'Đã hủy phiếu nhập.'); };
+  const create = (event: React.FormEvent) => { event.preventDefault(); const id = Math.max(0, ...orders.map((order) => order.id)) + 1; setOrders((current) => [{ id, code: `PO-${String(id).padStart(4, '0')}`, supplier, creator: 'Aura Admin', createdAt: new Date().toLocaleString('vi-VN', { hour12: false }), status, note, items }, ...current]); setCreateOpen(false); setItems([{ ingredient: INGREDIENTS[0], quantity: 1, unitPrice: 0 }]); setNote(''); setMessage('Đã tạo phiếu nhập hàng.'); };
+  const updateItem = (index: number, patch: Partial<Item>) => setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
+
+  return <AdminLayout route="admin-purchases" table="purchase_orders, purchase_order_items" title="Phiếu nhập hàng" subtitle="Tạo phiếu đặt hàng nhà cung cấp, theo dõi trạng thái và nhập kho khi nhận hàng."
+    actions={<><GhostButton icon="storefront" onClick={() => navigate('/admin/suppliers')}>Nhà cung cấp</GhostButton><PrimaryButton icon="add" onClick={() => setCreateOpen(true)}>Tạo phiếu nhập</PrimaryButton></>}
+    stats={<><StatCard label="Nháp / Đề xuất" value={counts.DRAFT} /><StatCard label="Đã đặt hàng" value={counts.ORDERED} /><StatCard label="Đã nhập kho" value={counts.RECEIVED} /><StatCard label="Đã hủy" value={counts.CANCELLED} /></>}>
+    {message ? <button type="button" onClick={() => setMessage('')} className="mb-3 w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-left text-xs text-stone-600">{message}</button> : null}
+    <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white"><div className="flex items-center justify-between border-b border-stone-100 px-5 py-4"><h2 className="font-bold">Danh sách phiếu nhập</h2><select aria-label="Lọc trạng thái" className={`${inputCls} w-auto min-w-40`} value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)}><option value="ALL">Tất cả trạng thái</option>{Object.entries(META).map(([key, value]) => <option key={key} value={key}>{value[0]}</option>)}</select></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-left text-xs"><thead className="border-b bg-stone-50 text-stone-500"><tr>{['Mã phiếu', 'Nhà cung cấp', 'Người tạo', 'Ngày tạo', 'Số dòng', 'Tổng tiền', 'Trạng thái', 'Thao tác'].map((heading) => <th key={heading} className="px-5 py-4">{heading}</th>)}</tr></thead><tbody className="divide-y">{visible.map((order) => <tr key={order.id}><td className="px-5 py-4 font-mono font-bold">{order.code}</td><td className="px-5 py-4 font-semibold">{order.supplier}</td><td className="px-5 py-4">{order.creator}</td><td className="px-5 py-4 text-stone-500">{order.createdAt}</td><td className="px-5 py-4 text-center">{order.items.length}</td><td className="px-5 py-4 text-right font-mono font-bold">{money(total(order))}</td><td className="px-5 py-4"><Badge className={META[order.status][1]}>{META[order.status][0]}</Badge></td><td className="px-5 py-4"><div className="flex justify-end gap-3 font-bold"><button onClick={() => setDetail(order)} className="text-[#a8071f]">Xem</button>{order.status === 'DRAFT' ? <button onClick={() => changeStatus(order.id, 'ORDERED')} className="text-blue-700">Đặt hàng</button> : null}{order.status === 'ORDERED' ? <button onClick={() => changeStatus(order.id, 'RECEIVED')} className="text-emerald-700">Nhập kho</button> : null}{['DRAFT', 'ORDERED'].includes(order.status) ? <button onClick={() => changeStatus(order.id, 'CANCELLED')} className="text-rose-700">Hủy</button> : null}</div></td></tr>)}</tbody></table></div>
+    </section>
+    {createOpen ? <Modal title="Tạo phiếu nhập hàng" onClose={() => setCreateOpen(false)} wide><form onSubmit={create} className="space-y-4 text-xs"><div className="grid gap-4 sm:grid-cols-2"><Field label="Nhà cung cấp"><select className={inputCls} value={supplier} onChange={(e) => setSupplier(e.target.value)}>{SUPPLIERS.map((name) => <option key={name}>{name}</option>)}</select></Field><Field label="Trạng thái ban đầu"><select className={inputCls} value={status} onChange={(e) => setStatus(e.target.value as Status)}><option value="DRAFT">Nháp / Đề xuất</option><option value="ORDERED">Đã đặt hàng</option></select></Field></div><div className="space-y-2"><div className="flex justify-between font-bold"><span>Nguyên liệu</span><button type="button" className="text-[#a8071f]" onClick={() => setItems((current) => [...current, { ingredient: INGREDIENTS[0], quantity: 1, unitPrice: 0 }])}>+ Thêm dòng</button></div>{items.map((item, index) => <div key={index} className="grid grid-cols-[1fr_100px_120px_32px] gap-2"><select aria-label={`Nguyên liệu ${index + 1}`} className={inputCls} value={item.ingredient} onChange={(e) => updateItem(index, { ingredient: e.target.value })}>{INGREDIENTS.map((name) => <option key={name}>{name}</option>)}</select><input aria-label={`Số lượng ${index + 1}`} required min="1" type="number" className={inputCls} value={item.quantity} onChange={(e) => updateItem(index, { quantity: Number(e.target.value) })} /><input aria-label={`Đơn giá ${index + 1}`} required min="0" type="number" className={inputCls} value={item.unitPrice} onChange={(e) => updateItem(index, { unitPrice: Number(e.target.value) })} /><button aria-label="Xóa dòng" type="button" disabled={items.length === 1} onClick={() => setItems((current) => current.filter((_, i) => i !== index))}>×</button></div>)}</div><Field label="Ghi chú"><textarea className={inputCls} value={note} onChange={(e) => setNote(e.target.value)} /></Field><div className="text-right font-bold">Tổng tiền: <span className="font-mono text-[#a8071f]">{money(items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0))}</span></div><FormActions onCancel={() => setCreateOpen(false)} submitLabel="Tạo phiếu nhập" /></form></Modal> : null}
+    {detail ? <Modal title={`Chi tiết ${detail.code}`} onClose={() => setDetail(null)} wide><div className="space-y-4 text-xs"><div className="grid grid-cols-2 gap-3 rounded-xl bg-stone-50 p-4"><div><span className="text-stone-500">Nhà cung cấp</span><p className="font-bold">{detail.supplier}</p></div><div><span className="text-stone-500">Trạng thái</span><p><Badge className={META[detail.status][1]}>{META[detail.status][0]}</Badge></p></div><div><span className="text-stone-500">Người tạo</span><p>{detail.creator}</p></div><div><span className="text-stone-500">Ngày tạo</span><p>{detail.createdAt}</p></div></div>{detail.items.map((item) => <div key={item.ingredient} className="flex justify-between border-b p-3"><b>{item.ingredient}</b><span className="font-mono">{item.quantity.toLocaleString('vi-VN')} × {money(item.unitPrice)}</span></div>)}<div className="text-right font-bold">Tổng tiền: {money(total(detail))}</div><GhostButton className="ml-auto" onClick={() => setDetail(null)}>Đóng</GhostButton></div></Modal> : null}
+  </AdminLayout>;
+}
