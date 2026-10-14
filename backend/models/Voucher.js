@@ -11,5 +11,5 @@ const voucherSchema = new mongoose.Schema({
   usageLimit: { type: Number },
   usedCount: { type: Number, default: 0 },
   status: { type: String, enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' }
-});
+}, { timestamps: true });
 module.exports = mongoose.model('Voucher', voucherSchema);

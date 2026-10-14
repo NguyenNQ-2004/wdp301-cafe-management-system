@@ -4,8 +4,9 @@ const userSchema = new mongoose.Schema(
   {
     fullName: { type: String, required: true },
     phone: { type: String, required: true, unique: true },
-    email: { type: String },
-    passwordHash: { type: String, required: true }, // Mật khẩu (sau này sẽ mã hoá)
+    passwordHash: { type: String, required: true },
+    birthday: { type: Date },
+    address: { type: String },
     role: { 
       type: String, 
       enum: ['ADMIN', 'STAFF', 'CUSTOMER'], 
@@ -21,17 +22,18 @@ const userSchema = new mongoose.Schema(
       type: String, 
       enum: ['MANAGER', 'BARISTA', 'CASHIER', 'SHIPPER'] 
     },
-    baseSalary: { type: Number, default: 0 },
+    baseSalary: { type: Number, default: 0, min: 0 },
+    hireDate: { type: Date },
     // Thuộc tính riêng của Customer (Membership)
     tierName: { 
       type: String, 
       enum: ['BRONZE', 'SILVER', 'GOLD', 'DIAMOND'], 
       default: 'BRONZE' 
     },
-    totalPoints: { type: Number, default: 0 },
+    totalPoints: { type: Number, default: 0, min: 0 },
   },
   {
-    timestamps: true, // Tự động tạo trường createdAt và updatedAt
+    timestamps: true,
   }
 );
 
