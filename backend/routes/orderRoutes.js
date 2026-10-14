@@ -10,6 +10,7 @@ const Cart = require('../models/Cart');
 const RewardItem = require('../models/RewardItem');
 const { protect } = require('../middlewares/authMiddleware');
 const { normalizeCartItems } = require('../utils/cartItems');
+const { demoPaymentsEnabled } = require('../utils/paymentMode');
 
 const router = express.Router();
 router.use(protect);
@@ -111,8 +112,9 @@ router.post('/', async (req, res) => {
     if (tableNumber != null && (typeof tableNumber !== 'string' || tableNumber.length > 20)) throw orderError('Số bàn không hợp lệ.');
     const finalPaymentMethod = isStaffOrAdmin
       ? (paymentMethod || (orderType === 'ONLINE' ? 'COD' : 'CASH'))
-      : (orderType === 'ONLINE' ? 'COD' : 'PAY_AT_COUNTER');
-    if (!['COD', 'PAY_AT_COUNTER', 'CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER'].includes(finalPaymentMethod)) throw orderError('Phương thức thanh toán không hợp lệ.');
+      : (orderType === 'ONLINE' ? (paymentMethod === 'DEMO_ONLINE' ? 'DEMO_ONLINE' : 'COD') : 'PAY_AT_COUNTER');
+    if (!['COD', 'PAY_AT_COUNTER', 'CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER', 'DEMO_ONLINE'].includes(finalPaymentMethod)) throw orderError('Phương thức thanh toán không hợp lệ.');
+    if (finalPaymentMethod === 'DEMO_ONLINE' && (orderType !== 'ONLINE' || req.user.role !== 'CUSTOMER' || !demoPaymentsEnabled())) throw orderError('Thanh toán mô phỏng hiện không khả dụng.', 403);
 
     const totalAmount = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
     let reward = null;
@@ -195,14 +197,12 @@ router.post('/', async (req, res) => {
     }
 
     // Tự động tạo payment ban đầu
-    const initialPaymentStatus = (orderType === 'DINE_IN' && isStaffOrAdmin) ? 'SUCCESS' : 'PENDING';
     await Payment.create({
       order: order._id,
-      paymentMethod: ['CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER'].includes(paymentMethod) ? paymentMethod : 'CASH',
+      paymentMethod: finalPaymentMethod === 'DEMO_ONLINE' ? 'DEMO_ONLINE' : ['CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER'].includes(finalPaymentMethod) ? finalPaymentMethod : 'CASH',
       amount: finalAmount,
-      status: initialPaymentStatus,
-      paidAt: initialPaymentStatus === 'SUCCESS' ? new Date() : undefined,
-      paymentNote: orderType === 'ONLINE' ? 'Đơn đặt online' : 'Thanh toán tại quầy'
+      status: 'PENDING',
+      paymentNote: finalPaymentMethod === 'DEMO_ONLINE' ? 'Giao dịch mô phỏng, không thu tiền thật' : orderType === 'ONLINE' ? 'Đơn đặt online' : 'Thanh toán tại quầy'
     });
 
     if (reward) await LoyaltyTransaction.create({ customer: req.user._id, order: order._id, pointsChange: -pointsReserved, transactionType: 'REDEEM' });
@@ -249,6 +249,7 @@ router.post('/', async (req, res) => {
 // 4. UPDATE ORDER STATUS (Dành cho Thu ngân, Pha chế, Shipper, Quản lý)
 router.put('/:id/status', async (req, res) => {
   try {
+    if (!['ADMIN', 'STAFF'].includes(req.user.role)) return res.status(403).json({ message: 'Chỉ nhân viên được cập nhật trạng thái đơn hàng.' });
     const { status, cancelReason, shipperId } = req.body;
     const validStatuses = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'DELIVERING', 'COMPLETED', 'CANCELLED'];
     
@@ -263,13 +264,15 @@ router.put('/:id/status', async (req, res) => {
     if (cancelReason !== undefined) order.cancelReason = cancelReason;
     if (shipperId) order.shipper = shipperId;
 
-    // Khi đơn COMPLETED: cập nhật thanh toán và cộng điểm tích lũy
+    // COD được thu khi giao xong; đơn tại quầy và demo có bước xác nhận riêng.
     if (status === 'COMPLETED') {
-      await Payment.findOneAndUpdate(
-        { order: order._id },
-        { status: 'SUCCESS', paidAt: new Date() },
-        { new: true }
-      );
+      if (order.orderType === 'ONLINE' && order.paymentMethod === 'COD') {
+        await Payment.findOneAndUpdate(
+          { order: order._id, status: 'PENDING', paymentMethod: 'CASH' },
+          { $set: { status: 'SUCCESS', paidAt: new Date(), paymentNote: 'Thu tiền COD khi giao hàng hoàn tất' } },
+          { returnDocument: 'after' }
+        );
+      }
 
       // Nếu có khách hàng và chưa cộng điểm cho đơn này: cộng điểm (1.000đ = 1 điểm)
       if (order.customer) {
