@@ -9,6 +9,7 @@ import AdminDashboard from './pages/admin/AdminDashboardPage';
 import AdminShiftsPage from './pages/admin/AdminShiftsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminSchedulesPage from './pages/admin/AdminSchedulesPage';
+import AdminAttendancePage from './pages/admin/AdminAttendancePage';
 import AdminCategoriesPage from './pages/admin/AdminCategoriesPage';
 import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
@@ -277,19 +278,11 @@ const AppLayout = () => {
           />
           <Route
             path="/admin/attendance"
-            element={
-              user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-attendance"
-                  title="26. Chấm công nhân sự"
-                  subtitle="Màn hình theo dõi điểm danh và lịch sử chấm công ra vào ca của nhân viên."
-                  table="attendance_records"
-                  branch="feature/attendance-management"
-                />
-              ) : (
-                <Navigate to="/" />
-              )
-            }
+            element={user?.role === 'ADMIN' ? <AdminAttendancePage /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/my-attendance"
+            element={user?.role === 'STAFF' ? <AdminAttendancePage /> : <Navigate to="/" />}
           />
           <Route
             path="/admin/customers"

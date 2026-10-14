@@ -314,6 +314,18 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>Lịch làm việc của tôi</span>
                     </button>
                   )}
+                  {user.role === 'STAFF' && (
+                    <button
+                      onClick={() => {
+                        onNavigate('my-attendance');
+                        setIsUserMenuOpen(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-xs sm:text-sm text-on-surface hover:bg-surface-container flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[18px] text-secondary">how_to_reg</span>
+                      <span>Chấm công của tôi</span>
+                    </button>
+                  )}
 
                   {/* Quyền quản trị cho Admin */}
                   {user.role === 'ADMIN' && (

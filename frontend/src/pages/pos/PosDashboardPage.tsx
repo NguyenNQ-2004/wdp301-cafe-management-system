@@ -65,6 +65,7 @@ const CashierDashboard: React.FC = () => {
         {/* Chuyển nhanh giữa các phân hệ */}
         <div className="flex items-center gap-2">
           {user.role === 'STAFF' && <button onClick={() => navigate('/my-schedule')} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-blue-700 border border-blue-200">Lịch của tôi</button>}
+          {user.role === 'STAFF' && <button onClick={() => navigate('/my-attendance')} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-blue-700 border border-blue-200">Chấm công</button>}
           {user.role === 'ADMIN' && (
             <button
               onClick={() => navigate('/admin')}
