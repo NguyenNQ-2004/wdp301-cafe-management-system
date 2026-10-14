@@ -6,6 +6,8 @@ import useCartStore from './store/cartStore';
 import useCartSync from './hooks/useCartSync';
 import { shopApi, ShopApiError } from './lib/shopApi';
 import AdminDashboard from './pages/admin/AdminDashboardPage';
+import AdminCategoriesPage from './pages/admin/AdminCategoriesPage';
+import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
 import CounterPaymentsPage from './pages/pos/CounterPaymentsPage';
 import BaristaDashboard from './pages/kds/KdsTerminalPage';
@@ -20,7 +22,9 @@ import FeedbackPage from './pages/FeedbackPage';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { AuthModal } from './components/AuthModal';
+import { DbContextProvider } from './data/DbContext';
 import type { PageRoute } from './types';
+
 
 /** Trả về đường dẫn phù hợp sau khi đăng nhập */
 const getRoleRedirectPath = (user: { role: string; position?: string } | null, currentPath: string = '/'): string => {
@@ -64,6 +68,7 @@ const AppLayout = () => {
 
   const handleNavigate = (route: PageRoute) => {
     if (route === 'home') navigate('/');
+    else if (route.startsWith('admin-')) navigate(`/admin/${route.replace('admin-', '')}`);
     else navigate(`/${route}`);
   };
 
@@ -71,33 +76,37 @@ const AppLayout = () => {
   useEffect(() => {
     const path = location.pathname;
     if (!user) {
-      if (['/admin', '/cashier', '/barista', '/delivery', '/profile'].includes(path)) {
+      if (['/admin', '/admin/categories', '/cashier', '/barista', '/delivery', '/profile'].some(p => path.startsWith(p))) {
         navigate('/');
         setIsAuthOpen(true);
       }
     }
   }, [user, location.pathname, navigate]);
 
+  const isDedicatedScreen = location.pathname.startsWith('/admin') || ['/cashier', '/barista'].includes(location.pathname);
+
   return (
     <div className="min-h-screen bg-surface flex flex-col">
-      <Header
-        currentRoute={getRouteFromPath(location.pathname)}
-        onNavigate={handleNavigate}
-        cartCount={cartCount}
-        onSearch={(query) => navigate(query ? `/menu?search=${encodeURIComponent(query)}` : '/menu')}
-        onOpenAuth={() => {
-          if (user) {
-            // Nếu đã đăng nhập thì mở profile hoặc dashboard tương ứng
-            if (user.role === 'ADMIN') navigate('/admin');
-            else if (user.role === 'STAFF' && user.position === 'CASHIER') navigate('/cashier');
-            else if (user.role === 'STAFF' && user.position === 'BARISTA') navigate('/barista');
-            else navigate('/profile');
-          } else {
-            setIsAuthOpen(true);
-          }
-        }}
-      />
-      <main className="flex-1 pt-20">
+      {!isDedicatedScreen && (
+        <Header
+          currentRoute={getRouteFromPath(location.pathname)}
+          onNavigate={handleNavigate}
+          cartCount={cartCount}
+          onSearch={(query) => navigate(query ? `/menu?search=${encodeURIComponent(query)}` : '/menu')}
+          onOpenAuth={() => {
+            if (user) {
+              // Nếu đã đăng nhập thì mở profile hoặc dashboard tương ứng
+              if (user.role === 'ADMIN') navigate('/admin');
+              else if (user.role === 'STAFF' && user.position === 'CASHIER') navigate('/cashier');
+              else if (user.role === 'STAFF' && user.position === 'BARISTA') navigate('/barista');
+              else navigate('/profile');
+            } else {
+              setIsAuthOpen(true);
+            }
+          }}
+        />
+      )}
+      <main className={`flex-1 ${!isDedicatedScreen ? 'pt-20' : ''}`}>
         <Routes>
           <Route path="/" element={<HomeContainer />} />
           <Route path="/home" element={<HomeContainer />} />
@@ -115,6 +124,232 @@ const AppLayout = () => {
           <Route
             path="/admin"
             element={user?.role === 'ADMIN' ? <AdminDashboard /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/admin/categories"
+            element={user?.role === 'ADMIN' ? <AdminCategoriesPage onNavigate={handleNavigate} /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/admin/products"
+            element={
+              user?.role === 'ADMIN' ? (
+                <AdminPlaceholderPage
+                  route="admin-products"
+                  title="16. Quản lý Sản phẩm & Giá bán"
+                  subtitle="Màn hình quản lý danh sách sản phẩm, giá bán và cấu hình kích cỡ / topping."
+                  table="products"
+                  branch="feature/product-management"
+                />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/admin/recipes"
+            element={
+              user?.role === 'ADMIN' ? (
+                <AdminPlaceholderPage
+                  route="admin-recipes"
+                  title="17. Công thức pha chế (BOM)"
+                  subtitle="Màn hình thiết lập định mức nguyên vật liệu tiêu hao cho từng món đồ uống."
+                  table="product_ingredients"
+                  branch="feature/recipe-management"
+                />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/admin/orders"
+            element={
+              user?.role === 'ADMIN' ? (
+                <AdminPlaceholderPage
+                  route="admin-orders"
+                  title="32. Quản lý Đơn hàng"
+                  subtitle="Màn hình theo dõi toàn bộ hóa đơn và đơn bán hàng từ POS và online."
+                  table="orders"
+                />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/admin/ingredients"
+            element={
+              user?.role === 'ADMIN' ? (
+                <AdminPlaceholderPage
+                  route="admin-ingredients"
+                  title="18. Kho Nguyên liệu"
+                  subtitle="Màn hình danh mục nguyên vật liệu dùng trong pha chế và bếp."
+                  table="ingredients"
+                  branch="feature/ingredient-management"
+                />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/admin/inventory"
+            element={
+              user?.role === 'ADMIN' ? (
+                <AdminPlaceholderPage
+                  route="admin-inventory"
+                  title="19. Tồn kho & Cảnh báo"
+                  subtitle="Màn hình theo dõi số lượng tồn kho thực tế và cảnh báo chạm mức tối thiểu."
+                  table="inventory_transactions"
+                  branch="feature/inventory-management"
+                />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/admin/restock"
+            element={
+              user?.role === 'ADMIN' ? (
+                <AdminPlaceholderPage
+                  route="admin-restock"
+                  title="20. Đề xuất nhập hàng"
+                  subtitle="Màn hình tạo và duyệt các yêu cầu nhập nguyên liệu từ bộ phận pha chế/kho."
+                  table="restock_requests"
+                  branch="feature/restock-request"
+                />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/admin/suppliers"
+            element={
+              user?.role === 'ADMIN' ? (
+                <AdminPlaceholderPage
+                  route="admin-suppliers"
+                  title="21. Nhà cung cấp"
+                  subtitle="Màn hình quản lý danh bạ đối tác cung cấp nguyên liệu và thiết bị."
+                  table="suppliers"
+                  branch="feature/supplier-management"
+                />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/admin/purchases"
+            element={
+              user?.role === 'ADMIN' ? (
+                <AdminPlaceholderPage
+                  route="admin-purchases"
+                  title="22. Phiếu nhập hàng (Purchase Order)"
+                  subtitle="Màn hình quản lý đơn đặt hàng và nhập kho nguyên vật liệu."
+                  table="purchase_orders"
+                  branch="feature/purchase-order"
+                />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/admin/employees"
+            element={
+              user?.role === 'ADMIN' ? (
+                <AdminPlaceholderPage
+                  route="admin-employees"
+                  title="23. Hồ sơ Nhân viên"
+                  subtitle="Màn hình quản lý danh sách nhân sự, thông tin cá nhân và tài khoản truy cập."
+                  table="users"
+                  branch="feature/employee-management"
+                />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/admin/shifts"
+            element={
+              user?.role === 'ADMIN' ? (
+                <AdminPlaceholderPage
+                  route="admin-shifts"
+                  title="24. Khung giờ ca làm"
+                  subtitle="Màn hình thiết lập các khung giờ ca sáng, chiều, tối của cửa hàng."
+                  table="work_shifts"
+                  branch="feature/shift-management"
+                />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/admin/schedules"
+            element={
+              user?.role === 'ADMIN' ? (
+                <AdminPlaceholderPage
+                  route="admin-schedules"
+                  title="25. Lịch phân ca"
+                  subtitle="Màn hình xếp lịch làm việc hàng tuần cho nhân viên thu ngân và pha chế."
+                  table="work_schedules"
+                  branch="feature/schedule-management"
+                />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/admin/attendance"
+            element={
+              user?.role === 'ADMIN' ? (
+                <AdminPlaceholderPage
+                  route="admin-attendance"
+                  title="26. Chấm công nhân sự"
+                  subtitle="Màn hình theo dõi điểm danh và lịch sử chấm công ra vào ca của nhân viên."
+                  table="attendance_records"
+                  branch="feature/attendance-management"
+                />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/admin/customers"
+            element={
+              user?.role === 'ADMIN' ? (
+                <AdminPlaceholderPage
+                  route="admin-customers"
+                  title="28. Quản lý Khách hàng"
+                  subtitle="Màn hình danh sách khách hàng thân thiết, điểm tích lũy và lịch sử giao dịch."
+                  table="users"
+                  branch="feature/customer-management"
+                />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/admin/*"
+            element={
+              user?.role === 'ADMIN' ? (
+                <AdminPlaceholderPage
+                  route="admin"
+                  title="Tính năng đang được phát triển"
+                  subtitle="Phân hệ này đang trong lộ trình phát triển của hệ thống Aura Café ERP."
+                  table="system"
+                />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
           />
           <Route
             path="/cashier"
@@ -138,9 +373,11 @@ const AppLayout = () => {
           />
           
           <Route path="*" element={<Navigate to="/" replace />} />
+
         </Routes>
       </main>
-      <Footer onNavigate={handleNavigate} />
+      {!isDedicatedScreen && <Footer onNavigate={handleNavigate} />}
+
       <AuthModal 
         isOpen={isAuthOpen} 
         onClose={() => setIsAuthOpen(false)} 
@@ -168,9 +405,12 @@ const AppLayout = () => {
 function App() {
   return (
     <BrowserRouter>
-      <AppLayout />
+      <DbContextProvider>
+        <AppLayout />
+      </DbContextProvider>
     </BrowserRouter>
   );
 }
 
 export default App;
+
