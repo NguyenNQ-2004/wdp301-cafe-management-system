@@ -171,6 +171,13 @@ const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
+      <section className="mb-8 rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div><p className="text-xs font-bold uppercase tracking-widest text-primary">Màn hình 23 · Nhân sự</p><h2 className="mt-1 text-xl font-bold text-on-surface">Quản lý nhân viên</h2><p className="mt-1 text-sm text-secondary">Thêm, sửa, phân vị trí và bật/tắt tài khoản nhân viên.</p></div>
+          <button onClick={() => navigate('/admin/employees')} className="rounded-lg bg-primary px-5 py-2.5 font-semibold text-white">Mở quản lý nhân viên</button>
+        </div>
+      </section>
+
       {/* Thông tin tài khoản & Đổi mật khẩu */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm">

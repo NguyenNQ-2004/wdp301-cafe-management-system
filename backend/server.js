@@ -20,6 +20,7 @@ app.get('/', (req, res) => {
 // Group A: Users & Work Schedules
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/employees', require('./routes/employeeRoutes'));
 app.use('/api/work-schedules', require('./routes/workScheduleRoutes'));
 
 // Group B: Products & Sales

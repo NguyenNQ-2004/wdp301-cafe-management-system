@@ -6,6 +6,7 @@ import useCartStore from './store/cartStore';
 import useCartSync from './hooks/useCartSync';
 import { shopApi, ShopApiError } from './lib/shopApi';
 import AdminDashboard from './pages/admin/AdminDashboardPage';
+import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminCategoriesPage from './pages/admin/AdminCategoriesPage';
 import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
@@ -258,19 +259,7 @@ const AppLayout = () => {
           />
           <Route
             path="/admin/employees"
-            element={
-              user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-employees"
-                  title="23. Hồ sơ Nhân viên"
-                  subtitle="Màn hình quản lý danh sách nhân sự, thông tin cá nhân và tài khoản truy cập."
-                  table="users"
-                  branch="feature/employee-management"
-                />
-              ) : (
-                <Navigate to="/" />
-              )
-            }
+            element={user?.role === 'ADMIN' ? <AdminUsersPage /> : <Navigate to="/" />}
           />
           <Route
             path="/admin/shifts"
