@@ -16,6 +16,7 @@ import AdminSuppliersPage from './pages/admin/AdminSuppliersPage';
 import AdminPurchasesPage from './pages/admin/AdminPurchasesPage';
 import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage';
 import AdminCustomersPage from './pages/admin/AdminCustomersPage';
+import AdminMembershipsPage from './pages/admin/AdminMembershipsPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
 import CounterPaymentsPage from './pages/pos/CounterPaymentsPage';
 import PosHandoverPage from './pages/pos/PosHandoverPage';
@@ -269,6 +270,14 @@ const AppLayout = () => {
             element={
               user?.role === 'ADMIN' || (user?.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user?.position || ''))
                 ? <AdminCustomersPage />
+                : <Navigate to="/" />
+            }
+          />
+          <Route
+            path="/admin/memberships"
+            element={
+              user?.role === 'ADMIN' || user?.role === 'STAFF'
+                ? <AdminMembershipsPage />
                 : <Navigate to="/" />
             }
           />

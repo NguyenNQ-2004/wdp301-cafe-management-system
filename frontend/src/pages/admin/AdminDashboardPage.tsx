@@ -212,7 +212,7 @@ const AdminDashboard: React.FC = () => {
 
             <div 
               onClick={() => navigate('/admin/memberships')}
-              className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm hover:shadow-md transition-all cursor-pointer group"
+              className="bg-surface-container-lowest p-6 rounded-xl border-2 border-amber-300 shadow-sm hover:shadow-md transition-all cursor-pointer group bg-gradient-to-br from-white to-amber-50/40"
             >
               <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
                 <span className="material-symbols-outlined text-[24px]">loyalty</span>

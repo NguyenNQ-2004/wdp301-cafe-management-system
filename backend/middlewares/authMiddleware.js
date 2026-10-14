@@ -126,4 +126,3 @@ const adminOrStaff = (req, res, next) => {
 };
 
 module.exports = { protect, adminOnly, authorize, authorizePosition, adminOrCashier, adminOrStaff };
-
