@@ -161,6 +161,68 @@ const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Grid: Customer, Loyalty & Complaints (Cụm 4) */}
+      <div className="mb-4">
+        <h2 className="text-sm font-bold text-secondary uppercase tracking-wider mb-3">
+          Phân hệ Quản lý Đơn hàng, Hội viên & Phản hồi (Cụm 4)
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div 
+            onClick={() => navigate('/admin/customers')}
+            className="bg-surface-container-lowest p-6 rounded-xl border-2 border-red-200/80 shadow-sm hover:shadow-md transition-all cursor-pointer group bg-gradient-to-br from-white to-red-50/40"
+          >
+            <div className="w-12 h-12 rounded-xl bg-red-100 text-red-800 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[24px]">contact_page</span>
+            </div>
+            <div className="inline-block px-2 py-0.5 rounded bg-red-100 text-red-800 text-[10px] font-bold mb-1">Screen 28</div>
+            <h3 className="font-bold text-base text-on-surface mb-1">Khách hàng & Hội viên (CRM)</h3>
+            <p className="text-secondary text-xs leading-relaxed">
+              Quản lý danh sách hội viên, tra cứu lịch sử mua hàng thật, chi tiêu tích lũy và điểm thưởng.
+            </p>
+            <div className="mt-4 flex items-center text-xs font-semibold text-red-700 group-hover:underline">
+              <span>Mở quản trị Khách hàng</span>
+              <span className="material-symbols-outlined text-[16px] ml-1">east</span>
+            </div>
+          </div>
+
+          <div 
+            onClick={() => navigate('/admin/memberships')}
+            className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm hover:shadow-md transition-all cursor-pointer group"
+          >
+            <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[24px]">loyalty</span>
+            </div>
+            <div className="inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold mb-1">Screen 29</div>
+            <h3 className="font-bold text-base text-on-surface mb-1">Tích điểm & Hạng thẻ</h3>
+            <p className="text-secondary text-xs leading-relaxed">
+              Cấu hình hạng thẻ Đồng-Bạc-Vàng-Kim Cương, tra cứu điểm theo SĐT và nhật ký tích điểm.
+            </p>
+            <div className="mt-4 flex items-center text-xs font-semibold text-amber-700 group-hover:underline">
+              <span>Mở chương trình Hội viên</span>
+              <span className="material-symbols-outlined text-[16px] ml-1">east</span>
+            </div>
+          </div>
+
+          <div 
+            onClick={() => navigate('/admin/complaints')}
+            className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm hover:shadow-md transition-all cursor-pointer group"
+          >
+            <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[24px]">feedback</span>
+            </div>
+            <div className="inline-block px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-bold mb-1">Screen 30</div>
+            <h3 className="font-bold text-base text-on-surface mb-1">Đánh giá & Khiếu nại</h3>
+            <p className="text-secondary text-xs leading-relaxed">
+              Tiếp nhận đánh giá sao, khiếu nại sự cố đơn hàng, viết phản hồi và đổi trạng thái xử lý.
+            </p>
+            <div className="mt-4 flex items-center text-xs font-semibold text-purple-700 group-hover:underline">
+              <span>Mở xử lý Khiếu nại</span>
+              <span className="material-symbols-outlined text-[16px] ml-1">east</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Thông tin tài khoản & Đổi mật khẩu */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm">

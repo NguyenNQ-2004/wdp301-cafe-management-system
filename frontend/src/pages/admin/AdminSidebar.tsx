@@ -1,11 +1,4 @@
-import React from 'react';
+import { AdminSidebar } from './AdminUi';
 
-export const AdminSidebar: React.FC = () => {
-  return (
-    <div>
-      <h1>AdminSidebar</h1>
-    </div>
-  );
-};
-
+export { AdminSidebar };
 export default AdminSidebar;
