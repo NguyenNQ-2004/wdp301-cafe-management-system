@@ -75,6 +75,10 @@ Sau khi chạy lệnh `/api/seed` ở Backend, bạn có thể đăng nhập b�
 
 Giỏ hàng được lưu trong MongoDB khi đăng nhập. Khách chưa đăng nhập có thể thêm món vào giỏ trên trình duyệt, sau đó đăng nhập để đồng bộ và đặt hàng. Đơn giao tận nơi thanh toán khi nhận hàng; đơn mang đi thanh toán tại quầy.
 
+### Đặt hàng online (UC11)
+
+Từ giỏ hàng, chọn món rồi vào trang xác nhận đơn. Khách hàng cần đăng nhập, nhập tên và số điện thoại người nhận; đơn giao tận nơi cần thêm địa chỉ. Server tính lại giá món, mức giảm điểm và phí giao hàng trước khi tạo đơn, lưu thông tin nhận hàng, các món, trạng thái thanh toán chờ xử lý và xóa những món đã đặt khỏi giỏ. Đơn giao tận nơi dùng COD; đơn mang đi thanh toán tại quầy. Có thể chạy `npm run test:online-ordering` trong thư mục `backend` để kiểm tra luồng này bằng database tạm tự dọn sau khi chạy.
+
 Khách hàng đăng nhập có thể chọn tối đa một ưu đãi đổi bằng điểm trong giỏ hàng. Hệ thống dùng `RewardItem.pointsCost`, `discountValue`, `minOrderValue`, `stock` và `User.totalPoints` để kiểm tra; điểm và số lượng ưu đãi chỉ bị trừ khi đơn được tạo thành công. Đơn lưu mức giảm và số điểm đã dùng, đồng thời ghi `LoyaltyTransaction`. Mốc miễn phí giao hàng tính theo tiền món trước giảm điểm. Không có ô nhập mã voucher trong luồng này. Không cần chạy lại `seed.js` để dùng tính năng; chạy seed sẽ xóa dữ liệu mẫu cũ.
 
 ### Phân quyền tài khoản mẫu

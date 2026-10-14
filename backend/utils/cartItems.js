@@ -39,6 +39,9 @@ const normalizeCartItems = async (rawItems) => {
 
     const modifier = sizes ? Number(sizes[size]) : 0;
     if (!Number.isFinite(modifier) || modifier < 0) throw new Error('Giá size không hợp lệ.');
+    if (!Number.isInteger(product.basePrice) || product.basePrice < 0 || !Number.isInteger(modifier)) {
+      throw new Error(`Giá của ${product.name} không hợp lệ.`);
+    }
     normalized.push({
       product,
       quantity,
