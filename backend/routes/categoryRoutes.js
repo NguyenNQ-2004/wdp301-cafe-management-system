@@ -64,7 +64,7 @@ router.put('/:id', protect, adminOnly, async (req, res) => {
       updateData.imageUrl = finalImg;
       updateData.image_url = finalImg;
     }
-    const updated = await Category.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    const updated = await Category.findByIdAndUpdate(req.params.id, updateData, { returnDocument: 'after' });
     res.json(updated); 
   } 
   catch (error) { res.status(500).json({ error: error.message }); }

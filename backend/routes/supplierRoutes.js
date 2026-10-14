@@ -40,7 +40,7 @@ router.post('/', adminOnly, async (req, res) => {
 // 4. UPDATE
 router.put('/:id', adminOnly, async (req, res) => {
   try {
-    const supplier = await Supplier.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const supplier = await Supplier.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
     res.json(supplier);
   } catch (error) {
     res.status(400).json({ message: error.message });
