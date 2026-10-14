@@ -87,8 +87,10 @@ router.put('/:id/status', adminOnly, async (req, res) => {
           ingredient: item.ingredient,
           transactionType: 'IN_PURCHASE',
           quantity: item.quantity,
+          stockDelta: item.quantity,
           referenceType: 'PURCHASE_ORDER',
-          referenceId: po._id
+          referenceId: po._id,
+          createdBy: req.user._id
         });
       }
     }

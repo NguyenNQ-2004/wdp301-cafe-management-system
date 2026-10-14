@@ -103,9 +103,10 @@ export const PrimaryButton: React.FC<{
 
 export const StatCard: React.FC<{
   label: string;
-  value: string | number;
-  tone?: 'success' | 'danger' | 'warning' | 'default';
-}> = ({ label, value, tone = 'default' }) => {
+  value: React.ReactNode;
+  hint?: React.ReactNode;
+  tone?: 'success' | 'danger' | 'warning' | 'primary' | 'default';
+}> = ({ label, value, hint, tone = 'default' }) => {
   const toneCls =
     tone === 'success'
       ? 'text-[#0f5132] bg-[#eefbf4] border-[#d1f2e1]'
@@ -113,12 +114,41 @@ export const StatCard: React.FC<{
       ? 'text-[#991b1b] bg-[#fdf2f2] border-[#fde2e2]'
       : tone === 'warning'
       ? 'text-amber-800 bg-amber-50 border-amber-200'
+      : tone === 'primary'
+      ? 'text-[#800020] bg-[#fff5f6] border-[#efc4cc]'
       : 'text-stone-900 bg-white border-stone-200';
 
   return (
     <div className={`p-4 rounded-2xl border shadow-2xs space-y-1 ${toneCls}`}>
       <div className="text-[10px] font-bold uppercase tracking-wider text-stone-500">{label}</div>
       <div className="text-2xl font-bold font-mono">{value}</div>
+      {hint && <div className="text-[11px] font-normal text-stone-500">{hint}</div>}
     </div>
   );
 };
+
+export const GhostButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: string }> = ({ icon, children, className = '', ...rest }) => (
+  <button {...rest} className={`px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold rounded-xl border border-stone-200 flex items-center gap-1.5 disabled:opacity-50 cursor-pointer ${className}`}>
+    {icon && <span className="material-symbols-outlined text-[16px]">{icon}</span>}
+    {children}
+  </button>
+);
+
+export const Modal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }> = ({ title, onClose, children, wide }) => (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm">
+    <div className={`bg-white rounded-2xl shadow-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-md'} overflow-hidden flex flex-col max-h-[90vh]`}>
+      <div className="flex justify-between items-center p-4 border-b border-stone-100 bg-stone-50">
+        <h3 className="font-bold text-stone-900 text-sm">{title}</h3>
+        <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700 cursor-pointer"><span className="material-symbols-outlined text-[20px]">close</span></button>
+      </div>
+      <div className="p-5 overflow-y-auto">{children}</div>
+    </div>
+  </div>
+);
+
+export const FormActions: React.FC<{ onCancel: () => void; submitLabel: string }> = ({ onCancel, submitLabel }) => (
+  <div className="pt-4 flex gap-3">
+    <button type="button" onClick={onCancel} className="flex-1 px-4 py-2.5 bg-stone-100 text-stone-700 font-bold rounded-xl text-xs hover:bg-stone-200 cursor-pointer">Hủy bỏ</button>
+    <button type="submit" className="flex-1 px-4 py-2.5 bg-[#800020] text-white font-bold rounded-xl text-xs hover:bg-[#68001a] cursor-pointer">{submitLabel}</button>
+  </div>
+);

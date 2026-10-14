@@ -818,12 +818,12 @@ const importData = async () => {
     // ==========================================
     console.log('📊 Đang tạo Inventory Transactions...');
     await InventoryTransaction.insertMany([
-      { ingredient: ing[1]._id, transactionType: 'IN_PURCHASE', quantity: 5000, referenceType: 'PURCHASE_ORDER', referenceId: po[1]._id, createdAt: new Date('2026-10-01T10:00:00Z') },
-      { ingredient: ing[2]._id, transactionType: 'IN_PURCHASE', quantity: 10000, referenceType: 'PURCHASE_ORDER', referenceId: po[2]._id, createdAt: new Date('2026-10-02T10:00:00Z') },
-      { ingredient: ing[1]._id, transactionType: 'OUT_ORDER', quantity: 36, referenceType: 'ORDER', referenceId: ord[1]._id, createdAt: new Date('2026-10-03T09:10:00Z') },
-      { ingredient: ing[2]._id, transactionType: 'OUT_ORDER', quantity: 360, referenceType: 'ORDER', referenceId: ord[2]._id, createdAt: new Date('2026-10-03T10:10:00Z') },
-      { ingredient: ing[5]._id, transactionType: 'SPOILAGE', quantity: 100, referenceType: 'ADJUSTMENT', createdAt: new Date('2026-10-03T11:00:00Z') },
-      { ingredient: ing[3]._id, transactionType: 'ADJUSTMENT', quantity: 50, referenceType: 'ADJUSTMENT', createdAt: new Date('2026-10-03T11:30:00Z') }
+      { ingredient: ing[1]._id, transactionType: 'IN_PURCHASE', quantity: 5000, stockDelta: 5000, referenceType: 'PURCHASE_ORDER', referenceId: po[1]._id, createdAt: new Date('2026-10-01T10:00:00Z') },
+      { ingredient: ing[2]._id, transactionType: 'IN_PURCHASE', quantity: 10000, stockDelta: 10000, referenceType: 'PURCHASE_ORDER', referenceId: po[2]._id, createdAt: new Date('2026-10-02T10:00:00Z') },
+      { ingredient: ing[1]._id, transactionType: 'OUT_ORDER', quantity: 36, stockDelta: -36, referenceType: 'ORDER', referenceId: ord[1]._id, createdAt: new Date('2026-10-03T09:10:00Z') },
+      { ingredient: ing[2]._id, transactionType: 'OUT_ORDER', quantity: 360, stockDelta: -360, referenceType: 'ORDER', referenceId: ord[2]._id, createdAt: new Date('2026-10-03T10:10:00Z') },
+      { ingredient: ing[5]._id, transactionType: 'SPOILAGE', quantity: 100, stockDelta: -100, referenceType: 'ADJUSTMENT', createdAt: new Date('2026-10-03T11:00:00Z') },
+      { ingredient: ing[3]._id, transactionType: 'ADJUSTMENT', quantity: 50, stockDelta: 50, referenceType: 'ADJUSTMENT', createdAt: new Date('2026-10-03T11:30:00Z') }
     ]);
 
     // ==========================================
