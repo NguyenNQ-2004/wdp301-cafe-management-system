@@ -77,6 +77,15 @@ app.get('/api/seed', async (req, res) => {
   }
 });
 
+// Middleware xử lý lỗi chung (JSON không hợp lệ, lỗi server)
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ message: 'Dữ liệu JSON không hợp lệ.' });
+  }
+  console.error('Server error:', err);
+  res.status(err.status || 500).json({ message: err.message || 'Lỗi máy chủ.' });
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Aura Cafe ERP API Server đang chạy trên cổng ${PORT}`);
