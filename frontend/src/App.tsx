@@ -8,6 +8,7 @@ import { shopApi, ShopApiError } from './lib/shopApi';
 import AdminDashboard from './pages/admin/AdminDashboardPage';
 import AdminShiftsPage from './pages/admin/AdminShiftsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
+import AdminSchedulesPage from './pages/admin/AdminSchedulesPage';
 import AdminCategoriesPage from './pages/admin/AdminCategoriesPage';
 import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
@@ -268,19 +269,11 @@ const AppLayout = () => {
           />
           <Route
             path="/admin/schedules"
-            element={
-              user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-schedules"
-                  title="25. Lịch phân ca"
-                  subtitle="Màn hình xếp lịch làm việc hàng tuần cho nhân viên thu ngân và pha chế."
-                  table="work_schedules"
-                  branch="feature/schedule-management"
-                />
-              ) : (
-                <Navigate to="/" />
-              )
-            }
+            element={user?.role === 'ADMIN' ? <AdminSchedulesPage /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/my-schedule"
+            element={user?.role === 'STAFF' ? <AdminSchedulesPage /> : <Navigate to="/" />}
           />
           <Route
             path="/admin/attendance"
