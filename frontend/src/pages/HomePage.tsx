@@ -11,7 +11,7 @@ interface HomePageProps {
 
 export const HomePage: React.FC<HomePageProps> = ({
   onNavigate,
-  onNavigateCategory = () => {},
+  onNavigateCategory = () => { },
   onSelectProduct
 }) => {
   const { db } = useDb();

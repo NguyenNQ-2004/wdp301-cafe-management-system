@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import axios from 'axios';
-import type { Category, Product, ActiveStatus } from '../types';
+import type { Category, Product, ActiveStatus, OrderStatus, OrderType } from '../types';
 
 import useAuthStore from '../store/authStore';
 
@@ -79,6 +79,10 @@ export interface Transaction {
 export interface DbState {
   categories: Category[];
   products: Product[];
+  orders: any[];
+  users: any[];
+  payments: any[];
+  order_items: any[];
   [key: string]: any[];
 }
 
@@ -87,12 +91,18 @@ export interface DbContextValue {
   transact: <R = any>(callback: (tx: Transaction) => R) => R;
   refresh: () => Promise<void>;
   loading: boolean;
+  setOrderStatus: (orderId: any, status: OrderStatus) => Promise<void> | void;
+  cancelOrder: (orderId: any, reason: string) => Promise<void> | void;
 }
 
 const defaultContextValue: DbContextValue = {
   db: {
     categories: DEFAULT_CATEGORIES,
-    products: []
+    products: [],
+    orders: [],
+    users: [],
+    payments: [],
+    order_items: []
   },
   transact: <R = any>(callback: (tx: Transaction) => R): R => {
     const dummyTx: Transaction = {
@@ -103,7 +113,9 @@ const defaultContextValue: DbContextValue = {
     return callback(dummyTx);
   },
   refresh: async () => {},
-  loading: false
+  loading: false,
+  setOrderStatus: async () => {},
+  cancelOrder: async () => {}
 };
 
 export const DbContext = createContext<DbContextValue>(defaultContextValue);
@@ -111,6 +123,9 @@ export const DbContext = createContext<DbContextValue>(defaultContextValue);
 export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   const getAuthHeader = () => {
@@ -156,12 +171,85 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
     });
   };
 
+  const normalizeOrders = (rawOrders: any[]): any[] => {
+    return rawOrders.map((o: any, idx: number) => {
+      const orderId = o._id || o.id || idx + 1;
+      return {
+        id: orderId,
+        _id: orderId,
+        order_code: o.orderCode || o.order_code || `ORD-${orderId}`,
+        orderCode: o.orderCode || o.order_code || `ORD-${orderId}`,
+        created_at: o.createdAt || o.created_at || new Date().toISOString(),
+        createdAt: o.createdAt || o.created_at || new Date().toISOString(),
+        order_type: (o.orderType || o.order_type || 'DINE_IN') as OrderType,
+        orderType: (o.orderType || o.order_type || 'DINE_IN') as OrderType,
+        table_number: o.tableNumber || o.table_number || null,
+        tableNumber: o.tableNumber || o.table_number || null,
+        customer_id: o.customer?._id || o.customer_id || (typeof o.customer === 'string' ? o.customer : null),
+        customer: o.customer,
+        cashier_id: o.cashier?._id || o.cashier_id || (typeof o.cashier === 'string' ? o.cashier : null),
+        cashier: o.cashier,
+        shipper_id: o.shipper?._id || o.shipper_id || (typeof o.shipper === 'string' ? o.shipper : null),
+        shipper: o.shipper,
+        total_amount: o.totalAmount ?? o.total_amount ?? 0,
+        totalAmount: o.totalAmount ?? o.total_amount ?? 0,
+        discount_amount: o.discountAmount ?? o.discount_amount ?? 0,
+        discountAmount: o.discountAmount ?? o.discount_amount ?? 0,
+        delivery_fee: o.deliveryFee ?? o.delivery_fee ?? 0,
+        deliveryFee: o.deliveryFee ?? o.delivery_fee ?? 0,
+        final_amount: o.finalAmount ?? o.final_amount ?? 0,
+        finalAmount: o.finalAmount ?? o.final_amount ?? 0,
+        payment_method: o.paymentMethod || o.payment_method || 'CASH',
+        paymentMethod: o.paymentMethod || o.payment_method || 'CASH',
+        status: (o.status || 'PENDING') as OrderStatus,
+        recipient_name: o.recipientName || o.recipient_name || '',
+        recipientName: o.recipientName || o.recipient_name || '',
+        recipient_phone: o.recipientPhone || o.recipient_phone || '',
+        recipientPhone: o.recipientPhone || o.recipient_phone || '',
+        delivery_address: o.deliveryAddress || o.delivery_address || '',
+        deliveryAddress: o.deliveryAddress || o.delivery_address || '',
+        order_note: o.orderNote || o.order_note || '',
+        orderNote: o.orderNote || o.order_note || '',
+        cancel_reason: o.cancelReason || o.cancel_reason || '',
+        cancelReason: o.cancelReason || o.cancel_reason || '',
+        items: o.items || []
+      };
+    });
+  };
+
+  const normalizeUsers = (rawUsers: any[]): any[] => {
+    return rawUsers.map((u: any, idx: number) => {
+      const uId = u._id || u.id || idx + 1;
+      return {
+        id: uId,
+        _id: uId,
+        full_name: u.fullName || u.full_name || u.name || 'Người dùng',
+        fullName: u.fullName || u.full_name || u.name || 'Người dùng',
+        phone: u.phone || '',
+        position: u.position || 'STAFF',
+        status: u.status || 'ACTIVE',
+        role: u.role || 'STAFF'
+      };
+    });
+  };
+
   const refresh = useCallback(async () => {
     try {
-      const [catRes, prodRes] = await Promise.allSettled([
+      const authHeaders = getAuthHeader();
+      const promises: Promise<any>[] = [
         axios.get(`${API_BASE}/categories`),
         axios.get(`${API_BASE}/products`)
-      ]);
+      ];
+
+      if (authHeaders.Authorization) {
+        promises.push(axios.get(`${API_BASE}/orders`, { headers: authHeaders }));
+        promises.push(axios.get(`${API_BASE}/employees`, { headers: authHeaders }));
+        promises.push(axios.get(`${API_BASE}/payments`, { headers: authHeaders }));
+      }
+
+      const results = await Promise.allSettled(promises);
+      const catRes = results[0];
+      const prodRes = results[1];
 
       if (catRes.status === 'fulfilled' && Array.isArray(catRes.value.data) && catRes.value.data.length > 0) {
         setCategories(normalizeCategories(catRes.value.data));
@@ -169,6 +257,18 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
 
       if (prodRes.status === 'fulfilled' && Array.isArray(prodRes.value.data)) {
         setProducts(normalizeProducts(prodRes.value.data));
+      }
+
+      if (results[2]?.status === 'fulfilled' && Array.isArray(results[2].value.data)) {
+        setOrders(normalizeOrders(results[2].value.data));
+      }
+
+      if (results[3]?.status === 'fulfilled' && Array.isArray(results[3].value.data)) {
+        setUsers(normalizeUsers(results[3].value.data));
+      }
+
+      if (results[4]?.status === 'fulfilled' && Array.isArray(results[4].value.data)) {
+        setPayments(results[4].value.data);
       }
     } catch (err) {
       console.warn('DbContext refresh error:', err);
@@ -180,6 +280,36 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  const setOrderStatus = useCallback(async (orderId: any, status: OrderStatus) => {
+    setOrders(prev =>
+      prev.map(o => (o.id === orderId || o._id === orderId || String(o.id) === String(orderId)) ? { ...o, status } : o)
+    );
+    try {
+      const target = orders.find(o => o.id === orderId || o._id === orderId || String(o.id) === String(orderId));
+      const mongoId = target?._id || orderId;
+      await axios.put(`${API_BASE}/orders/${mongoId}/status`, { status }, { headers: getAuthHeader() });
+    } catch (err) {
+      console.error('Failed to update order status on server:', err);
+    }
+  }, [orders]);
+
+  const cancelOrder = useCallback(async (orderId: any, reason: string) => {
+    setOrders(prev =>
+      prev.map(o =>
+        (o.id === orderId || o._id === orderId || String(o.id) === String(orderId))
+          ? { ...o, status: 'CANCELLED' as OrderStatus, cancel_reason: reason, cancelReason: reason }
+          : o
+      )
+    );
+    try {
+      const target = orders.find(o => o.id === orderId || o._id === orderId || String(o.id) === String(orderId));
+      const mongoId = target?._id || orderId;
+      await axios.put(`${API_BASE}/orders/${mongoId}/status`, { status: 'CANCELLED', cancelReason: reason }, { headers: getAuthHeader() });
+    } catch (err) {
+      console.error('Failed to cancel order on server:', err);
+    }
+  }, [orders]);
 
   const transact = useCallback(<R = any>(callback: (tx: Transaction) => R): R => {
     let result: any;
@@ -263,6 +393,30 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
             .catch(err => {
               console.error('Failed to update category on server:', err);
             });
+        } else if (table === 'orders') {
+          setOrders(prev =>
+            prev.map(o => {
+              if (o.id === id || o._id === id || String(o.id) === String(id)) {
+                return { ...o, ...data };
+              }
+              return o;
+            })
+          );
+
+          const target = orders.find(o => o.id === id || o._id === id || String(o.id) === String(id));
+          const mongoId = target?._id || id;
+          if (data.shipper_id !== undefined || data.shipperId !== undefined) {
+            axios.put(
+              `${API_BASE}/orders/${mongoId}/status`,
+              {
+                status: target?.status || 'PENDING',
+                shipperId: data.shipper_id !== undefined ? data.shipper_id : data.shipperId
+              },
+              { headers: getAuthHeader() }
+            ).catch(err => {
+              console.error('Failed to update shipper on server:', err);
+            });
+          }
         }
       },
 
@@ -276,7 +430,6 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
           axios.delete(`${API_BASE}/categories/${mongoId}`, { headers: getAuthHeader() })
             .catch(err => {
               console.error('Failed to remove category on server:', err);
-              // Rollback if needed
               refresh();
             });
         }
@@ -285,16 +438,22 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
 
     result = callback(tx);
     return result;
-  }, [categories, refresh]);
+  }, [categories, orders, refresh]);
 
   const value: DbContextValue = {
     db: {
       categories,
-      products
+      products,
+      orders,
+      users,
+      payments,
+      order_items: orders.flatMap(o => o.items || [])
     },
     transact,
     refresh,
-    loading
+    loading,
+    setOrderStatus,
+    cancelOrder
   };
 
   return <DbContext.Provider value={value}>{children}</DbContext.Provider>;

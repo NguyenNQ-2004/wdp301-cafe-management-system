@@ -10,6 +10,7 @@ import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminSchedulesPage from './pages/admin/AdminSchedulesPage';
 import AdminAttendancePage from './pages/admin/AdminAttendancePage';
 import AdminCategoriesPage from './pages/admin/AdminCategoriesPage';
+import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 import AdminStockPage from './pages/admin/AdminStockPage';
 import AdminRestockPage from './pages/admin/AdminRestockPage';
 import AdminSuppliersPage from './pages/admin/AdminSuppliersPage';
@@ -175,12 +176,7 @@ const AppLayout = () => {
             path="/admin/orders"
             element={
               user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-orders"
-                  title="32. Quản lý Đơn hàng"
-                  subtitle="Màn hình theo dõi toàn bộ hóa đơn và đơn bán hàng từ POS và online."
-                  table="orders"
-                />
+                <AdminOrdersPage onNavigate={handleNavigate} />
               ) : (
                 <Navigate to="/" />
               )
