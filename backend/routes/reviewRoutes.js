@@ -211,7 +211,7 @@ router.put('/:id/respond', adminOnly, async (req, res) => {
       .populate('respondedBy', 'fullName position');
 
     res.json({
-      message: `Đã phản hồi phiếu #${review._id.slice(-6).toUpperCase()} thành công!`,
+      message: `Đã phản hồi phiếu #${String(review._id).slice(-6).toUpperCase()} thành công!`,
       review: updated
     });
   } catch (error) {

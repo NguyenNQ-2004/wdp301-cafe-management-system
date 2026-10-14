@@ -14,7 +14,10 @@
     "test:employee-management": "node --test tests/employeeManagement.test.js",
     "test:employee-schedule": "node --test tests/employeeSchedule.test.js",
     "test:attendance-management": "node --test tests/attendanceManagement.test.js",
-    "test:shift-handover": "node --test tests/shiftHandover.test.js"
+    "test:shift-handover": "node --test tests/shiftHandover.test.js",
+    "test:customer-management": "node --test tests/customerManagement.test.js",
+    "test:loyalty-management": "node --test tests/loyaltyManagement.test.js",
+    "test:feedback-complaints": "node --test tests/feedbackComplaints.test.js"
   },
   "keywords": [],
   "author": "",

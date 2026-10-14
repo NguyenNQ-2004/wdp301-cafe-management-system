@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Order = require('../models/Order');
+const Product = require('../models/Product');
 const LoyaltyTransaction = require('../models/LoyaltyTransaction');
 const { protect, adminOnly, adminOrCashier } = require('../middlewares/authMiddleware');
 
