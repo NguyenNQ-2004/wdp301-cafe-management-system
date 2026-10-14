@@ -6,6 +6,7 @@ import useCartStore from './store/cartStore';
 import useCartSync from './hooks/useCartSync';
 import { shopApi, ShopApiError } from './lib/shopApi';
 import AdminDashboard from './pages/admin/AdminDashboardPage';
+import AdminComplaintsPage from './pages/admin/AdminComplaintsPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
 import BaristaDashboard from './pages/kds/KdsTerminalPage';
 import CustomerDashboard from './pages/ProfilePage';
@@ -70,7 +71,7 @@ const AppLayout = () => {
   useEffect(() => {
     const path = location.pathname;
     if (!user) {
-      if (['/admin', '/cashier', '/barista', '/delivery', '/profile'].includes(path)) {
+      if (path.startsWith('/admin') || ['/cashier', '/barista', '/delivery', '/profile'].includes(path)) {
         navigate('/');
         setIsAuthOpen(true);
       }
@@ -114,6 +115,10 @@ const AppLayout = () => {
           <Route
             path="/admin"
             element={user?.role === 'ADMIN' ? <AdminDashboard /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/admin/complaints"
+            element={user?.role === 'ADMIN' ? <AdminComplaintsPage /> : <Navigate to="/" />}
           />
           <Route
             path="/cashier"

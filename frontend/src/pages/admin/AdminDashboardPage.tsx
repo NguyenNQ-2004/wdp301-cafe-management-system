@@ -161,6 +161,32 @@ const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Grid: Feedback & Complaints (Screen 30) */}
+      <div className="mb-4">
+        <h2 className="text-sm font-bold text-secondary uppercase tracking-wider mb-3">
+          Chăm sóc khách hàng & Xử lý khiếu nại (Feedback & Complaints)
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div 
+            onClick={() => navigate('/admin/complaints')}
+            className="bg-surface-container-lowest p-6 rounded-xl border-2 border-purple-300 shadow-sm hover:shadow-md transition-all cursor-pointer group bg-gradient-to-br from-white to-purple-50/40"
+          >
+            <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[24px]">feedback</span>
+            </div>
+            <div className="inline-block px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-bold mb-1">Screen 30</div>
+            <h3 className="font-bold text-base text-on-surface mb-1">Đánh giá & Khiếu nại sự cố</h3>
+            <p className="text-secondary text-xs leading-relaxed">
+              Tiếp nhận đánh giá sao, khiếu nại đơn hàng, viết phản hồi chính thức và cập nhật trạng thái xử lý.
+            </p>
+            <div className="mt-4 flex items-center text-xs font-semibold text-purple-700 group-hover:underline">
+              <span>Mở quản trị Khiếu nại</span>
+              <span className="material-symbols-outlined text-[16px] ml-1">east</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Thông tin tài khoản & Đổi mật khẩu */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm">
