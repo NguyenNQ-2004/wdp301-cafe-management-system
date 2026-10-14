@@ -24,6 +24,10 @@ Admin mở `/admin/shifts` để chỉnh giờ bắt đầu và kết thúc củ
 
 Admin mở `/admin/schedules` để xem lịch theo tuần, phân công nhân viên đang hoạt động vào ca sáng, chiều, tối; có thể sửa hoặc bỏ ca chưa chấm công. Nhân viên mở `/my-schedule` để xem lịch của chính mình. Dữ liệu lưu trong bảng `work_schedules` đã có sẵn, khung giờ hiển thị theo cài đặt ca làm. API `/api/work-schedules` giới hạn dữ liệu theo tuần; nhân viên chỉ đọc được lịch cá nhân, Admin được quản lý phân công. Kiểm tra bằng `cd backend && npm run test:employee-schedule`.
 
+## Chấm công (màn hình 26)
+
+Nhân viên mở `/my-attendance` để check-in ca của mình từ 60 phút trước giờ bắt đầu đến giờ kết thúc trong ngày được phân, sau đó check-out trong ngày hoặc trước 06:00 sáng hôm sau. Hệ thống ghi giờ thực tế, ngăn chấm lặp và không cho chấm công hộ. Admin mở `/admin/attendance` để lọc lịch sử tối đa 31 ngày, xem giờ dự kiến so với giờ thực tế và đánh dấu vắng mặt cho ca đã qua ngày làm việc mà chưa check-in. Chức năng dùng các trường sẵn có trong bảng `work_schedules`, không cần chạy lại seed. Chạy `cd backend && npm run test:attendance-management` để kiểm tra.
+
 ## 🚀 Công nghệ sử dụng (MERN Stack)
 - **Frontend**: ReactJS (Vite, TypeScript), React Router DOM, Zustand (Quản lý State), Axios.
 - **Backend**: Node.js, Express.js.
