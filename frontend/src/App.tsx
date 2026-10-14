@@ -46,7 +46,7 @@ const AppLayout = () => {
     if (!user?.token) return;
     const token = user.token;
     let active = true;
-    shopApi<{ _id: string; fullName: string; phone: string; role: string; position?: string }>('/api/auth/me', { token })
+    shopApi<{ _id: string; fullName: string; phone: string; address?: string; role: string; position?: string }>('/api/auth/me', { token })
       .then((account) => {
         if (active && useAuthStore.getState().user?.token === token) login({ ...account, token });
       })
@@ -145,6 +145,7 @@ const AppLayout = () => {
             _id: userData._id,
             fullName: userData.fullName,
             phone: userData.phone,
+            address: userData.address,
             role: userData.role,
             position: userData.position,
             token: userData.token

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cartPayload, formatVnd, shopApi } from '../lib/shopApi';
@@ -24,9 +24,10 @@ export default function CheckoutPage({ onRequestAuth }: CheckoutPageProps) {
   const [mode, setMode] = useState<'ONLINE' | 'TAKEAWAY'>('ONLINE');
   const [name, setName] = useState(user?.fullName || '');
   const [phone, setPhone] = useState(user?.phone || '');
-  const [address, setAddress] = useState('');
+  const [address, setAddress] = useState(user?.address || '');
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [error, setError] = useState('');
   const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
   const reward = loyalty?.rewards.find((offer) => offer._id === rewardId);
@@ -35,21 +36,35 @@ export default function CheckoutPage({ onRequestAuth }: CheckoutPageProps) {
   const fee = mode === 'ONLINE' && subtotal < 150000 ? 18000 : 0;
 
   useEffect(() => {
-    if (user) { setName((current) => current || user.fullName); setPhone((current) => current || user.phone); }
+    if (user) {
+      setName((current) => current || user.fullName);
+      setPhone((current) => current || user.phone);
+      setAddress((current) => current || user.address || '');
+    }
   }, [user]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!items.length) { navigate('/cart'); return; }
     if (!user) { onRequestAuth(); return; }
+    if (user.role !== 'CUSTOMER') { setError('Vui lòng dùng tài khoản khách hàng để đặt món online.'); return; }
     if (!cartReady || cartOwnerId !== user._id) return;
     if (rewardId && !rewardValid) return;
+    if (submittingRef.current) return;
+    const recipientName = name.trim();
+    const recipientPhone = phone.trim();
+    const deliveryAddress = address.trim();
+    const digits = (recipientPhone.match(/\d/g) || []).length;
+    if (!recipientName || recipientName.length > 100) { setError('Tên người nhận phải từ 1 đến 100 ký tự.'); return; }
+    if (recipientPhone.length > 30 || !/^\+?[0-9 .()-]+$/.test(recipientPhone) || digits < 9 || digits > 15) { setError('Số điện thoại nhận hàng phải có từ 9 đến 15 chữ số.'); return; }
+    if (mode === 'ONLINE' && (deliveryAddress.length < 5 || deliveryAddress.length > 300)) { setError('Địa chỉ giao hàng phải từ 5 đến 300 ký tự.'); return; }
     setError('');
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const order = await shopApi<OrderRecord>('/api/orders', {
         method: 'POST', token: user.token,
-        body: { items: cartPayload(items), orderType: mode, recipientName: name, recipientPhone: phone, deliveryAddress: address, orderNote: note, rewardId: rewardValid ? rewardId : undefined, expectedTotal: subtotal - discount + fee }
+        body: { items: cartPayload(items), orderType: mode, recipientName, recipientPhone, deliveryAddress: mode === 'ONLINE' ? deliveryAddress : undefined, orderNote: note.trim(), rewardId: rewardValid ? rewardId : undefined, expectedTotal: subtotal - discount + fee }
       });
       setRewardId(null);
       removeSelected();
@@ -57,6 +72,7 @@ export default function CheckoutPage({ onRequestAuth }: CheckoutPageProps) {
     } catch (err) {
       setError((err as Error).message);
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -83,10 +99,10 @@ export default function CheckoutPage({ onRequestAuth }: CheckoutPageProps) {
           <section className="rounded-xl border border-blue-100 bg-white p-5 shadow-sm space-y-4">
             <h2 className="font-bold text-lg flex items-center gap-2"><span className="material-symbols-outlined text-primary">person_pin_circle</span>Thông tin nhận hàng</h2>
             <div className="grid sm:grid-cols-2 gap-4">
-              <label className="text-sm font-semibold text-slate-700">Tên người nhận<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} className="mt-1 block w-full rounded-lg border border-blue-100 bg-slate-50 px-3 py-2.5 outline-none focus:border-primary" /></label>
-              <label className="text-sm font-semibold text-slate-700">Số điện thoại<input value={phone} onChange={(event) => setPhone(event.target.value)} required inputMode="tel" className="mt-1 block w-full rounded-lg border border-blue-100 bg-slate-50 px-3 py-2.5 outline-none focus:border-primary" /></label>
+              <label className="text-sm font-semibold text-slate-700">Tên người nhận<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} autoComplete="name" className="mt-1 block w-full rounded-lg border border-blue-100 bg-slate-50 px-3 py-2.5 outline-none focus:border-primary" /></label>
+              <label className="text-sm font-semibold text-slate-700">Số điện thoại<input value={phone} onChange={(event) => setPhone(event.target.value)} required type="tel" maxLength={30} autoComplete="tel" inputMode="tel" aria-describedby="recipient-phone-hint" className="mt-1 block w-full rounded-lg border border-blue-100 bg-slate-50 px-3 py-2.5 outline-none focus:border-primary" /><span id="recipient-phone-hint" className="mt-1 block text-xs font-normal text-slate-500">Từ 9 đến 15 chữ số.</span></label>
             </div>
-            {mode === 'ONLINE' ? <label className="block text-sm font-semibold text-slate-700">Địa chỉ giao hàng<textarea value={address} onChange={(event) => setAddress(event.target.value)} required maxLength={300} rows={3} placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" className="mt-1 block w-full rounded-lg border border-blue-100 bg-slate-50 px-3 py-2.5 outline-none focus:border-primary" /></label>
+            {mode === 'ONLINE' ? <label className="block text-sm font-semibold text-slate-700">Địa chỉ giao hàng<textarea value={address} onChange={(event) => setAddress(event.target.value)} required maxLength={300} rows={3} autoComplete="street-address" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" className="mt-1 block w-full rounded-lg border border-blue-100 bg-slate-50 px-3 py-2.5 outline-none focus:border-primary" /></label>
               : <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm"><strong className="block text-slate-900">Nhận tại quầy Aura Café</strong><span className="text-slate-600">Chi nhánh 01: 28 Phố Tràng Tiền, Hoàn Kiếm, Hà Nội</span></div>}
           </section>
 
