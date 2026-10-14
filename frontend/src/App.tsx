@@ -7,6 +7,7 @@ import useCartSync from './hooks/useCartSync';
 import { shopApi, ShopApiError } from './lib/shopApi';
 import AdminDashboard from './pages/admin/AdminDashboardPage';
 import AdminCategoriesPage from './pages/admin/AdminCategoriesPage';
+import AdminStockPage from './pages/admin/AdminStockPage';
 import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
 import CounterPaymentsPage from './pages/pos/CounterPaymentsPage';
@@ -196,13 +197,7 @@ const AppLayout = () => {
             path="/admin/inventory"
             element={
               user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-inventory"
-                  title="19. Tồn kho & Cảnh báo"
-                  subtitle="Màn hình theo dõi số lượng tồn kho thực tế và cảnh báo chạm mức tối thiểu."
-                  table="inventory_transactions"
-                  branch="feature/inventory-management"
-                />
+                <AdminStockPage />
               ) : (
                 <Navigate to="/" />
               )
