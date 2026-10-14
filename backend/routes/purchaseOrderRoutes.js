@@ -18,6 +18,31 @@ const populateOrder = (query) => query
   .populate('creator', 'fullName phone role')
   .populate('items.ingredient', 'name unit currentStock minStockLevel supplier');
 
+// Complete payload used by the Purchase Order management screen.
+router.get('/management-overview', async (req, res) => {
+  try {
+    const [orders, suppliers, ingredients, purchaseItems] = await Promise.all([
+      populateOrder(PurchaseOrder.find().sort({ createdAt: -1 })).lean(),
+      Supplier.find({ status: 'ACTIVE' }).sort({ name: 1 }).lean(),
+      Ingredient.find().populate('supplier', 'name status').sort({ name: 1 }).lean(),
+      PurchaseOrderItem.find().select('ingredient unitPrice createdAt').sort({ createdAt: -1, _id: -1 }).lean()
+    ]);
+    const latestPrices = new Map();
+    for (const item of purchaseItems) {
+      const key = String(item.ingredient);
+      if (!latestPrices.has(key)) latestPrices.set(key, item.unitPrice);
+    }
+    const ingredientRows = ingredients.map((ingredient) => ({
+      ...ingredient,
+      latestUnitPrice: latestPrices.get(String(ingredient._id)) ?? 0
+    }));
+    const summary = Object.fromEntries(STATUSES.map((status) => [status, orders.filter((order) => order.status === status).length]));
+    res.json({ summary, orders, suppliers, ingredients: ingredientRows });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Aggregated data used by the Restock Request screen.
 router.get('/restock-overview', async (req, res) => {
   try {
@@ -121,17 +146,35 @@ router.put('/:id/status', async (req, res) => {
     if (!ALLOWED_TRANSITIONS[order.status].includes(status)) return res.status(409).json({ message: `Không thể chuyển phiếu từ ${order.status} sang ${status}.` });
 
     if (status === 'RECEIVED') {
+      const ingredientIds = order.items.map((item) => item.ingredient);
+      if (await Ingredient.countDocuments({ _id: { $in: ingredientIds } }) !== ingredientIds.length) {
+        return res.status(409).json({ message: 'Phiếu nhập có nguyên liệu không còn tồn tại.' });
+      }
+      const statusUpdate = { status: 'RECEIVED' };
+      if (typeof note === 'string') statusUpdate.note = note.trim();
+      const lockedOrder = await PurchaseOrder.findOneAndUpdate(
+        { _id: order._id, status: 'ORDERED' },
+        { $set: statusUpdate },
+        { returnDocument: 'after', runValidators: true }
+      );
+      if (!lockedOrder) return res.status(409).json({ message: 'Phiếu nhập đã được xử lý bởi một yêu cầu khác.' });
+
       const stockOperations = order.items.map((item) => ({ updateOne: { filter: { _id: item.ingredient }, update: { $inc: { currentStock: item.quantity } } } }));
-      await Ingredient.bulkWrite(stockOperations);
+      let stockUpdated = false;
       try {
+        await Ingredient.bulkWrite(stockOperations);
+        stockUpdated = true;
         await InventoryTransaction.insertMany(order.items.map((item) => ({
           ingredient: item.ingredient, transactionType: 'IN_PURCHASE', quantity: item.quantity,
           stockDelta: item.quantity, referenceType: 'PURCHASE_ORDER', referenceId: order._id, createdBy: req.user._id
         })));
       } catch (error) {
-        await Ingredient.bulkWrite(order.items.map((item) => ({ updateOne: { filter: { _id: item.ingredient }, update: { $inc: { currentStock: -item.quantity } } } })));
+        if (stockUpdated) await Ingredient.bulkWrite(order.items.map((item) => ({ updateOne: { filter: { _id: item.ingredient }, update: { $inc: { currentStock: -item.quantity } } } })));
+        await PurchaseOrder.updateOne({ _id: order._id, status: 'RECEIVED' }, { $set: { status: 'ORDERED' } });
         throw error;
       }
+      const populated = await populateOrder(PurchaseOrder.findById(order._id));
+      return res.json({ message: 'Cập nhật trạng thái phiếu nhập thành công!', purchaseOrder: populated });
     }
 
     order.status = status;
