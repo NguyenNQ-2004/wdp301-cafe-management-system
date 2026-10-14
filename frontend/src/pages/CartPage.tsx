@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatVnd, shopApi } from '../lib/shopApi';
 import useCartStore from '../store/cartStore';
+import useAuthStore from '../store/authStore';
+import useLoyalty from '../hooks/useLoyalty';
 import type { CatalogProduct } from '../types/shop';
 
 const FREESHIP_THRESHOLD = 150000;
@@ -9,6 +11,13 @@ const FREESHIP_THRESHOLD = 150000;
 export default function CartPage() {
   const navigate = useNavigate();
   const items = useCartStore((state) => state.items);
+  const user = useAuthStore((state) => state.user);
+  const cartReady = useCartStore((state) => state.ready);
+  const cartOwnerId = useCartStore((state) => state.ownerId);
+  const syncError = useCartStore((state) => state.syncError);
+  const rewardId = useCartStore((state) => state.rewardId);
+  const setRewardId = useCartStore((state) => state.setRewardId);
+  const { summary: loyalty, loading: loyaltyLoading, error: loyaltyError } = useLoyalty(user?.token);
   const addProduct = useCartStore((state) => state.addProduct);
   const updateQuantity = useCartStore((state) => state.updateQuantity);
   const removeItem = useCartStore((state) => state.removeItem);
@@ -18,6 +27,10 @@ export default function CartPage() {
   const [suggestions, setSuggestions] = useState<CatalogProduct[]>([]);
   const selected = items.filter((item) => item.checked);
   const subtotal = selected.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  const reward = loyalty?.rewards.find((offer) => offer._id === rewardId);
+  const cartUsable = !user || (cartReady && cartOwnerId === user._id);
+  const rewardEligible = !!reward && !!loyalty?.canRedeem && cartUsable && subtotal >= reward.minOrderValue && loyalty.totalPoints >= reward.pointsCost;
+  const discount = rewardEligible && reward ? Math.min(reward.discountValue, subtotal) : 0;
   const percent = Math.min(100, Math.round(subtotal / FREESHIP_THRESHOLD * 100));
   const allChecked = items.length > 0 && selected.length === items.length;
 
@@ -28,6 +41,10 @@ export default function CartPage() {
     }).catch(() => {});
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (rewardId && (!user || (cartReady && loyalty && !rewardEligible))) setRewardId(null);
+  }, [rewardId, user, cartReady, loyalty, rewardEligible, setRewardId]);
 
   const suggested = suggestions.filter((product) => !items.some((item) => item.productId === product._id)).slice(0, 2);
 
@@ -118,10 +135,34 @@ export default function CartPage() {
 
         <aside className="lg:col-span-4 lg:sticky lg:top-24 rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-bold">Tóm tắt đơn hàng</h2>
+          {user && syncError && <p role="alert" className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{syncError}</p>}
           <div className="mt-5 flex justify-between text-sm text-slate-600"><span>Tổng tiền hàng ({selected.length} món)</span><strong className="text-slate-950">{formatVnd(subtotal)}</strong></div>
+          <div className="mt-5 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm">
+            <h3 className="font-bold flex items-center gap-2"><span className="material-symbols-outlined text-primary">stars</span>Dùng điểm tích lũy</h3>
+            {!user && <p className="mt-2 text-slate-600">Bạn có thể chọn món ngay. Đăng nhập ở bước đặt hàng để dùng điểm.</p>}
+            {user && loyaltyLoading && <p className="mt-2 text-slate-600">Đang tải điểm tích lũy...</p>}
+            {user && loyaltyError && <p role="alert" className="mt-2 text-red-700">{loyaltyError}</p>}
+            {loyalty && !loyalty.canRedeem && <p className="mt-2 text-slate-600">Ưu đãi điểm dành cho tài khoản khách hàng.</p>}
+            {loyalty?.canRedeem && <>
+              <p className="mt-2 text-slate-700">Bạn có <strong>{loyalty.totalPoints} điểm</strong>. Điểm chỉ bị trừ khi đặt hàng thành công.</p>
+              <div className="mt-3 space-y-2">
+                <label className="flex gap-2 items-center cursor-pointer"><input type="radio" name="loyalty-reward" checked={!rewardId} onChange={() => setRewardId(null)} className="accent-primary" />Không dùng điểm</label>
+                {loyalty.rewards.map((offer) => {
+                  const enoughPoints = loyalty.totalPoints >= offer.pointsCost;
+                  const enoughOrder = subtotal >= offer.minOrderValue;
+                  return <label key={offer._id} className={`flex gap-2 items-start rounded-lg bg-white p-2 ${enoughPoints && enoughOrder ? 'cursor-pointer' : 'opacity-55'}`}>
+                    <input type="radio" name="loyalty-reward" checked={rewardId === offer._id} disabled={!enoughPoints || !enoughOrder || !cartUsable} onChange={() => setRewardId(offer._id)} className="accent-primary mt-1" />
+                    <span><strong>Giảm {formatVnd(offer.discountValue)}</strong><span className="block text-xs text-slate-600">{offer.pointsCost} điểm · Đơn từ {formatVnd(offer.minOrderValue)}</span></span>
+                  </label>;
+                })}
+                {loyalty.rewards.length === 0 && <p className="text-slate-600">Hiện chưa có ưu đãi điểm khả dụng.</p>}
+              </div>
+            </>}
+          </div>
+          {discount > 0 && <div className="mt-4 flex justify-between text-sm text-emerald-700"><span>Giảm bằng điểm</span><strong>−{formatVnd(discount)}</strong></div>}
           <p className="mt-3 text-xs text-slate-500">Phí giao hàng được tính ở bước xác nhận đơn. Đơn từ {formatVnd(FREESHIP_THRESHOLD)} được miễn phí giao.</p>
-          <div className="mt-5 border-t border-blue-100 pt-5 flex items-end justify-between gap-2"><div><strong>Tổng tiền món</strong><p className="text-xs text-slate-500">Đã bao gồm thuế GTGT</p></div><strong className="text-2xl md:text-3xl text-primary">{formatVnd(subtotal)}</strong></div>
-          <button disabled={!selected.length} onClick={() => navigate('/checkout')} className="mt-6 w-full rounded-lg bg-primary py-3 text-white font-bold disabled:bg-slate-300 flex justify-center items-center gap-2">Tiến hành đặt hàng ({selected.length} món)<span className="material-symbols-outlined">arrow_forward</span></button>
+          <div className="mt-5 border-t border-blue-100 pt-5 flex items-end justify-between gap-2"><strong>Tổng tiền món sau giảm</strong><strong className="text-2xl md:text-3xl text-primary">{formatVnd(subtotal - discount)}</strong></div>
+          <button disabled={!selected.length || !cartUsable} onClick={() => navigate('/checkout')} className="mt-6 w-full rounded-lg bg-primary py-3 text-white font-bold disabled:bg-slate-300 flex justify-center items-center gap-2">{user && !cartUsable ? 'Đang đồng bộ giỏ hàng...' : `Tiến hành đặt hàng (${selected.length} món)`}<span className="material-symbols-outlined">arrow_forward</span></button>
           <div className="mt-5 rounded-lg border border-blue-100 bg-blue-50 p-4 text-xs text-slate-600 space-y-3">
             <p className="flex gap-2"><span className="material-symbols-outlined text-primary text-lg">verified_user</span>Đơn hàng được xác nhận trước khi pha chế.</p>
             <p className="flex gap-2"><span className="material-symbols-outlined text-primary text-lg">thermostat</span>Đồ uống được đóng gói phù hợp khi giao hàng.</p>

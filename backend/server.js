@@ -26,6 +26,7 @@ app.use('/api/work-schedules', require('./routes/workScheduleRoutes'));
 app.use('/api/categories', require('./routes/categoryRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
+app.use('/api/loyalty', require('./routes/rewardRoutes'));
 
 // Group C: Accounting & Customer Care
 app.use('/api/payments', require('./routes/paymentRoutes'));

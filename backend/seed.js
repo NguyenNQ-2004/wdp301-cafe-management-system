@@ -22,6 +22,7 @@ const PurchaseOrderItem = require('./models/PurchaseOrderItem');
 const InventoryTransaction = require('./models/InventoryTransaction');
 const ShopSetting = require('./models/ShopSetting');
 const Cart = require('./models/Cart');
+const RewardItem = require('./models/RewardItem');
 
 const connectDB = async () => {
   try {
@@ -53,7 +54,8 @@ const importData = async () => {
       PurchaseOrderItem.deleteMany({}),
       InventoryTransaction.deleteMany({}),
       ShopSetting.deleteMany({}),
-      Cart.deleteMany({})
+      Cart.deleteMany({}),
+      RewardItem.deleteMany({})
     ]);
 
     const salt = await bcrypt.genSalt(10);
@@ -731,6 +733,13 @@ const importData = async () => {
       { customer: u[5]._id, order: ord[2]._id, pointsChange: 100, transactionType: 'EARN' },
       { customer: u[4]._id, order: ord[3]._id, pointsChange: -20, transactionType: 'REDEEM' },
       { customer: u[4]._id, order: ord[9]._id, pointsChange: 80, transactionType: 'EARN' }
+    ]);
+
+    await RewardItem.insertMany([
+      { name: 'Giảm 15.000đ bằng điểm', pointsCost: 100, discountValue: 15000, minOrderValue: 60000, stock: 50 },
+      { name: 'Giảm 30.000đ bằng điểm', pointsCost: 180, discountValue: 30000, minOrderValue: 120000, stock: 30 },
+      { name: 'Giảm 50.000đ bằng điểm', pointsCost: 300, discountValue: 50000, minOrderValue: 200000, stock: 20 },
+      { name: 'Giảm 100.000đ bằng điểm', pointsCost: 600, discountValue: 100000, minOrderValue: 350000, stock: 10 }
     ]);
 
     // ==========================================

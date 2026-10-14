@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { cartPayload, formatVnd, shopApi } from '../lib/shopApi';
 import useAuthStore from '../store/authStore';
 import useCartStore from '../store/cartStore';
+import useLoyalty from '../hooks/useLoyalty';
 import type { OrderRecord } from '../types/shop';
 
 interface CheckoutPageProps { onRequestAuth: () => void }
@@ -13,6 +14,11 @@ export default function CheckoutPage({ onRequestAuth }: CheckoutPageProps) {
   const user = useAuthStore((state) => state.user);
   const cartItems = useCartStore((state) => state.items);
   const cartReady = useCartStore((state) => state.ready);
+  const cartOwnerId = useCartStore((state) => state.ownerId);
+  const syncError = useCartStore((state) => state.syncError);
+  const rewardId = useCartStore((state) => state.rewardId);
+  const setRewardId = useCartStore((state) => state.setRewardId);
+  const { summary: loyalty, loading: loyaltyLoading, error: loyaltyError } = useLoyalty(user?.token);
   const items = cartItems.filter((item) => item.checked);
   const removeSelected = useCartStore((state) => state.removeSelected);
   const [mode, setMode] = useState<'ONLINE' | 'TAKEAWAY'>('ONLINE');
@@ -23,6 +29,9 @@ export default function CheckoutPage({ onRequestAuth }: CheckoutPageProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  const reward = loyalty?.rewards.find((offer) => offer._id === rewardId);
+  const rewardValid = !!reward && !!loyalty?.canRedeem && loyalty.totalPoints >= reward.pointsCost && subtotal >= reward.minOrderValue;
+  const discount = rewardValid && reward ? Math.min(reward.discountValue, subtotal) : 0;
   const fee = mode === 'ONLINE' && subtotal < 150000 ? 18000 : 0;
 
   useEffect(() => {
@@ -33,14 +42,16 @@ export default function CheckoutPage({ onRequestAuth }: CheckoutPageProps) {
     event.preventDefault();
     if (!items.length) { navigate('/cart'); return; }
     if (!user) { onRequestAuth(); return; }
-    if (!cartReady) return;
+    if (!cartReady || cartOwnerId !== user._id) return;
+    if (rewardId && !rewardValid) return;
     setError('');
     setSubmitting(true);
     try {
       const order = await shopApi<OrderRecord>('/api/orders', {
         method: 'POST', token: user.token,
-        body: { items: cartPayload(items), orderType: mode, recipientName: name, recipientPhone: phone, deliveryAddress: address, orderNote: note, expectedTotal: subtotal + fee }
+        body: { items: cartPayload(items), orderType: mode, recipientName: name, recipientPhone: phone, deliveryAddress: address, orderNote: note, rewardId: rewardValid ? rewardId : undefined, expectedTotal: subtotal - discount + fee }
       });
+      setRewardId(null);
       removeSelected();
       navigate('/orders', { state: { newOrderCode: order.orderCode } });
     } catch (err) {
@@ -98,11 +109,13 @@ export default function CheckoutPage({ onRequestAuth }: CheckoutPageProps) {
             <div className="min-w-0 flex-1"><p className="font-semibold truncate">{item.name}</p><p className="text-xs text-slate-500">{item.quantity}x · Size {item.size}</p></div>
             <strong className="text-sm">{formatVnd(item.unitPrice * item.quantity)}</strong>
           </div>)}</div>
-          <div className="border-t border-blue-100 pt-4 space-y-2 text-sm"><div className="flex justify-between"><span>Tổng tiền món</span><strong>{formatVnd(subtotal)}</strong></div><div className="flex justify-between"><span>Phí giao hàng</span><strong>{fee ? formatVnd(fee) : 'Miễn phí'}</strong></div></div>
-          <div className="mt-4 border-t border-blue-100 pt-4 flex justify-between items-end gap-3"><div><strong className="text-lg">Tổng thanh toán</strong><p className="text-xs text-slate-500">{mode === 'ONLINE' ? 'Thanh toán khi nhận hàng' : 'Thanh toán tại quầy'}</p></div><strong className="text-2xl md:text-3xl text-primary">{formatVnd(subtotal + fee)}</strong></div>
+          <div className="border-t border-blue-100 pt-4 space-y-2 text-sm"><div className="flex justify-between"><span>Tổng tiền món</span><strong>{formatVnd(subtotal)}</strong></div>{discount > 0 && <div className="flex justify-between text-emerald-700"><span>Giảm bằng {reward?.pointsCost} điểm</span><strong>−{formatVnd(discount)}</strong></div>}<div className="flex justify-between"><span>Phí giao hàng</span><strong>{fee ? formatVnd(fee) : 'Miễn phí'}</strong></div></div>
+          <div className="mt-4 border-t border-blue-100 pt-4 flex justify-between items-end gap-3"><div><strong className="text-lg">Tổng thanh toán</strong><p className="text-xs text-slate-500">{mode === 'ONLINE' ? 'Thanh toán khi nhận hàng' : 'Thanh toán tại quầy'}</p></div><strong className="text-2xl md:text-3xl text-primary">{formatVnd(subtotal - discount + fee)}</strong></div>
+          {rewardId && !rewardValid && <div role="alert" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{loyaltyLoading ? 'Đang kiểm tra điểm tích lũy...' : loyaltyError || 'Ưu đãi điểm không còn phù hợp với đơn hàng.'} <button type="button" onClick={() => setRewardId(null)} className="font-bold underline">Bỏ ưu đãi</button></div>}
           {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+          {user && syncError && <p role="alert" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{syncError}</p>}
           {!user && <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Đăng nhập để lưu và theo dõi đơn hàng của bạn.</p>}
-          <button disabled={submitting || !items.length || (!!user && !cartReady)} type={user ? 'submit' : 'button'} onClick={user ? undefined : onRequestAuth} className="mt-6 w-full rounded-lg bg-primary py-3 text-white font-bold disabled:bg-slate-300 flex justify-center items-center gap-2">{submitting ? 'Đang tạo đơn...' : user && !cartReady ? 'Đang tải giỏ hàng...' : user ? 'Xác nhận & Đặt hàng' : 'Đăng nhập để đặt hàng'}<span className="material-symbols-outlined">arrow_forward</span></button>
+          <button disabled={submitting || !items.length || (!!user && (!cartReady || cartOwnerId !== user._id)) || (!!rewardId && !rewardValid)} type={user ? 'submit' : 'button'} onClick={user ? undefined : onRequestAuth} className="mt-6 w-full rounded-lg bg-primary py-3 text-white font-bold disabled:bg-slate-300 flex justify-center items-center gap-2">{submitting ? 'Đang tạo đơn...' : user && (!cartReady || cartOwnerId !== user._id) ? 'Đang tải giỏ hàng...' : user ? 'Xác nhận & Đặt hàng' : 'Đăng nhập để đặt hàng'}<span className="material-symbols-outlined">arrow_forward</span></button>
           <button type="button" onClick={() => navigate('/cart')} className="mt-2 w-full rounded-lg bg-slate-50 py-3 text-slate-600 font-semibold flex justify-center items-center gap-2"><span className="material-symbols-outlined">arrow_back</span>Quay lại giỏ hàng</button>
         </aside>
       </form>

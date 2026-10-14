@@ -6,7 +6,9 @@ import { productToCartItem } from '../lib/shopApi';
 interface CartState {
   items: CartItem[];
   ownerId: string | null;
+  rewardId: string | null;
   ready: boolean;
+  syncError: string | null;
   addProduct: (product: CatalogProduct, size?: string) => void;
   updateQuantity: (cartId: string, delta: number) => void;
   removeItem: (cartId: string) => void;
@@ -16,12 +18,16 @@ interface CartState {
   replace: (items: CartItem[], ownerId: string | null) => void;
   clear: () => void;
   setReady: (ready: boolean) => void;
+  setSyncError: (error: string | null) => void;
+  setRewardId: (rewardId: string | null) => void;
 }
 
 const useCartStore = create<CartState>()(persist((set) => ({
   items: [],
   ownerId: null,
+  rewardId: null,
   ready: false,
+  syncError: null,
   addProduct: (product, size = 'M') => set((state) => {
     const line = productToCartItem(product, size);
     const existing = state.items.find((item) => item.cartId === line.cartId);
@@ -41,12 +47,16 @@ const useCartStore = create<CartState>()(persist((set) => ({
     items: state.items.map((item) => item.cartId === cartId ? { ...item, checked: !item.checked } : item)
   })),
   toggleAll: (checked) => set((state) => ({ items: state.items.map((item) => ({ ...item, checked })) })),
-  replace: (items, ownerId) => set({ items, ownerId }),
-  clear: () => set({ items: [], ownerId: null }),
-  setReady: (ready) => set({ ready })
+  replace: (items, ownerId) => set((state) => ({
+    items, ownerId, rewardId: state.ownerId === ownerId ? state.rewardId : null
+  })),
+  clear: () => set({ items: [], ownerId: null, rewardId: null, syncError: null }),
+  setReady: (ready) => set({ ready }),
+  setSyncError: (syncError) => set({ syncError }),
+  setRewardId: (rewardId) => set({ rewardId })
 }), {
   name: 'aura-cart',
-  partialize: (state) => ({ items: state.items, ownerId: state.ownerId })
+  partialize: (state) => ({ items: state.items, ownerId: state.ownerId, rewardId: state.rewardId })
 }));
 
 export default useCartStore;

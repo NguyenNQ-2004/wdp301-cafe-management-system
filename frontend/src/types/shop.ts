@@ -23,6 +23,21 @@ export interface CartItem {
   checked: boolean;
 }
 
+export interface RewardOffer {
+  _id: string;
+  name: string;
+  pointsCost: number;
+  discountValue: number;
+  minOrderValue: number;
+  stock: number;
+}
+
+export interface LoyaltySummary {
+  totalPoints: number;
+  canRedeem: boolean;
+  rewards: RewardOffer[];
+}
+
 export interface OrderItem {
   product: string | { _id: string; name: string; imageUrl?: string };
   productNameAtTime: string;
@@ -40,6 +55,9 @@ export interface OrderRecord {
   items: OrderItem[];
   totalAmount: number;
   deliveryFee: number;
+  discountAmount: number;
+  pointsRedeemed?: number;
+  reward?: string;
   finalAmount: number;
   recipientName?: string;
   recipientPhone?: string;
