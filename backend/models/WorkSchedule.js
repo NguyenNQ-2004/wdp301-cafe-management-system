@@ -8,6 +8,12 @@ const workScheduleSchema = new mongoose.Schema({
   startingCash: { type: Number },
   endingCashSystem: { type: Number },
   endingCashActual: { type: Number },
+  handoverCashSales: { type: Number, min: 0 },
+  handoverPaymentCount: { type: Number, min: 0 },
+  handoverUnattributedCash: { type: Number, min: 0 },
+  handoverUnattributedCount: { type: Number, min: 0 },
+  handoverAt: { type: Date },
+  handoverNote: { type: String, maxlength: 500 },
   status: { type: String, enum: ['SCHEDULED', 'PRESENT', 'ABSENT', 'COMPLETED'], default: 'SCHEDULED' },
   note: { type: String }
 }, { timestamps: true });

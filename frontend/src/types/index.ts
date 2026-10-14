@@ -9,16 +9,21 @@ export type PageRoute =
   | 'checkout' 
   | 'payment' 
   | 'admin' 
+  | 'admin-orders'
   | 'admin-categories'
   | 'admin-products'
   | 'admin-recipes'
   | 'admin-ingredients'
   | 'admin-inventory'
+  | 'admin-restock'
   | 'admin-purchases'
+
   | 'admin-suppliers'
   | 'admin-employees'
   | 'admin-shifts'
   | 'admin-schedules'
+  | 'my-schedule'
+  | 'my-attendance'
   | 'admin-attendance'
   | 'admin-handover'
   | 'admin-customers'
@@ -55,4 +60,9 @@ export interface Product {
   image_url?: string;
   status?: string;
   isAvailable?: boolean;
+  badge?: string;
+  subtitle?: string;
+  description?: string;
+  variantsConfig?: any;
+  recipe?: any[];
 }

@@ -6,6 +6,10 @@ import useCartStore from './store/cartStore';
 import useCartSync from './hooks/useCartSync';
 import { shopApi, ShopApiError } from './lib/shopApi';
 import AdminDashboard from './pages/admin/AdminDashboardPage';
+import AdminShiftsPage from './pages/admin/AdminShiftsPage';
+import AdminUsersPage from './pages/admin/AdminUsersPage';
+import AdminSchedulesPage from './pages/admin/AdminSchedulesPage';
+import AdminAttendancePage from './pages/admin/AdminAttendancePage';
 import AdminCategoriesPage from './pages/admin/AdminCategoriesPage';
 import AdminStockPage from './pages/admin/AdminStockPage';
 import AdminRestockPage from './pages/admin/AdminRestockPage';
@@ -14,6 +18,7 @@ import AdminPurchasesPage from './pages/admin/AdminPurchasesPage';
 import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
 import CounterPaymentsPage from './pages/pos/CounterPaymentsPage';
+import PosHandoverPage from './pages/pos/PosHandoverPage';
 import BaristaDashboard from './pages/kds/KdsTerminalPage';
 import CustomerDashboard from './pages/ProfilePage';
 import HomeContainer from './pages/HomePage';
@@ -238,67 +243,27 @@ const AppLayout = () => {
           />
           <Route
             path="/admin/employees"
-            element={
-              user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-employees"
-                  title="23. Hồ sơ Nhân viên"
-                  subtitle="Màn hình quản lý danh sách nhân sự, thông tin cá nhân và tài khoản truy cập."
-                  table="users"
-                  branch="feature/employee-management"
-                />
-              ) : (
-                <Navigate to="/" />
-              )
-            }
+            element={user?.role === 'ADMIN' ? <AdminUsersPage /> : <Navigate to="/" />}
           />
           <Route
             path="/admin/shifts"
-            element={
-              user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-shifts"
-                  title="24. Khung giờ ca làm"
-                  subtitle="Màn hình thiết lập các khung giờ ca sáng, chiều, tối của cửa hàng."
-                  table="work_shifts"
-                  branch="feature/shift-management"
-                />
-              ) : (
-                <Navigate to="/" />
-              )
-            }
+            element={user?.role === 'ADMIN' ? <AdminShiftsPage /> : <Navigate to="/" />}
           />
           <Route
             path="/admin/schedules"
-            element={
-              user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-schedules"
-                  title="25. Lịch phân ca"
-                  subtitle="Màn hình xếp lịch làm việc hàng tuần cho nhân viên thu ngân và pha chế."
-                  table="work_schedules"
-                  branch="feature/schedule-management"
-                />
-              ) : (
-                <Navigate to="/" />
-              )
-            }
+            element={user?.role === 'ADMIN' ? <AdminSchedulesPage /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/my-schedule"
+            element={user?.role === 'STAFF' ? <AdminSchedulesPage /> : <Navigate to="/" />}
           />
           <Route
             path="/admin/attendance"
-            element={
-              user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-attendance"
-                  title="26. Chấm công nhân sự"
-                  subtitle="Màn hình theo dõi điểm danh và lịch sử chấm công ra vào ca của nhân viên."
-                  table="attendance_records"
-                  branch="feature/attendance-management"
-                />
-              ) : (
-                <Navigate to="/" />
-              )
-            }
+            element={user?.role === 'ADMIN' ? <AdminAttendancePage /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/my-attendance"
+            element={user?.role === 'STAFF' ? <AdminAttendancePage /> : <Navigate to="/" />}
           />
           <Route
             path="/admin/customers"
@@ -342,6 +307,10 @@ const AppLayout = () => {
           <Route
             path="/cashier/payments"
             element={user?.role === 'ADMIN' || (user?.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user.position || '')) ? <CounterPaymentsPage /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/cashier/handover"
+            element={user?.role === 'ADMIN' || (user?.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user.position || '')) ? <PosHandoverPage /> : <Navigate to="/" />}
           />
           <Route
             path="/barista"

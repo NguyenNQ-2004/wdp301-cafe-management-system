@@ -8,30 +8,67 @@ export default function MenuPage() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [dbCategories, setDbCategories] = useState<{ _id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [category, setCategory] = useState('all');
+  
+  const search = params.get('search') || '';
+  const categoryParam = params.get('category') || 'all';
+  const [category, setCategory] = useState(categoryParam);
   const [sizes, setSizes] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState('');
   const addProduct = useCartStore((state) => state.addProduct);
-  const search = params.get('search') || '';
+
+  useEffect(() => {
+    if (categoryParam) {
+      setCategory(categoryParam);
+    }
+  }, [categoryParam]);
 
   useEffect(() => {
     let active = true;
-    shopApi<CatalogProduct[]>('/api/products')
-      .then((data) => { if (active) setProducts(data.filter((item) => item.isAvailable !== false)); })
-      .catch((err: Error) => { if (active) setError(err.message); })
+    Promise.allSettled([
+      shopApi<CatalogProduct[]>('/api/products'),
+      shopApi<{ _id: string; name: string; status?: string }[]>('/api/categories')
+    ])
+      .then(([prodRes, catRes]) => {
+        if (!active) return;
+        if (prodRes.status === 'fulfilled') {
+          setProducts(prodRes.value.filter((item) => item.isAvailable !== false));
+        } else {
+          setError((prodRes.reason as Error)?.message || 'Lỗi tải danh sách sản phẩm');
+        }
+        if (catRes.status === 'fulfilled') {
+          setDbCategories(catRes.value.filter(c => c.status !== 'INACTIVE'));
+        }
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
 
-  const categories = useMemo(() => Array.from(new Set(products.map((product) => product.category?.name).filter((name): name is string => !!name))), [products]);
+  const categories = useMemo(() => {
+    if (dbCategories.length > 0) {
+      return dbCategories.map(c => c.name);
+    }
+    return Array.from(new Set(products.map((product) => product.category?.name).filter((name): name is string => !!name)));
+  }, [dbCategories, products]);
+
   const filtered = useMemo(() => products.filter((product) => {
-    const matchesCategory = category === 'all' || product.category?.name === category;
+    const matchesCategory = category === 'all' || product.category?.name?.toLowerCase() === category.toLowerCase();
     const matchesSearch = `${product.name} ${product.description || ''} ${product.category?.name || ''}`.toLocaleLowerCase('vi')
       .includes(search.toLocaleLowerCase('vi'));
     return matchesCategory && matchesSearch;
   }), [products, category, search]);
+
+  const handleCategoryChange = (newCat: string) => {
+    setCategory(newCat);
+    setParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (newCat === 'all') next.delete('category');
+      else next.set('category', newCat);
+      return next;
+    });
+  };
 
   const add = (product: CatalogProduct) => {
     addProduct(product, sizes[product._id] || 'M');
@@ -48,7 +85,7 @@ export default function MenuPage() {
             <h1 className="text-4xl font-bold text-slate-950 mt-2">Chọn món bạn yêu thích</h1>
             <p className="text-slate-600 mt-2">Cà phê, trà và bánh được chuẩn bị tươi mới cho từng đơn hàng.</p>
           </div>
-          <button onClick={() => navigate('/cart')} className="rounded-xl bg-primary px-5 py-3 text-white font-semibold hover:brightness-95 flex items-center gap-2 self-start">
+          <button onClick={() => navigate('/cart')} className="rounded-xl bg-primary px-5 py-3 text-white font-semibold hover:brightness-95 flex items-center gap-2 self-start cursor-pointer">
             <span className="material-symbols-outlined text-lg">shopping_bag</span>Xem giỏ hàng
           </button>
         </div>
@@ -56,11 +93,19 @@ export default function MenuPage() {
         <div className="rounded-xl border border-slate-200 bg-white p-4 mb-7 flex flex-col md:flex-row gap-4">
           <label className="relative flex-1">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-            <input aria-label="Tìm món" value={search} onChange={(event) => setParams(event.target.value ? { search: event.target.value } : {})}
-              placeholder="Tìm cà phê, trà, bánh..." className="w-full rounded-lg border border-slate-200 py-2.5 pl-11 pr-4 outline-none focus:border-primary" />
+            <input aria-label="Tìm món" value={search} onChange={(event) => {
+              const val = event.target.value;
+              setParams(prev => {
+                const next = new URLSearchParams(prev);
+                if (val) next.set('search', val);
+                else next.delete('search');
+                return next;
+              });
+            }}
+              placeholder="Tìm cà phê, trà, bánh..." className="w-full rounded-lg border border-slate-200 py-2.5 pl-11 pr-4 outline-none focus:border-primary text-sm" />
           </label>
-          <select aria-label="Danh mục" value={category} onChange={(event) => setCategory(event.target.value)} className="rounded-lg border border-slate-200 px-4 py-2.5 outline-none focus:border-primary">
-            <option value="all">Tất cả danh mục</option>
+          <select aria-label="Danh mục" value={category} onChange={(event) => handleCategoryChange(event.target.value)} className="rounded-lg border border-slate-200 px-4 py-2.5 outline-none focus:border-primary text-sm cursor-pointer bg-white">
+            <option value="all">Tất cả danh mục ({products.length} món)</option>
             {categories.map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
         </div>

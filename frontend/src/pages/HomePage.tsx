@@ -1,16 +1,22 @@
 import React from 'react';
 import type { PageRoute, Product } from '../types';
+import { useDb } from '../data/DbContext';
 
 interface HomePageProps {
   onNavigate: (route: PageRoute) => void;
+  onNavigateCategory?: (categoryName: string) => void;
   onSelectProduct: (productId: string) => void;
   onQuickAdd: (product: Product) => void;
 }
 
 export const HomePage: React.FC<HomePageProps> = ({
   onNavigate,
+  onNavigateCategory = () => {},
   onSelectProduct
 }) => {
+  const { db } = useDb();
+  const activeCategories = db.categories.filter(c => c.status === 'ACTIVE');
+
   return (
     <div className="flex flex-col w-full">
       {/* Hero Showcase Section */}
@@ -126,6 +132,68 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </div>
 
+      {/* Product Categories Showcase Section (Synchronized with DB Categories) */}
+      <section className="w-full px-margin-lg py-space-xl bg-surface-container-lowest border-y border-surface-container-high">
+        <div className="max-w-7xl mx-auto flex flex-col gap-space-lg">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-space-sm">
+            <div className="flex flex-col gap-space-xs">
+              <div className="flex items-center gap-space-xs text-primary font-semibold">
+                <span className="material-symbols-outlined text-[20px]">category</span>
+                <span className="font-label-sm text-label-sm uppercase tracking-wider">
+                  Khám phá thực đơn Aura
+                </span>
+              </div>
+              <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight font-bold">
+                Danh mục món & Đồ uống
+              </h2>
+              <p className="font-body-md text-body-md text-on-surface-variant">
+                Lựa chọn từ 6 dòng thực đơn chuẩn vị được cập nhật đồng bộ với quầy và hệ thống Aura Café.
+              </p>
+            </div>
+            <button
+              onClick={() => onNavigate('menu')}
+              className="inline-flex items-center gap-space-xs text-primary hover:text-primary-container font-label-lg text-label-lg transition-colors cursor-pointer group"
+            >
+              <span>Xem toàn bộ Menu</span>
+              <span className="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">east</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            {activeCategories.map((cat) => (
+              <div
+                key={String(cat.id)}
+                onClick={() => onNavigateCategory(cat.name)}
+                className="group flex flex-col rounded-2xl bg-surface p-3 border border-surface-container-high hover:border-primary/50 hover:shadow-md transition-all duration-300 cursor-pointer text-center"
+              >
+                <div className="relative h-28 w-full rounded-xl overflow-hidden mb-3 bg-surface-container">
+                  {cat.image_url || cat.imageUrl ? (
+                    <img
+                      src={cat.image_url || cat.imageUrl || ''}
+                      alt={cat.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-primary/5 text-primary text-3xl">
+                      <span className="material-symbols-outlined">{cat.icon || 'local_cafe'}</span>
+                    </div>
+                  )}
+                  <span className="absolute bottom-2 right-2 w-7 h-7 rounded-lg bg-surface-container-lowest/90 backdrop-blur text-primary flex items-center justify-center shadow-xs">
+                    <span className="material-symbols-outlined text-[16px]">{cat.icon || 'local_cafe'}</span>
+                  </span>
+                </div>
+                <h3 className="font-headline-sm text-sm font-bold text-on-surface group-hover:text-primary transition-colors">
+                  {cat.name}
+                </h3>
+                <p className="text-[11px] text-on-surface-variant line-clamp-1 mt-0.5">
+                  {cat.description || 'Thức uống chuẩn vị'}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Best Sellers Section */}
       <div className="w-full px-margin-lg py-space-xl">
         <div className="max-w-7xl mx-auto flex flex-col gap-space-lg">
@@ -154,20 +222,20 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter-lg">
-            {/* Card 1: Cà phê Muối Aura */}
+            {/* Card 1: Cà phê Muối Aura Đặc Biệt */}
             <div className="group bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col">
               <div className="relative h-56 bg-surface-container overflow-hidden">
                 <div
                   className="bg-cover bg-center w-full h-full group-hover:scale-105 transition-transform duration-500"
                   style={{
-                    backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuDZIHvaJT4mQKloRO3wsOdLK_H-3jVQ6dlX5-V0MNiGe9EovAzUhlDHw4iFDJtfJeJfdvT9P6mdfbUGDTw_S4MpFvJT_JgLtBh308WQKUWEf29pPjIWTcUameeU4l5ufqziY_8QwroRkxCAhBlf0pUKdbFwLrrTYOeVTgCO0N8ZxuIqKFXyVkSDgIrDu18Gy9OJ42tGAayDee90kqkZgUbnSxICfokYqruhylqZ3Kbea0iuhuFL904x')`
+                    backgroundImage: `url('https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&auto=format&fit=crop&q=80')`
                   }}
                 />
                 <span className="absolute top-3 left-3 px-space-sm py-0.5 rounded-md bg-primary text-white font-label-sm text-label-sm uppercase font-bold">
-                  Top 1 Trend
+                  Bán chạy
                 </span>
                 <span className="absolute bottom-3 right-3 px-space-sm py-0.5 rounded bg-surface-container-lowest/90 backdrop-blur font-tabular-data text-tabular-data font-semibold text-on-surface">
-                  55.000đ
+                  45.000đ
                 </span>
               </div>
               <div className="p-space-md flex flex-col flex-1 justify-between gap-space-sm">
@@ -180,10 +248,10 @@ export const HomePage: React.FC<HomePageProps> = ({
                     </div>
                   </div>
                   <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
-                    Cà phê Muối Aura
+                    Cà Phê Muối Aura Đặc Biệt
                   </h3>
                   <p className="font-body-sm text-body-sm text-on-surface-variant line-clamp-2">
-                    Lớp kem béo mặn thanh thoát ôm trọn vị cà phê phin đượm vị caramel tự nhiên.
+                    Fine Robusta ủ phin truyền thống phối kem sữa mằn mặn béo ngậy, cân bằng hậu vị ngọt đầm.
                   </p>
                 </div>
                 <div className="flex items-center justify-between pt-space-xs">
@@ -201,36 +269,36 @@ export const HomePage: React.FC<HomePageProps> = ({
               </div>
             </div>
 
-            {/* Card 2: Trà Sen Vàng */}
+            {/* Card 2: Trà Sen Vàng Long Nhãn */}
             <div className="group bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col">
               <div className="relative h-56 bg-surface-container overflow-hidden">
                 <div
                   className="bg-cover bg-center w-full h-full group-hover:scale-105 transition-transform duration-500"
                   style={{
-                    backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuDsWG5hD7E15KulXih9-NnE_R9_q5zYuELTnI0f8MXtEIXP7V-KuC_696klLO7Cd9fXL6KzINoUGXlmIE_ML7BlaYoR3l-UOkB4vVHXlt5_lpDLwd84j4A8DKEdx84ncy00mJLRkDbN9XrMwNhT0izwq360-GTh9E3gzOkVdML26LXs_ZK8CtaYG2L06kfyYmxpPJdf9JWMf0lvb5TsMzI7_ziZbnrUyEsnx_7afxyL1L9H_qp9HXG4')`
+                    backgroundImage: `url('https://images.unsplash.com/photo-1597481499750-3e6b22637e12?w=600&auto=format&fit=crop&q=80')`
                   }}
                 />
                 <span className="absolute top-3 left-3 px-space-sm py-0.5 rounded-md bg-tertiary-container text-white font-label-sm text-label-sm uppercase font-bold">
                   Thanh nhiệt
                 </span>
                 <span className="absolute bottom-3 right-3 px-space-sm py-0.5 rounded bg-surface-container-lowest/90 backdrop-blur font-tabular-data text-tabular-data font-semibold text-on-surface">
-                  62.000đ
+                  49.000đ
                 </span>
               </div>
               <div className="p-space-md flex flex-col flex-1 justify-between gap-space-sm">
                 <div className="flex flex-col gap-space-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-label-sm text-label-sm text-secondary">Trà mộc trái cây</span>
+                    <span className="font-label-sm text-label-sm text-secondary">Trà trái cây</span>
                     <div className="flex items-center gap-0.5 text-tertiary-container">
                       <span className="material-symbols-outlined text-[16px] text-amber-500">star</span>
                       <span className="font-tabular-data text-label-sm font-bold">4.8</span>
                     </div>
                   </div>
                   <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
-                    Trà Sen Vàng
+                    Trà Sen Vàng Long Nhãn
                   </h3>
                   <p className="font-body-sm text-body-sm text-on-surface-variant line-clamp-2">
-                    Trà Ô Long thanh mát quyện cùng hạt sen Huế bùi dẻo và củ năng giòn ngọt ngào.
+                    Hạt sen Huế ninh mềm dẻo, nhãn nhục ngọt thanh quyện cùng trà ô long hảo hạng và lớp kem củ năng giòn.
                   </p>
                 </div>
                 <div className="flex items-center justify-between pt-space-xs">
@@ -238,7 +306,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                     Bán ra 980+ ly
                   </span>
                   <button
-                    onClick={() => onSelectProduct('tra-dao-cam-sa')}
+                    onClick={() => onSelectProduct('tra-sen-vang')}
                     className="w-8 h-8 rounded-lg bg-surface-container-high text-on-surface flex items-center justify-center hover:bg-primary hover:text-white transition-colors cursor-pointer"
                     title="Chọn món & Tuỳ chỉnh"
                   >
@@ -248,41 +316,41 @@ export const HomePage: React.FC<HomePageProps> = ({
               </div>
             </div>
 
-            {/* Card 3: Cold Brew Cam Quế */}
+            {/* Card 3: Cold Brew Đóng Chai */}
             <div className="group bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col">
               <div className="relative h-56 bg-surface-container overflow-hidden">
                 <div
                   className="bg-cover bg-center w-full h-full group-hover:scale-105 transition-transform duration-500"
                   style={{
-                    backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuC73bJIMisYC3woutOOND70MWfIGTxEDrf6b4c9PBVm8Xe0RfUwFXbefz-HWRFvMEM7NgC88FeAZRF_MM8Qh9hsXGpTHFKAJpCwnHl0P_hjHQONbklfl90oML_oSdFivqy_dWF6LTdp8MVKYKiI-xfCHRMcfJZkJdHVKUsHEN7thwPrKkyUaNxM7CfZNzbJRZXcursv4JU19T3_v8Fm_VYRo5tOT04zh-0zo083vUvymgsgvmZAzf-F')`
+                    backgroundImage: `url('https://images.unsplash.com/photo-1517701550927-30cf4ba1dba5?w=600&auto=format&fit=crop&q=80')`
                   }}
                 />
                 <span className="absolute top-3 left-3 px-space-sm py-0.5 rounded-md bg-secondary text-white font-label-sm text-label-sm uppercase font-bold">
-                  Ủ lạnh 18H
+                  Ủ lạnh 16H
                 </span>
                 <span className="absolute bottom-3 right-3 px-space-sm py-0.5 rounded bg-surface-container-lowest/90 backdrop-blur font-tabular-data text-tabular-data font-semibold text-on-surface">
-                  65.000đ
+                  68.000đ
                 </span>
               </div>
               <div className="p-space-md flex flex-col flex-1 justify-between gap-space-sm">
                 <div className="flex flex-col gap-space-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-label-sm text-label-sm text-secondary">Cold Brew Series</span>
+                    <span className="font-label-sm text-label-sm text-secondary">Đóng chai</span>
                     <div className="flex items-center gap-0.5 text-tertiary-container">
                       <span className="material-symbols-outlined text-[16px] text-amber-500">star</span>
                       <span className="font-tabular-data text-label-sm font-bold">4.9</span>
                     </div>
                   </div>
                   <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
-                    Cold Brew Cam Quế
+                    Cold Brew Đóng Chai Aura Reserve
                   </h3>
                   <p className="font-body-sm text-body-sm text-on-surface-variant line-clamp-2">
-                    Cà phê ủ lạnh kết hợp lát cam vàng sấy mộc và thanh quế Trà Bồng thơm nồng nàn.
+                    Chiết xuất lạnh 16 tiếng từ 100% Arabica Bourbon, hương hoa quả nhiệt đới tươi mát, giữ trọn vị nguyên bản.
                   </p>
                 </div>
                 <div className="flex items-center justify-between pt-space-xs">
                   <span className="font-label-sm text-label-sm text-primary font-medium">
-                    Bán ra 870+ ly
+                    Bán ra 870+ chai
                   </span>
                   <button
                     onClick={() => onSelectProduct('coldbrew-300ml')}
@@ -295,44 +363,44 @@ export const HomePage: React.FC<HomePageProps> = ({
               </div>
             </div>
 
-            {/* Card 4: Bạc Xỉu Kem Trứng */}
+            {/* Card 4: Caramel Macchiato Đặc Sản */}
             <div className="group bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col">
               <div className="relative h-56 bg-surface-container overflow-hidden">
                 <div
                   className="bg-cover bg-center w-full h-full group-hover:scale-105 transition-transform duration-500"
                   style={{
-                    backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuCv1Ywnp65znPe0Z-5bzYLoIagLEnA_Hd7l7AiVu3pIEEFgWHVMftCWb-A2yq8nQcXMNi5cA0CYTwbYFh5M-jz6s5m-cKlnQO946HqJnAeLaQpbUi4OL26qOqujvJcK69-w7ol9T3cOz60pCDSlNB3iKQGf-bUb9l2Wdz8wvctQCddX4WVWsFGioMxOoLm48kizX8qOpr2SCY7HOiXQkqlMiiIB_VibQi00xFDxJ_MrZg3pn_pl-exQ')`
+                    backgroundImage: `url('https://images.unsplash.com/photo-1485808191679-5f86510681a2?w=600&auto=format&fit=crop&q=80')`
                   }}
                 />
                 <span className="absolute top-3 left-3 px-space-sm py-0.5 rounded-md bg-primary-container text-white font-label-sm text-label-sm uppercase font-bold">
-                  Đậm đà
+                  Pha máy
                 </span>
                 <span className="absolute bottom-3 right-3 px-space-sm py-0.5 rounded bg-surface-container-lowest/90 backdrop-blur font-tabular-data text-tabular-data font-semibold text-on-surface">
-                  59.000đ
+                  55.000đ
                 </span>
               </div>
               <div className="p-space-md flex flex-col flex-1 justify-between gap-space-sm">
                 <div className="flex flex-col gap-space-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-label-sm text-label-sm text-secondary">Cà phê sáng tạo</span>
+                    <span className="font-label-sm text-label-sm text-secondary">Cà phê máy</span>
                     <div className="flex items-center gap-0.5 text-tertiary-container">
                       <span className="material-symbols-outlined text-[16px] text-amber-500">star</span>
-                      <span className="font-tabular-data text-label-sm font-bold">4.7</span>
+                      <span className="font-tabular-data text-label-sm font-bold">4.8</span>
                     </div>
                   </div>
                   <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
-                    Bạc Xỉu Kem Trứng
+                    Caramel Macchiato Đặc Sản
                   </h3>
                   <p className="font-body-sm text-body-sm text-on-surface-variant line-clamp-2">
-                    Sự giao thoa mượt mà giữa sữa đặc ngọt dịu, cốt cà phê robusta và lớp kem trứng mịn màng.
+                    Lớp sữa tươi nóng thanh dịu, quyện cùng espresso kép Arabica Cầu Đất đậm đà và vân sốt caramel thơm lừng.
                   </p>
                 </div>
                 <div className="flex items-center justify-between pt-space-xs">
                   <span className="font-label-sm text-label-sm text-primary font-medium">
-                    Bán ra 1.150+ ly
+                    Bán ra 1.250+ ly
                   </span>
                   <button
-                    onClick={() => onSelectProduct('nau-sai-gon')}
+                    onClick={() => onSelectProduct('caramel-macchiato')}
                     className="w-8 h-8 rounded-lg bg-surface-container-high text-on-surface flex items-center justify-center hover:bg-primary hover:text-white transition-colors cursor-pointer"
                     title="Chọn món & Tuỳ chỉnh"
                   >
@@ -354,10 +422,10 @@ export const HomePage: React.FC<HomePageProps> = ({
                 Aura Seasonal Releases
               </span>
               <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight font-bold">
-                Bộ sưu tập món mới - Mùa Thảo Mộc & Hạt
+                Bộ sưu tập món mới & Đặc sản tuyển chọn
               </h2>
               <p className="font-body-md text-body-md text-on-surface-variant">
-                Sự thăng hoa của các loại hạt rang mộc và thảo dược tự nhiên được tuyển lựa đặc biệt cho mùa này.
+                Các công thức hương vị mới nhất được cập nhật đồng bộ với quầy và hệ thống Aura Café.
               </p>
             </div>
             <div className="flex items-center gap-space-xs">
@@ -371,31 +439,32 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter-lg">
-            {/* Seasonal 1 */}
+            {/* Seasonal 1: Latte Nghệ Thuật Hạt Phỉ */}
             <div className="bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm flex flex-col group">
               <div className="relative h-64 overflow-hidden">
                 <div
                   className="bg-cover bg-center w-full h-full group-hover:scale-105 transition-transform duration-500"
                   style={{
-                    backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuAcgRPc8BItsw3RcB_6EvOwKbblAJajE3GUnNQJzOqbV8wu_PNvyvs1Om33aV8PewUezJRcqBzMb-2WdFoD0_VkUZgNj07Jme5IP6Mc31_Si0ZlI7cwIlZLx17Gp2rVR49Rd9YwRNSQgPewzdmOqd1F4dkobPBHSXXpRULTAM8u0cxM1waClivynY60mAjv0ni79mgw7xTpUaF8stgm0Rrp4aQ_ClW65FsN3fI0pBTWd3KfpF-XMGQR')`
+                    backgroundImage: `url('https://images.unsplash.com/photo-1534778101976-62847782c213?w=600&auto=format&fit=crop&q=80')`
                   }}
                 />
                 <div className="absolute top-3 left-3 bg-surface-container-lowest/90 backdrop-blur px-space-sm py-1 rounded text-primary font-label-sm text-label-sm font-semibold">
-                  New Arrival
+                  Món mới
                 </div>
               </div>
               <div className="p-space-lg flex flex-col flex-1 justify-between gap-space-md">
                 <div className="flex flex-col gap-space-xs">
-                  <div className="flex justify-between items-baseline">
-                    <h3 className="font-headline-md text-headline-md text-on-surface font-semibold">
-                      Latte Hạt Dẻ Cười
-                    </h3>
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-sm text-label-sm text-secondary">Cà phê máy</span>
                     <span className="font-tabular-data text-headline-sm font-bold text-primary">
-                      69.000đ
+                      52.000đ
                     </span>
                   </div>
+                  <h3 className="font-headline-md text-headline-md text-on-surface font-semibold">
+                    Latte Nghệ Thuật Hạt Phỉ
+                  </h3>
                   <p className="font-body-sm text-body-sm text-on-surface-variant">
-                    Sữa hạt dẻ cười nguyên chất nghiền mịn kết hợp espresso đơn nguồn gốc từ Colombia.
+                    Hòa quyện tinh tế giữa espresso thơm ngát, sữa tươi đánh bọt mịn màng và siro hạt phỉ thơm lừng.
                   </p>
                 </div>
                 <div className="flex items-center justify-between pt-space-sm bg-surface-container/50 -mx-space-lg -mb-space-lg p-space-md">
@@ -403,92 +472,94 @@ export const HomePage: React.FC<HomePageProps> = ({
                     Phục vụ: Nóng / Lạnh
                   </span>
                   <button
-                    onClick={() => onNavigate('menu')}
+                    onClick={() => onSelectProduct('latte-hat-phi')}
                     className="font-label-md text-label-md text-primary font-semibold hover:underline cursor-pointer"
                   >
-                    Chi tiết
+                    Chi tiết & Thêm món
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Seasonal 2 */}
+            {/* Seasonal 2: Trà Đào Cam Sả Tươi */}
             <div className="bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm flex flex-col group">
               <div className="relative h-64 overflow-hidden">
                 <div
                   className="bg-cover bg-center w-full h-full group-hover:scale-105 transition-transform duration-500"
                   style={{
-                    backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuA6msjrrNwbb8UKa9RmgpX4emU7meNLw3YvbVlIHV6kqIjjfBbtCd_TrXK2Z-vhIscCsKHyXjhj2isU-gUzUBjWYNz8V8rozBRYRGPdhLRyO9dJ8D301EHX1mfdqpQE9LoE4Ch45Ik8XAlwqrg453f6sS4uQBfJwfQVBCK1ardOWICDodJQYSCgXyJatRTAi4b9bpjo_Xfx8WZLgy4-H7czWISlwItU9uSVAJzsvNWKyW4O4Y--lLyw')`
+                    backgroundImage: `url('https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=600&auto=format&fit=crop&q=80')`
                   }}
                 />
                 <div className="absolute top-3 left-3 bg-surface-container-lowest/90 backdrop-blur px-space-sm py-1 rounded text-primary font-label-sm text-label-sm font-semibold">
-                  Signature Craft
+                  Món mới
                 </div>
               </div>
               <div className="p-space-lg flex flex-col flex-1 justify-between gap-space-md">
                 <div className="flex flex-col gap-space-xs">
-                  <div className="flex justify-between items-baseline">
-                    <h3 className="font-headline-md text-headline-md text-on-surface font-semibold">
-                      Cascara Sparkling Nho Đỏ
-                    </h3>
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-sm text-label-sm text-secondary">Trà trái cây</span>
                     <span className="font-tabular-data text-headline-sm font-bold text-primary">
-                      68.000đ
+                      45.000đ
                     </span>
                   </div>
+                  <h3 className="font-headline-md text-headline-md text-on-surface font-semibold">
+                    Trà Đào Cam Sả Tươi
+                  </h3>
                   <p className="font-body-sm text-body-sm text-on-surface-variant">
-                    Trà vỏ cà phê chín mọng sấy nắng tự nhiên, kết hợp men nho đỏ và bọt gas sảng khoái.
+                    Nước cốt trà đen Ceylon thanh dịu kết hợp miếng đào giòn ngọt mọng nước cùng sả tươi ấm nồng.
                   </p>
                 </div>
                 <div className="flex items-center justify-between pt-space-sm bg-surface-container/50 -mx-space-lg -mb-space-lg p-space-md">
                   <span className="font-label-sm text-label-sm text-secondary">
-                    Phục vụ: Lạnh có ga
+                    Phục vụ: Lạnh đá
                   </span>
                   <button
-                    onClick={() => onNavigate('menu')}
+                    onClick={() => onSelectProduct('tra-dao-cam-sa')}
                     className="font-label-md text-label-md text-primary font-semibold hover:underline cursor-pointer"
                   >
-                    Chi tiết
+                    Chi tiết & Thêm món
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Seasonal 3 */}
+            {/* Seasonal 3: Matcha Latte Uji Kyoto Đá Xay */}
             <div className="bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm flex flex-col group">
               <div className="relative h-64 overflow-hidden">
                 <div
                   className="bg-cover bg-center w-full h-full group-hover:scale-105 transition-transform duration-500"
                   style={{
-                    backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuAUxS7WE42UCsJ_BAbKdVEGakmkGWJrlt5mGpMesAKZeERcJE_C2bXMjyusXY0yYjqLqsEPBMu54G_zKSk-EmvPSuVTdPzGkmLXbH9MAW1mHwq1BKaC8paH2GEs0DQsntPwRpHMfEHiAeEupSM6XKMvsVfvDLY2XgwgCYk3tB_ohM9hh_FoYUa1kgDySfRUnmFKItK4dnW1Qx4oCfgoNXvStWhI6a8KyQCHGT5AzPmuErNHXJTC7kGU')`
+                    backgroundImage: `url('https://images.unsplash.com/photo-1536256263959-770b48d82b0a?w=600&auto=format&fit=crop&q=80')`
                   }}
                 />
                 <div className="absolute top-3 left-3 bg-surface-container-lowest/90 backdrop-blur px-space-sm py-1 rounded text-primary font-label-sm text-label-sm font-semibold">
-                  Seasonal Warmth
+                  Bán chạy
                 </div>
               </div>
               <div className="p-space-lg flex flex-col flex-1 justify-between gap-space-md">
                 <div className="flex flex-col gap-space-xs">
-                  <div className="flex justify-between items-baseline">
-                    <h3 className="font-headline-md text-headline-md text-on-surface font-semibold">
-                      Mocha Bơ Đậu Phộng
-                    </h3>
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-sm text-label-sm text-secondary">Đá xay & Matcha</span>
                     <span className="font-tabular-data text-headline-sm font-bold text-primary">
-                      72.000đ
+                      58.000đ
                     </span>
                   </div>
+                  <h3 className="font-headline-md text-headline-md text-on-surface font-semibold">
+                    Matcha Latte Uji Kyoto Đá Xay
+                  </h3>
                   <p className="font-body-sm text-body-sm text-on-surface-variant">
-                    Sô-cô-la Bỉ nguyên chất hòa quyện lớp kem bơ đậu phộng mặn nhẹ và espresso đậm vị.
+                    Bột trà xanh Uji trứ danh cố đô Kyoto xay cùng sữa hạt và kem whipping bông xốp béo mịn thượng hạng.
                   </p>
                 </div>
                 <div className="flex items-center justify-between pt-space-sm bg-surface-container/50 -mx-space-lg -mb-space-lg p-space-md">
                   <span className="font-label-sm text-label-sm text-secondary">
-                    Phục vụ: Nóng / Lạnh
+                    Phục vụ: Đá xay mát lạnh
                   </span>
                   <button
-                    onClick={() => onNavigate('menu')}
+                    onClick={() => onSelectProduct('matcha-uji')}
                     className="font-label-md text-label-md text-primary font-semibold hover:underline cursor-pointer"
                   >
-                    Chi tiết
+                    Chi tiết & Thêm món
                   </button>
                 </div>
               </div>
@@ -496,8 +567,6 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
       </div>
-
-
 
       {/* Call to Action Banner */}
       <div className="w-full px-margin-lg pb-space-xl">
@@ -543,14 +612,20 @@ const HomeContainer: React.FC = () => {
         if (route === 'menu') navigate('/menu');
         if (route === 'profile') navigate('/profile');
       }}
+      onNavigateCategory={(categoryName) => {
+        navigate(`/menu?category=${encodeURIComponent(categoryName)}`);
+      }}
       onSelectProduct={(productId) => {
         const search: Record<string, string> = {
           'ca-phe-muoi': 'muối',
-          'tra-dao-cam-sa': 'trà',
+          'tra-sen-vang': 'sen vàng',
           'coldbrew-300ml': 'cold brew',
-          'nau-sai-gon': 'sữa đá'
+          'caramel-macchiato': 'caramel',
+          'latte-hat-phi': 'hạt phỉ',
+          'tra-dao-cam-sa': 'trà đào',
+          'matcha-uji': 'matcha'
         };
-        navigate(`/menu?search=${encodeURIComponent(search[productId] || '')}`);
+        navigate(`/menu?search=${encodeURIComponent(search[productId] || productId)}`);
       }}
       onQuickAdd={(product) => {
         navigate(`/menu?search=${encodeURIComponent(product.name)}`);
