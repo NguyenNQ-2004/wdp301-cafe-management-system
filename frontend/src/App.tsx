@@ -1,4 +1,3 @@
-
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import useAuthStore from './store/authStore';
@@ -16,6 +15,7 @@ import AdminRestockPage from './pages/admin/AdminRestockPage';
 import AdminSuppliersPage from './pages/admin/AdminSuppliersPage';
 import AdminPurchasesPage from './pages/admin/AdminPurchasesPage';
 import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage';
+import AdminCustomersPage from './pages/admin/AdminCustomersPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
 import CounterPaymentsPage from './pages/pos/CounterPaymentsPage';
 import PosHandoverPage from './pages/pos/PosHandoverPage';
@@ -33,7 +33,6 @@ import { Footer } from './components/Footer';
 import { AuthModal } from './components/AuthModal';
 import { DbContextProvider } from './data/DbContext';
 import type { PageRoute } from './types';
-
 
 /** Trả về đường dẫn phù hợp sau khi đăng nhập */
 const getRoleRedirectPath = (user: { role: string; position?: string } | null, currentPath: string = '/'): string => {
@@ -85,7 +84,7 @@ const AppLayout = () => {
   useEffect(() => {
     const path = location.pathname;
     if (!user) {
-      if (['/admin', '/admin/categories', '/cashier', '/barista', '/delivery', '/profile'].some(p => path.startsWith(p))) {
+      if (path.startsWith('/admin') || ['/cashier', '/barista', '/delivery', '/profile'].includes(path)) {
         navigate('/');
         setIsAuthOpen(true);
       }
@@ -268,17 +267,9 @@ const AppLayout = () => {
           <Route
             path="/admin/customers"
             element={
-              user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-customers"
-                  title="28. Quản lý Khách hàng"
-                  subtitle="Màn hình danh sách khách hàng thân thiết, điểm tích lũy và lịch sử giao dịch."
-                  table="users"
-                  branch="feature/customer-management"
-                />
-              ) : (
-                <Navigate to="/" />
-              )
+              user?.role === 'ADMIN' || (user?.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user?.position || ''))
+                ? <AdminCustomersPage />
+                : <Navigate to="/" />
             }
           />
           <Route
@@ -362,4 +353,3 @@ function App() {
 }
 
 export default App;
-
