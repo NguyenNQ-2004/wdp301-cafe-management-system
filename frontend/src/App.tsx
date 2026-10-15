@@ -21,6 +21,7 @@ import AdminCustomersPage from './pages/admin/AdminCustomersPage';
 import AdminMembershipsPage from './pages/admin/AdminMembershipsPage';
 import AdminComplaintsPage from './pages/admin/AdminComplaintsPage';
 import AdminReportsPage from './pages/admin/AdminReportsPage';
+import AdminSettingsPage from './pages/admin/AdminSettingsPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
 import CounterPaymentsPage from './pages/pos/CounterPaymentsPage';
 import PosHandoverPage from './pages/pos/PosHandoverPage';
@@ -281,6 +282,10 @@ const AppLayout = () => {
           <Route
             path="/admin/complaints"
             element={user?.role === 'ADMIN' ? <AdminComplaintsPage /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/admin/settings"
+            element={user?.role === 'ADMIN' ? <AdminSettingsPage /> : <Navigate to="/" />}
           />
           <Route
             path="/admin/*"
