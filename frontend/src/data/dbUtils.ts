@@ -170,24 +170,97 @@ export const productToppings = (p: any): { name: string; price: number }[] => {
   return [];
 };
 
+export const fmtNumber = (value: number | undefined | null): string => {
+  return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 }).format(value || 0);
+};
+
+export const lastPurchasePrice = (db: any, ingredientId: any): number | null => {
+  if (!db) return null;
+  if (db.purchase_order_items && Array.isArray(db.purchase_order_items)) {
+    const items = db.purchase_order_items.filter(
+      (it: any) =>
+        it.ingredient_id === ingredientId ||
+        it.ingredient === ingredientId ||
+        it.ingredient?._id === ingredientId ||
+        String(it.ingredient_id) === String(ingredientId) ||
+        String(it.ingredient?._id) === String(ingredientId)
+    );
+    if (items.length > 0) {
+      const latest = items[items.length - 1];
+      return latest.unit_price ?? latest.unitPrice ?? null;
+    }
+  }
+  if (db.purchase_orders && Array.isArray(db.purchase_orders)) {
+    for (let i = db.purchase_orders.length - 1; i >= 0; i--) {
+      const po = db.purchase_orders[i];
+      if (po.items && Array.isArray(po.items)) {
+        const found = po.items.find(
+          (it: any) =>
+            it.ingredient === ingredientId ||
+            it.ingredient?._id === ingredientId ||
+            it.ingredient_id === ingredientId ||
+            String(it.ingredient) === String(ingredientId) ||
+            String(it.ingredient?._id) === String(ingredientId)
+        );
+        if (found) return found.unitPrice ?? found.unit_price ?? null;
+      }
+    }
+  }
+  if (db.ingredients && Array.isArray(db.ingredients)) {
+    const ing = db.ingredients.find(
+      (i: any) => i.id === ingredientId || i._id === ingredientId || String(i.id) === String(ingredientId)
+    );
+    if (ing && (ing.latestUnitPrice || ing.cost_per_unit || ing.costPrice)) {
+      return ing.latestUnitPrice ?? ing.cost_per_unit ?? ing.costPrice;
+    }
+  }
+  return null;
+};
+
 export const productCost = (db: any, productId: any): number | null => {
   if (!db) return null;
-  const pis = db.product_ingredients?.filter((pi: any) => pi.product_id === productId || pi.productId === productId);
+  const pis = db.product_ingredients?.filter(
+    (pi: any) =>
+      pi.product_id === productId ||
+      pi.productId === productId ||
+      String(pi.product_id) === String(productId)
+  );
   if (pis && pis.length > 0) {
     let total = 0;
     for (const item of pis) {
-      const ing = db.ingredients?.find((i: any) => i.id === item.ingredient_id || i._id === item.ingredient_id);
-      const unitCost = ing?.cost_per_unit || ing?.price || 5000;
-      total += (Number(item.amount || item.quantity || 1) * unitCost);
+      const ing = db.ingredients?.find(
+        (i: any) =>
+          i.id === item.ingredient_id ||
+          i._id === item.ingredient_id ||
+          String(i.id) === String(item.ingredient_id)
+      );
+      const unitCost =
+        lastPurchasePrice(db, item.ingredient_id) ||
+        ing?.cost_per_unit ||
+        ing?.price ||
+        ing?.latestUnitPrice ||
+        5000;
+      const qty = Number(
+        item.quantity_required ?? item.quantityRequired ?? item.quantity ?? item.amount ?? 1
+      );
+      total += qty * unitCost;
     }
     return total > 0 ? total : null;
   }
-  const prod = db.products?.find((p: any) => p.id === productId || p._id === productId);
+  const prod = db.products?.find(
+    (p: any) => p.id === productId || p._id === productId || String(p.id) === String(productId)
+  );
   if (prod?.recipe && Array.isArray(prod.recipe) && prod.recipe.length > 0) {
     let total = 0;
     for (const r of prod.recipe) {
-      const ingCost = r.ingredient?.costPrice || r.ingredient?.cost_per_unit || 5000;
-      total += (Number(r.quantity || 1) * ingCost);
+      const ingId = r.ingredient?._id || r.ingredient;
+      const ingCost =
+        lastPurchasePrice(db, ingId) ||
+        r.ingredient?.costPrice ||
+        r.ingredient?.cost_per_unit ||
+        5000;
+      const qty = Number(r.quantity_required ?? r.quantityRequired ?? r.quantity ?? 1);
+      total += qty * ingCost;
     }
     return total > 0 ? total : null;
   }
