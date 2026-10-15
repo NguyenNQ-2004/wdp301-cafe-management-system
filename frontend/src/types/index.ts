@@ -9,16 +9,21 @@ export type PageRoute =
   | 'checkout' 
   | 'payment' 
   | 'admin' 
+  | 'admin-orders'
   | 'admin-categories'
   | 'admin-products'
   | 'admin-recipes'
   | 'admin-ingredients'
   | 'admin-inventory'
+  | 'admin-restock'
   | 'admin-purchases'
+
   | 'admin-suppliers'
   | 'admin-employees'
   | 'admin-shifts'
   | 'admin-schedules'
+  | 'my-schedule'
+  | 'my-attendance'
   | 'admin-attendance'
   | 'admin-handover'
   | 'admin-customers'
@@ -30,6 +35,17 @@ export type PageRoute =
   | 'barista';
 
 export type ActiveStatus = 'ACTIVE' | 'INACTIVE';
+
+export type OrderStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'PREPARING'
+  | 'READY'
+  | 'DELIVERING'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export type OrderType = 'DINE_IN' | 'TAKEAWAY' | 'ONLINE';
 
 export interface Category {
   id: string | number;
@@ -43,9 +59,9 @@ export interface Category {
 }
 
 export interface Product {
-  id: string | number;
+  id: any;
   _id?: string;
-  category_id?: string | number;
+  category_id?: any;
   category?: any;
   name: string;
   price?: number;
@@ -55,4 +71,11 @@ export interface Product {
   image_url?: string;
   status?: string;
   isAvailable?: boolean;
+  is_available?: boolean;
+  badge?: string;
+  subtitle?: string;
+  description?: string;
+  variantsConfig?: any;
+  variants_config?: any;
+  recipe?: any[];
 }

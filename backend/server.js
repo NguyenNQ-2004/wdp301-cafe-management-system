@@ -3,6 +3,9 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const connectDB = require('./config/db');
 
+const path = require('path');
+
+dotenv.config({ path: path.join(__dirname, '.env') });
 dotenv.config();
 connectDB();
 
@@ -22,12 +25,15 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/employees', require('./routes/employeeRoutes'));
 app.use('/api/work-schedules', require('./routes/workScheduleRoutes'));
+app.use('/api/work-shifts', require('./routes/workShiftRoutes'));
+app.use('/api/shift-handovers', require('./routes/shiftHandoverRoutes'));
 
 // Group B: Products & Sales
 app.use('/api/categories', require('./routes/categoryRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/loyalty', require('./routes/rewardRoutes'));
+app.use('/api/reports', require('./routes/reportRoutes'));
 
 // Group C: Accounting & Customer Care
 app.use('/api/payments', require('./routes/paymentRoutes'));
@@ -70,6 +76,15 @@ app.get('/api/seed', async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
+});
+
+// Middleware xử lý lỗi chung (JSON không hợp lệ, lỗi server)
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ message: 'Dữ liệu JSON không hợp lệ.' });
+  }
+  console.error('Server error:', err);
+  res.status(err.status || 500).json({ message: err.message || 'Lỗi máy chủ.' });
 });
 
 const PORT = process.env.PORT || 5000;

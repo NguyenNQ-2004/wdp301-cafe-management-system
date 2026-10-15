@@ -10,3 +10,13 @@
     flex-direction: column;
   }
 }
+
+.admin-reports-main-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1024px) {
+  .admin-reports-main-grid {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+}

@@ -98,7 +98,7 @@ router.post('/:id/counter-confirm', async (req, res) => {
     if (payment.status !== 'PENDING') return res.status(409).json({ message: 'Giao dịch không còn chờ thanh toán.' });
     const updated = await Payment.findOneAndUpdate(
       { _id: payment._id, status: 'PENDING' },
-      { $set: { paymentMethod: method, status: 'SUCCESS', paidAt: new Date(), paymentNote: `Thu ngân ${req.user.fullName} xác nhận đã nhận tiền tại quầy`, ...(method === 'BANK_TRANSFER' ? { transactionCode: reference } : {}) }, ...(method === 'CASH' ? { $unset: { transactionCode: 1 } } : {}) },
+      { $set: { paymentMethod: method, status: 'SUCCESS', paidAt: new Date(), receivedBy: req.user._id, paymentNote: `Thu ngân ${req.user.fullName} xác nhận đã nhận tiền tại quầy`, ...(method === 'BANK_TRANSFER' ? { transactionCode: reference } : {}) }, ...(method === 'CASH' ? { $unset: { transactionCode: 1 } } : {}) },
       { returnDocument: 'after', runValidators: true }
     );
     if (!updated) return res.status(409).json({ message: 'Giao dịch đã được xử lý. Vui lòng tải lại trạng thái.' });

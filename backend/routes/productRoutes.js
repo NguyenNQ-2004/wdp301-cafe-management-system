@@ -23,7 +23,7 @@ router.post('/', protect, adminOnly, async (req, res) => {
 
 // 4. PUT - Update
 router.put('/:id', protect, adminOnly, async (req, res) => {
-  try { res.json(await Product.findByIdAndUpdate(req.params.id, req.body, { new: true })); } 
+  try { res.json(await Product.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' })); } 
   catch (error) { res.status(500).json({ error: error.message }); }
 });
 

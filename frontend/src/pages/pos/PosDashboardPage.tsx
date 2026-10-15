@@ -64,6 +64,8 @@ const CashierDashboard: React.FC = () => {
 
         {/* Chuyển nhanh giữa các phân hệ */}
         <div className="flex items-center gap-2">
+          {user.role === 'STAFF' && <button onClick={() => navigate('/my-schedule')} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-blue-700 border border-blue-200">Lịch của tôi</button>}
+          {user.role === 'STAFF' && <button onClick={() => navigate('/my-attendance')} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-blue-700 border border-blue-200">Chấm công</button>}
           {user.role === 'ADMIN' && (
             <button
               onClick={() => navigate('/admin')}
@@ -159,6 +161,17 @@ const CashierDashboard: React.FC = () => {
             <span>Về Trang chủ</span>
             <span className="material-symbols-outlined text-[16px] ml-1">east</span>
           </div>
+        </div>
+        <div
+          onClick={() => navigate('/cashier/handover')}
+          className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm hover:shadow-md transition-all cursor-pointer group"
+        >
+          <div className="w-12 h-12 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center mb-4">
+            <span className="material-symbols-outlined text-[24px]">receipt_long</span>
+          </div>
+          <h3 className="font-bold text-base text-on-surface mb-1">Bàn giao ca thu ngân</h3>
+          <p className="text-secondary text-xs leading-relaxed">Kiểm đếm két, xem chênh lệch và in phiếu K80 sau khi check-out.</p>
+          <div className="mt-4 flex items-center text-xs font-semibold text-orange-700 group-hover:underline">Mở bàn giao ca →</div>
         </div>
       </div>
 

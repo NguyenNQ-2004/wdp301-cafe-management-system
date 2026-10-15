@@ -1,4 +1,3 @@
-
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import useAuthStore from './store/authStore';
@@ -6,11 +5,25 @@ import useCartStore from './store/cartStore';
 import useCartSync from './hooks/useCartSync';
 import { shopApi, ShopApiError } from './lib/shopApi';
 import AdminDashboard from './pages/admin/AdminDashboardPage';
+import AdminShiftsPage from './pages/admin/AdminShiftsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
+import AdminSchedulesPage from './pages/admin/AdminSchedulesPage';
+import AdminAttendancePage from './pages/admin/AdminAttendancePage';
 import AdminCategoriesPage from './pages/admin/AdminCategoriesPage';
+import AdminOrdersPage from './pages/admin/AdminOrdersPage';
+import AdminStockPage from './pages/admin/AdminStockPage';
+import AdminRestockPage from './pages/admin/AdminRestockPage';
+import AdminSuppliersPage from './pages/admin/AdminSuppliersPage';
+import AdminPurchasesPage from './pages/admin/AdminPurchasesPage';
+import AdminProductsPage from './pages/admin/AdminProductsPage';
 import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage';
+import AdminCustomersPage from './pages/admin/AdminCustomersPage';
+import AdminMembershipsPage from './pages/admin/AdminMembershipsPage';
+import AdminComplaintsPage from './pages/admin/AdminComplaintsPage';
+import AdminReportsPage from './pages/admin/AdminReportsPage';
 import CashierDashboard from './pages/pos/PosDashboardPage';
 import CounterPaymentsPage from './pages/pos/CounterPaymentsPage';
+import PosHandoverPage from './pages/pos/PosHandoverPage';
 import BaristaDashboard from './pages/kds/KdsTerminalPage';
 import CustomerDashboard from './pages/ProfilePage';
 import HomeContainer from './pages/HomePage';
@@ -25,7 +38,6 @@ import { Footer } from './components/Footer';
 import { AuthModal } from './components/AuthModal';
 import { DbContextProvider } from './data/DbContext';
 import type { PageRoute } from './types';
-
 
 /** Trả về đường dẫn phù hợp sau khi đăng nhập */
 const getRoleRedirectPath = (user: { role: string; position?: string } | null, currentPath: string = '/'): string => {
@@ -77,7 +89,7 @@ const AppLayout = () => {
   useEffect(() => {
     const path = location.pathname;
     if (!user) {
-      if (['/admin', '/admin/categories', '/cashier', '/barista', '/delivery', '/profile'].some(p => path.startsWith(p))) {
+      if (path.startsWith('/admin') || ['/cashier', '/barista', '/delivery', '/profile'].includes(path)) {
         navigate('/');
         setIsAuthOpen(true);
       }
@@ -127,6 +139,10 @@ const AppLayout = () => {
             element={user?.role === 'ADMIN' ? <AdminDashboard /> : <Navigate to="/" />}
           />
           <Route
+            path="/admin/reports"
+            element={user?.role === 'ADMIN' ? <AdminReportsPage /> : <Navigate to="/" />}
+          />
+          <Route
             path="/admin/categories"
             element={user?.role === 'ADMIN' ? <AdminCategoriesPage onNavigate={handleNavigate} /> : <Navigate to="/" />}
           />
@@ -134,13 +150,7 @@ const AppLayout = () => {
             path="/admin/products"
             element={
               user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-products"
-                  title="16. Quản lý Sản phẩm & Giá bán"
-                  subtitle="Màn hình quản lý danh sách sản phẩm, giá bán và cấu hình kích cỡ / topping."
-                  table="products"
-                  branch="feature/product-management"
-                />
+                <AdminProductsPage onNavigate={handleNavigate} />
               ) : (
                 <Navigate to="/" />
               )
@@ -166,12 +176,7 @@ const AppLayout = () => {
             path="/admin/orders"
             element={
               user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-orders"
-                  title="32. Quản lý Đơn hàng"
-                  subtitle="Màn hình theo dõi toàn bộ hóa đơn và đơn bán hàng từ POS và online."
-                  table="orders"
-                />
+                <AdminOrdersPage onNavigate={handleNavigate} />
               ) : (
                 <Navigate to="/" />
               )
@@ -197,13 +202,7 @@ const AppLayout = () => {
             path="/admin/inventory"
             element={
               user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-inventory"
-                  title="19. Tồn kho & Cảnh báo"
-                  subtitle="Màn hình theo dõi số lượng tồn kho thực tế và cảnh báo chạm mức tối thiểu."
-                  table="inventory_transactions"
-                  branch="feature/inventory-management"
-                />
+                <AdminStockPage />
               ) : (
                 <Navigate to="/" />
               )
@@ -213,13 +212,7 @@ const AppLayout = () => {
             path="/admin/restock"
             element={
               user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-restock"
-                  title="20. Đề xuất nhập hàng"
-                  subtitle="Màn hình tạo và duyệt các yêu cầu nhập nguyên liệu từ bộ phận pha chế/kho."
-                  table="restock_requests"
-                  branch="feature/restock-request"
-                />
+                <AdminRestockPage />
               ) : (
                 <Navigate to="/" />
               )
@@ -229,13 +222,7 @@ const AppLayout = () => {
             path="/admin/suppliers"
             element={
               user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-suppliers"
-                  title="21. Nhà cung cấp"
-                  subtitle="Màn hình quản lý danh bạ đối tác cung cấp nguyên liệu và thiết bị."
-                  table="suppliers"
-                  branch="feature/supplier-management"
-                />
+                <AdminSuppliersPage />
               ) : (
                 <Navigate to="/" />
               )
@@ -245,13 +232,7 @@ const AppLayout = () => {
             path="/admin/purchases"
             element={
               user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-purchases"
-                  title="22. Phiếu nhập hàng (Purchase Order)"
-                  subtitle="Màn hình quản lý đơn đặt hàng và nhập kho nguyên vật liệu."
-                  table="purchase_orders"
-                  branch="feature/purchase-order"
-                />
+                <AdminPurchasesPage />
               ) : (
                 <Navigate to="/" />
               )
@@ -263,67 +244,43 @@ const AppLayout = () => {
           />
           <Route
             path="/admin/shifts"
-            element={
-              user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-shifts"
-                  title="24. Khung giờ ca làm"
-                  subtitle="Màn hình thiết lập các khung giờ ca sáng, chiều, tối của cửa hàng."
-                  table="work_shifts"
-                  branch="feature/shift-management"
-                />
-              ) : (
-                <Navigate to="/" />
-              )
-            }
+            element={user?.role === 'ADMIN' ? <AdminShiftsPage /> : <Navigate to="/" />}
           />
           <Route
             path="/admin/schedules"
-            element={
-              user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-schedules"
-                  title="25. Lịch phân ca"
-                  subtitle="Màn hình xếp lịch làm việc hàng tuần cho nhân viên thu ngân và pha chế."
-                  table="work_schedules"
-                  branch="feature/schedule-management"
-                />
-              ) : (
-                <Navigate to="/" />
-              )
-            }
+            element={user?.role === 'ADMIN' ? <AdminSchedulesPage /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/my-schedule"
+            element={user?.role === 'STAFF' ? <AdminSchedulesPage /> : <Navigate to="/" />}
           />
           <Route
             path="/admin/attendance"
-            element={
-              user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-attendance"
-                  title="26. Chấm công nhân sự"
-                  subtitle="Màn hình theo dõi điểm danh và lịch sử chấm công ra vào ca của nhân viên."
-                  table="attendance_records"
-                  branch="feature/attendance-management"
-                />
-              ) : (
-                <Navigate to="/" />
-              )
-            }
+            element={user?.role === 'ADMIN' ? <AdminAttendancePage /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/my-attendance"
+            element={user?.role === 'STAFF' ? <AdminAttendancePage /> : <Navigate to="/" />}
           />
           <Route
             path="/admin/customers"
             element={
-              user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-customers"
-                  title="28. Quản lý Khách hàng"
-                  subtitle="Màn hình danh sách khách hàng thân thiết, điểm tích lũy và lịch sử giao dịch."
-                  table="users"
-                  branch="feature/customer-management"
-                />
-              ) : (
-                <Navigate to="/" />
-              )
+              user?.role === 'ADMIN' || (user?.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user?.position || ''))
+                ? <AdminCustomersPage />
+                : <Navigate to="/" />
             }
+          />
+          <Route
+            path="/admin/memberships"
+            element={
+              user?.role === 'ADMIN' || user?.role === 'STAFF'
+                ? <AdminMembershipsPage />
+                : <Navigate to="/" />
+            }
+          />
+          <Route
+            path="/admin/complaints"
+            element={user?.role === 'ADMIN' ? <AdminComplaintsPage /> : <Navigate to="/" />}
           />
           <Route
             path="/admin/*"
@@ -351,6 +308,10 @@ const AppLayout = () => {
           <Route
             path="/cashier/payments"
             element={user?.role === 'ADMIN' || (user?.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user.position || '')) ? <CounterPaymentsPage /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/cashier/handover"
+            element={user?.role === 'ADMIN' || (user?.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user.position || '')) ? <PosHandoverPage /> : <Navigate to="/" />}
           />
           <Route
             path="/barista"
@@ -402,4 +363,3 @@ function App() {
 }
 
 export default App;
-

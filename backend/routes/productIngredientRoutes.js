@@ -42,7 +42,7 @@ router.post('/', adminOnly, async (req, res) => {
 // 3. UPDATE BOM LINK
 router.put('/:id', adminOnly, async (req, res) => {
   try {
-    const bom = await ProductIngredient.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const bom = await ProductIngredient.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
     res.json(bom);
   } catch (error) {
     res.status(400).json({ message: error.message });
