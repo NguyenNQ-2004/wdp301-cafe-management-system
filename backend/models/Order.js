@@ -14,6 +14,8 @@ const orderSchema = new mongoose.Schema({
   customer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   cashier: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   voucher: { type: mongoose.Schema.Types.ObjectId, ref: 'Voucher' },
+  reward: { type: mongoose.Schema.Types.ObjectId, ref: 'RewardItem' },
+  pointsRedeemed: { type: Number, default: 0 },
   orderType: { type: String, enum: ['DINE_IN', 'TAKEAWAY', 'ONLINE'], required: true },
   status: { 
     type: String, 
@@ -25,7 +27,7 @@ const orderSchema = new mongoose.Schema({
   discountAmount: { type: Number, default: 0 },
   deliveryFee: { type: Number, default: 0 },
   finalAmount: { type: Number, required: true },
-  paymentMethod: { type: String, enum: ['COD', 'PAY_AT_COUNTER', 'CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER'], default: 'CASH' },
+  paymentMethod: { type: String, enum: ['COD', 'PAY_AT_COUNTER', 'CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER', 'DEMO_ONLINE'], default: 'CASH' },
   recipientName: { type: String },
   recipientPhone: { type: String },
   deliveryAddress: { type: String },

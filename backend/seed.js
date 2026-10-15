@@ -22,6 +22,7 @@ const PurchaseOrderItem = require('./models/PurchaseOrderItem');
 const InventoryTransaction = require('./models/InventoryTransaction');
 const ShopSetting = require('./models/ShopSetting');
 const Cart = require('./models/Cart');
+const RewardItem = require('./models/RewardItem');
 
 const connectDB = async () => {
   try {
@@ -53,7 +54,8 @@ const importData = async () => {
       PurchaseOrderItem.deleteMany({}),
       InventoryTransaction.deleteMany({}),
       ShopSetting.deleteMany({}),
-      Cart.deleteMany({})
+      Cart.deleteMany({}),
+      RewardItem.deleteMany({})
     ]);
 
     const salt = await bcrypt.genSalt(10);
@@ -733,6 +735,13 @@ const importData = async () => {
       { customer: u[4]._id, order: ord[9]._id, pointsChange: 80, transactionType: 'EARN' }
     ]);
 
+    await RewardItem.insertMany([
+      { name: 'Giảm 15.000đ bằng điểm', pointsCost: 100, discountValue: 15000, minOrderValue: 60000, stock: 50 },
+      { name: 'Giảm 30.000đ bằng điểm', pointsCost: 180, discountValue: 30000, minOrderValue: 120000, stock: 30 },
+      { name: 'Giảm 50.000đ bằng điểm', pointsCost: 300, discountValue: 50000, minOrderValue: 200000, stock: 20 },
+      { name: 'Giảm 100.000đ bằng điểm', pointsCost: 600, discountValue: 100000, minOrderValue: 350000, stock: 10 }
+    ]);
+
     // ==========================================
     // 11. CUSTOMER REVIEWS (3 Reviews)
     // ==========================================
@@ -809,12 +818,12 @@ const importData = async () => {
     // ==========================================
     console.log('📊 Đang tạo Inventory Transactions...');
     await InventoryTransaction.insertMany([
-      { ingredient: ing[1]._id, transactionType: 'IN_PURCHASE', quantity: 5000, referenceType: 'PURCHASE_ORDER', referenceId: po[1]._id, createdAt: new Date('2026-10-01T10:00:00Z') },
-      { ingredient: ing[2]._id, transactionType: 'IN_PURCHASE', quantity: 10000, referenceType: 'PURCHASE_ORDER', referenceId: po[2]._id, createdAt: new Date('2026-10-02T10:00:00Z') },
-      { ingredient: ing[1]._id, transactionType: 'OUT_ORDER', quantity: 36, referenceType: 'ORDER', referenceId: ord[1]._id, createdAt: new Date('2026-10-03T09:10:00Z') },
-      { ingredient: ing[2]._id, transactionType: 'OUT_ORDER', quantity: 360, referenceType: 'ORDER', referenceId: ord[2]._id, createdAt: new Date('2026-10-03T10:10:00Z') },
-      { ingredient: ing[5]._id, transactionType: 'SPOILAGE', quantity: 100, referenceType: 'ADJUSTMENT', createdAt: new Date('2026-10-03T11:00:00Z') },
-      { ingredient: ing[3]._id, transactionType: 'ADJUSTMENT', quantity: 50, referenceType: 'ADJUSTMENT', createdAt: new Date('2026-10-03T11:30:00Z') }
+      { ingredient: ing[1]._id, transactionType: 'IN_PURCHASE', quantity: 5000, stockDelta: 5000, referenceType: 'PURCHASE_ORDER', referenceId: po[1]._id, createdAt: new Date('2026-10-01T10:00:00Z') },
+      { ingredient: ing[2]._id, transactionType: 'IN_PURCHASE', quantity: 10000, stockDelta: 10000, referenceType: 'PURCHASE_ORDER', referenceId: po[2]._id, createdAt: new Date('2026-10-02T10:00:00Z') },
+      { ingredient: ing[1]._id, transactionType: 'OUT_ORDER', quantity: 36, stockDelta: -36, referenceType: 'ORDER', referenceId: ord[1]._id, createdAt: new Date('2026-10-03T09:10:00Z') },
+      { ingredient: ing[2]._id, transactionType: 'OUT_ORDER', quantity: 360, stockDelta: -360, referenceType: 'ORDER', referenceId: ord[2]._id, createdAt: new Date('2026-10-03T10:10:00Z') },
+      { ingredient: ing[5]._id, transactionType: 'SPOILAGE', quantity: 100, stockDelta: -100, referenceType: 'ADJUSTMENT', createdAt: new Date('2026-10-03T11:00:00Z') },
+      { ingredient: ing[3]._id, transactionType: 'ADJUSTMENT', quantity: 50, stockDelta: 50, referenceType: 'ADJUSTMENT', createdAt: new Date('2026-10-03T11:30:00Z') }
     ]);
 
     // ==========================================

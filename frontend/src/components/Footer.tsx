@@ -15,7 +15,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <span className="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center text-white shadow-sm">
               <span className="material-symbols-outlined text-[18px]">local_cafe</span>
             </span>
-            <span className="font-headline-sm text-headline-sm text-primary font-bold">
+            <span className="font-headline-sm text-headline-sm text-primary">
               Aura Café
             </span>
           </div>
@@ -26,7 +26,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <span className="font-label-md text-label-md text-on-surface-variant">Hotline hỗ trợ:</span>
             <a
               href="tel:19006868"
-              className="font-headline-sm text-headline-sm text-primary tabular-data font-bold hover:underline cursor-pointer"
+              className="font-headline-sm text-headline-sm text-primary tabular-data hover:underline cursor-pointer"
             >
               1900 6868
             </a>
@@ -35,7 +35,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
         {/* Col 2: Chi nhánh */}
         <div className="flex flex-col gap-space-sm">
-          <h4 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
+          <h4 className="font-headline-sm text-headline-sm text-on-surface">
             Hệ thống chi nhánh
           </h4>
           <ul className="flex flex-col gap-space-xs font-body-sm text-body-sm text-on-surface-variant">
@@ -60,7 +60,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
         {/* Col 3: Chính sách & Dịch vụ */}
         <div className="flex flex-col gap-space-sm">
-          <h4 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
+          <h4 className="font-headline-sm text-headline-sm text-on-surface">
             Chính sách & Dịch vụ
           </h4>
           <ul className="flex flex-col gap-space-xs font-body-md text-body-md text-on-surface-variant">
@@ -101,7 +101,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
         {/* Col 4: Giờ mở cửa */}
         <div className="flex flex-col gap-space-sm">
-          <h4 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
+          <h4 className="font-headline-sm text-headline-sm text-on-surface">
             Giờ mở cửa
           </h4>
           <div className="flex flex-col gap-space-xs font-body-md text-body-md text-on-surface-variant">

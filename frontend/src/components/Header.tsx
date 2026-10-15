@@ -127,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Global Search Input */}
         <form
           onSubmit={handleSearchSubmit}
-          className="flex items-center gap-space-md flex-1 max-w-md mx-space-md hidden md:flex"
+          className="hidden md:flex items-center gap-space-md flex-1 max-w-md mx-space-md"
         >
           <div className="relative w-full">
             <span className="material-symbols-outlined absolute left-space-md top-1/2 -translate-y-1/2 text-secondary text-[20px]">
@@ -301,6 +301,31 @@ export const Header: React.FC<HeaderProps> = ({
                     <span className="material-symbols-outlined text-[18px] text-secondary">account_circle</span>
                     <span>Hồ sơ & Đổi mật khẩu</span>
                   </button>
+
+                  {user.role === 'STAFF' && (
+                    <button
+                      onClick={() => {
+                        onNavigate('my-schedule');
+                        setIsUserMenuOpen(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-xs sm:text-sm text-on-surface hover:bg-surface-container flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[18px] text-secondary">calendar_month</span>
+                      <span>Lịch làm việc của tôi</span>
+                    </button>
+                  )}
+                  {user.role === 'STAFF' && (
+                    <button
+                      onClick={() => {
+                        onNavigate('my-attendance');
+                        setIsUserMenuOpen(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-xs sm:text-sm text-on-surface hover:bg-surface-container flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[18px] text-secondary">how_to_reg</span>
+                      <span>Chấm công của tôi</span>
+                    </button>
+                  )}
 
                   {/* Quyền quản trị cho Admin */}
                   {user.role === 'ADMIN' && (
