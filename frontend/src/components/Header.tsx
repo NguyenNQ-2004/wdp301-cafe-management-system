@@ -127,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Global Search Input */}
         <form
           onSubmit={handleSearchSubmit}
-          className="flex items-center gap-space-md flex-1 max-w-md mx-space-md hidden md:flex"
+          className="hidden md:flex items-center gap-space-md flex-1 max-w-md mx-space-md"
         >
           <div className="relative w-full">
             <span className="material-symbols-outlined absolute left-space-md top-1/2 -translate-y-1/2 text-secondary text-[20px]">

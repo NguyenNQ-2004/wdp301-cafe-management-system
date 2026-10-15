@@ -8,7 +8,7 @@ const inventoryTransactionSchema = new mongoose.Schema({
   referenceType: { type: String, enum: ['ORDER', 'PURCHASE_ORDER', 'ADJUSTMENT'], default: 'ADJUSTMENT' },
   referenceId: { type: mongoose.Schema.Types.Mixed },
   note: { type: String, trim: true, maxlength: 500 },
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 
 module.exports = mongoose.model('InventoryTransaction', inventoryTransactionSchema);
