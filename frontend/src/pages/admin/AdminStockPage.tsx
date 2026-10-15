@@ -54,6 +54,8 @@ export default function AdminStockPage() {
 
   const ingredients = overview?.ingredients ?? [];
   const filteredStock = ingredients.filter((item) => stockFilter === 'all' || item.status === 'LOW_STOCK');
+  const selectedIngredient = ingredients.find((item) => item._id === form.ingredientId);
+  const selectedUnit = selectedIngredient?.unit || 'đơn vị';
   const filteredTransactions = useMemo(() => transactions.filter((item) => txFilter === 'all' || item.transactionType === txFilter), [transactions, txFilter]);
   const showToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 3000); };
 
@@ -97,6 +99,58 @@ export default function AdminStockPage() {
         <div className="max-h-[520px] divide-y divide-stone-100 overflow-y-auto text-xs">{filteredTransactions.map((transaction) => <div key={transaction._id} className="flex items-center justify-between gap-2 p-3"><div><div className="flex items-center gap-1.5"><Badge className={transaction.stockDelta > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}>{TX_LABEL[transaction.transactionType]}</Badge><span className="font-mono text-[10px] text-stone-400">#{transaction._id.slice(-6)}</span></div><p className="mt-1 font-semibold text-stone-900">{transaction.ingredient?.name || 'Nguyên liệu đã xóa'}</p><p className="text-[10px] text-stone-400">{fmtDateTime(transaction.createdAt)} • {transaction.referenceType}</p></div><span className={`font-mono font-bold ${transaction.stockDelta > 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{transaction.stockDelta > 0 ? '+' : ''}{fmtNumber(transaction.stockDelta)} {transaction.ingredient?.unit}</span></div>)}</div>
       </div>
     </div>}
-    {isModalOpen ? <Modal title="Ghi phiếu điều chỉnh tồn kho" onClose={() => setIsModalOpen(false)}><form onSubmit={handleCreate} className="space-y-3"><Field label="Nguyên liệu" column="ingredient_id"><select required value={form.ingredientId} onChange={(event) => setForm((current) => ({ ...current, ingredientId: event.target.value }))} className={inputCls}>{ingredients.map((item) => <option key={item._id} value={item._id}>{item.name} (tồn {fmtNumber(item.currentStock)} {item.unit})</option>)}</select></Field><Field label="Loại phiếu" column="transaction_type"><select value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as 'ADJUSTMENT' | 'SPOILAGE' }))} className={inputCls}><option value="ADJUSTMENT">ADJUSTMENT - Điều chỉnh tăng</option><option value="SPOILAGE">SPOILAGE - Hao hụt / hủy hàng</option></select></Field><Field label="Số lượng (luôn dương)" column="quantity"><input required type="number" min="0.001" step="0.001" value={form.quantity} onChange={(event) => setForm((current) => ({ ...current, quantity: Number(event.target.value) }))} className={inputCls} /></Field><FormActions onCancel={() => setIsModalOpen(false)} submitLabel={saving ? 'Đang ghi...' : 'Ghi phiếu'} /></form></Modal> : null}
+    {isModalOpen ? (
+      <Modal title="Ghi phiếu điều chỉnh tồn kho" onClose={() => setIsModalOpen(false)}>
+        <form onSubmit={handleCreate} className="space-y-3">
+          <Field label="Nguyên liệu">
+            <select
+              required
+              value={form.ingredientId}
+              onChange={(event) => setForm((current) => ({ ...current, ingredientId: event.target.value }))}
+              className={inputCls}
+            >
+              {ingredients.map((item) => (
+                <option key={item._id} value={item._id}>
+                  {item.name} (tồn {fmtNumber(item.currentStock)} {item.unit})
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Loại điều chỉnh">
+            <select
+              value={form.type}
+              onChange={(event) => setForm((current) => ({
+                ...current,
+                type: event.target.value as 'ADJUSTMENT' | 'SPOILAGE',
+              }))}
+              className={inputCls}
+            >
+              <option value="ADJUSTMENT">Điều chỉnh tăng tồn kho</option>
+              <option value="SPOILAGE">Hao hụt / hủy hàng</option>
+            </select>
+          </Field>
+          <Field label={`Số lượng (${selectedUnit})`}>
+            <div className="relative">
+              <input
+                required
+                type="number"
+                min="0.001"
+                step="0.001"
+                value={form.quantity}
+                onChange={(event) => setForm((current) => ({ ...current, quantity: Number(event.target.value) }))}
+                className={`${inputCls} pr-20`}
+              />
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-semibold text-stone-500">
+                {selectedUnit}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-stone-500">
+              Nhập số lượng theo đơn vị của nguyên liệu đã chọn.
+            </p>
+          </Field>
+          <FormActions onCancel={() => setIsModalOpen(false)} submitLabel={saving ? 'Đang ghi...' : 'Ghi phiếu'} />
+        </form>
+      </Modal>
+    ) : null}
   </AdminLayout>;
 }
