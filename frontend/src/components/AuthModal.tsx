@@ -39,9 +39,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: loginIdentifier, password: loginPassword }),
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
         triggerToast(data.message || 'Login failed. Check your phone and password.');
         return;
@@ -177,31 +177,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="flex items-center p-1 bg-surface-container-high rounded-lg mb-space-lg">
             <button
               onClick={() => setActiveTab('login')}
-              className={`flex-1 py-space-sm px-space-md text-center rounded font-label-lg text-label-lg transition-all duration-200 cursor-pointer ${
-                activeTab === 'login'
-                  ? 'bg-surface-container-lowest text-on-surface shadow-sm font-semibold'
-                  : 'text-secondary hover:text-on-surface'
-              }`}
+              className={`flex-1 py-space-sm px-space-md text-center rounded font-label-lg text-label-lg transition-all duration-200 cursor-pointer ${activeTab === 'login'
+                ? 'bg-surface-container-lowest text-on-surface shadow-sm font-semibold'
+                : 'text-secondary hover:text-on-surface'
+                }`}
             >
               Đăng nhập
             </button>
             <button
               onClick={() => setActiveTab('register')}
-              className={`flex-1 py-space-sm px-space-md text-center rounded font-label-lg text-label-lg transition-all duration-200 cursor-pointer ${
-                activeTab === 'register'
-                  ? 'bg-surface-container-lowest text-on-surface shadow-sm font-semibold'
-                  : 'text-secondary hover:text-on-surface'
-              }`}
+              className={`flex-1 py-space-sm px-space-md text-center rounded font-label-lg text-label-lg transition-all duration-200 cursor-pointer ${activeTab === 'register'
+                ? 'bg-surface-container-lowest text-on-surface shadow-sm font-semibold'
+                : 'text-secondary hover:text-on-surface'
+                }`}
             >
               Đăng ký
             </button>
             <button
               onClick={() => setActiveTab('forgot')}
-              className={`flex-1 py-space-sm px-space-md text-center rounded font-label-lg text-label-lg transition-all duration-200 cursor-pointer ${
-                activeTab === 'forgot'
-                  ? 'bg-surface-container-lowest text-on-surface shadow-sm font-semibold'
-                  : 'text-secondary hover:text-on-surface'
-              }`}
+              className={`flex-1 py-space-sm px-space-md text-center rounded font-label-lg text-label-lg transition-all duration-200 cursor-pointer ${activeTab === 'forgot'
+                ? 'bg-surface-container-lowest text-on-surface shadow-sm font-semibold'
+                : 'text-secondary hover:text-on-surface'
+                }`}
             >
               Quên mật khẩu
             </button>
