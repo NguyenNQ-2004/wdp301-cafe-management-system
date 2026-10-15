@@ -40,6 +40,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentRoute, active
       title: 'BÁO CÁO',
       items: [
         { route: 'admin', path: '/admin', pageRoute: 'admin', label: 'Tổng quan', icon: 'dashboard', table: 'orders, payments' },
+        { route: 'admin-reports', path: '/admin/reports', pageRoute: 'admin-reports', label: 'Báo cáo kinh doanh', icon: 'analytics' },
       ]
     },
     {
@@ -76,6 +77,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentRoute, active
         { route: 'admin-customers', path: '/admin/customers', pageRoute: 'admin-customers', label: 'Khách hàng (CRM)', icon: 'group', table: 'users (role=CUSTOMER)' },
         { route: 'admin-loyalty', path: '/admin/memberships', pageRoute: 'admin-loyalty', label: 'Tích điểm & Hạng thẻ', icon: 'loyalty', table: 'loyalty_transactions' },
         { route: 'admin-complaints', path: '/admin/complaints', pageRoute: 'admin-complaints', label: 'Đánh giá & Khiếu nại', icon: 'feedback', table: 'customer_reviews' },
+      ]
+    },
+    {
+      title: 'HỆ THỐNG',
+      items: [
+        { route: 'admin-settings', path: '/admin/settings', pageRoute: 'admin-settings', label: 'Cài đặt cửa hàng', icon: 'settings', table: 'shop_settings' },
       ]
     }
   ];

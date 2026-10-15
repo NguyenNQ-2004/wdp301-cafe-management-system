@@ -117,6 +117,23 @@ const AdminDashboard: React.FC = () => {
             </div>
           </div>
 
+          <div
+            onClick={() => navigate('/admin/reports')}
+            className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm hover:shadow-md transition-all cursor-pointer group"
+          >
+            <div className="w-12 h-12 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[24px]">analytics</span>
+            </div>
+            <h3 className="font-bold text-base text-on-surface mb-1">31. Báo cáo kinh doanh</h3>
+            <p className="text-secondary text-xs leading-relaxed">
+              Theo dõi doanh thu, phương thức thanh toán và tình trạng tồn kho.
+            </p>
+            <div className="mt-4 flex items-center text-xs font-semibold text-rose-700 group-hover:underline">
+              <span>Mở Reports Dashboard</span>
+              <span className="material-symbols-outlined text-[16px] ml-1">east</span>
+            </div>
+          </div>
+
           <div 
             onClick={() => navigate('/menu')}
             className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm hover:shadow-md transition-all cursor-pointer group"

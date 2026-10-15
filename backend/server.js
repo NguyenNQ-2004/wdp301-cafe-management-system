@@ -33,6 +33,7 @@ app.use('/api/categories', require('./routes/categoryRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/loyalty', require('./routes/rewardRoutes'));
+app.use('/api/reports', require('./routes/reportRoutes'));
 
 // Group C: Accounting & Customer Care
 app.use('/api/payments', require('./routes/paymentRoutes'));
