@@ -17,6 +17,7 @@ import AdminSuppliersPage from './pages/admin/AdminSuppliersPage';
 import AdminPurchasesPage from './pages/admin/AdminPurchasesPage';
 import AdminProductsPage from './pages/admin/AdminProductsPage';
 import AdminRecipesPage from './pages/admin/AdminRecipesPage';
+import AdminIngredientsPage from './pages/admin/AdminIngredientsPage';
 import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage';
 import AdminCustomersPage from './pages/admin/AdminCustomersPage';
 import AdminMembershipsPage from './pages/admin/AdminMembershipsPage';
@@ -182,13 +183,7 @@ const AppLayout = () => {
             path="/admin/ingredients"
             element={
               user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-ingredients"
-                  title="18. Kho Nguyên liệu"
-                  subtitle="Màn hình danh mục nguyên vật liệu dùng trong pha chế và bếp."
-                  table="ingredients"
-                  branch="feature/ingredient-management"
-                />
+                <AdminIngredientsPage onNavigate={handleNavigate} />
               ) : (
                 <Navigate to="/" />
               )

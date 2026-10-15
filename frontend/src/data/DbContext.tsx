@@ -70,15 +70,22 @@ const DEFAULT_CATEGORIES: Category[] = [
   }
 ];
 
+const DEFAULT_SUPPLIERS = [
+  { id: 1, _id: 'sup-1', name: 'Đà Lạt Farm Coffee', phone: '0901234567', address: 'Đà Lạt, Lâm Đồng', status: 'ACTIVE' },
+  { id: 2, _id: 'sup-2', name: 'Vinamilk Dairy Corp', phone: '0902345678', address: 'Quận 7, TP.HCM', status: 'ACTIVE' },
+  { id: 3, _id: 'sup-3', name: 'Trà Việt & Nông sản', phone: '0903456789', address: 'Bảo Lộc, Lâm Đồng', status: 'ACTIVE' },
+  { id: 4, _id: 'sup-4', name: 'Nguyên liệu Pha chế Monin', phone: '0904567890', address: 'Bình Thạnh, TP.HCM', status: 'ACTIVE' }
+];
+
 const DEFAULT_INGREDIENTS = [
-  { id: 1, _id: 'ing-1', name: 'Coffee beans', unit: 'gram', currentStock: 10000, minStockLevel: 2000, cost_per_unit: 350 },
-  { id: 2, _id: 'ing-2', name: 'Fresh milk', unit: 'ml', currentStock: 20000, minStockLevel: 5000, cost_per_unit: 35 },
-  { id: 3, _id: 'ing-3', name: 'Peach syrup', unit: 'ml', currentStock: 5000, minStockLevel: 1000, cost_per_unit: 120 },
-  { id: 4, _id: 'ing-4', name: 'Black tea', unit: 'gram', currentStock: 8000, minStockLevel: 1500, cost_per_unit: 200 },
-  { id: 5, _id: 'ing-5', name: 'Tapioca pearls', unit: 'gram', currentStock: 4000, minStockLevel: 1000, cost_per_unit: 80 },
-  { id: 6, _id: 'ing-6', name: 'Cheesecake slice', unit: 'piece', currentStock: 30, minStockLevel: 5, cost_per_unit: 22000 },
-  { id: 7, _id: 'ing-7', name: 'Orange', unit: 'piece', currentStock: 100, minStockLevel: 20, cost_per_unit: 5000 },
-  { id: 8, _id: 'ing-8', name: 'Lemon', unit: 'piece', currentStock: 80, minStockLevel: 15, cost_per_unit: 2000 }
+  { id: 1, _id: 'ing-1', name: 'Coffee beans', unit: 'gram', currentStock: 10000, current_stock: 10000, minStockLevel: 2000, min_stock_level: 2000, supplier_id: 1, cost_per_unit: 350 },
+  { id: 2, _id: 'ing-2', name: 'Fresh milk', unit: 'ml', currentStock: 20000, current_stock: 20000, minStockLevel: 5000, min_stock_level: 5000, supplier_id: 2, cost_per_unit: 35 },
+  { id: 3, _id: 'ing-3', name: 'Peach syrup', unit: 'ml', currentStock: 5000, current_stock: 5000, minStockLevel: 1000, min_stock_level: 1000, supplier_id: 4, cost_per_unit: 120 },
+  { id: 4, _id: 'ing-4', name: 'Black tea', unit: 'gram', currentStock: 8000, current_stock: 8000, minStockLevel: 1500, min_stock_level: 1500, supplier_id: 3, cost_per_unit: 200 },
+  { id: 5, _id: 'ing-5', name: 'Tapioca pearls', unit: 'gram', currentStock: 4000, current_stock: 4000, minStockLevel: 1000, min_stock_level: 1000, supplier_id: 4, cost_per_unit: 80 },
+  { id: 6, _id: 'ing-6', name: 'Cheesecake slice', unit: 'piece', currentStock: 30, current_stock: 30, minStockLevel: 5, min_stock_level: 5, supplier_id: 4, cost_per_unit: 22000 },
+  { id: 7, _id: 'ing-7', name: 'Orange', unit: 'piece', currentStock: 100, current_stock: 100, minStockLevel: 20, min_stock_level: 20, supplier_id: 3, cost_per_unit: 5000 },
+  { id: 8, _id: 'ing-8', name: 'Lemon', unit: 'piece', currentStock: 80, current_stock: 80, minStockLevel: 15, min_stock_level: 15, supplier_id: 3, cost_per_unit: 2000 }
 ];
 
 const DEFAULT_PRODUCT_INGREDIENTS = [
@@ -114,6 +121,10 @@ export interface DbState {
   order_items: any[];
   ingredients: any[];
   product_ingredients: any[];
+  suppliers: any[];
+  purchase_orders: any[];
+  purchase_order_items: any[];
+  inventory_transactions: any[];
   [key: string]: any[];
 }
 
@@ -135,7 +146,11 @@ const defaultContextValue: DbContextValue = {
     payments: [],
     order_items: [],
     ingredients: DEFAULT_INGREDIENTS,
-    product_ingredients: DEFAULT_PRODUCT_INGREDIENTS
+    product_ingredients: DEFAULT_PRODUCT_INGREDIENTS,
+    suppliers: DEFAULT_SUPPLIERS,
+    purchase_orders: [],
+    purchase_order_items: [],
+    inventory_transactions: []
   },
   transact: <R = any>(callback: (tx: Transaction) => R): R => {
     const dummyTx: Transaction = {
@@ -162,6 +177,10 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [payments, setPayments] = useState<any[]>([]);
   const [ingredients, setIngredients] = useState<any[]>(DEFAULT_INGREDIENTS);
   const [productIngredients, setProductIngredients] = useState<any[]>(DEFAULT_PRODUCT_INGREDIENTS);
+  const [suppliers, setSuppliers] = useState<any[]>(DEFAULT_SUPPLIERS);
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
+  const [purchaseOrderItems, setPurchaseOrderItems] = useState<any[]>([]);
+  const [inventoryTransactions, setInventoryTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   const getAuthHeader = () => {
@@ -274,6 +293,7 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
   const normalizeIngredients = (raw: any[]): any[] => {
     return raw.map((item: any, idx: number) => {
       const id = item._id || item.id || idx + 1;
+      const suppId = item.supplier?._id || item.supplier_id || (typeof item.supplier === 'string' ? item.supplier : null);
       return {
         id,
         _id: item._id || String(id),
@@ -284,7 +304,21 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
         minStockLevel: item.minStockLevel ?? item.min_stock_level ?? 0,
         min_stock_level: item.minStockLevel ?? item.min_stock_level ?? 0,
         supplier: item.supplier,
-        supplier_id: item.supplier?._id || item.supplier
+        supplier_id: suppId
+      };
+    });
+  };
+
+  const normalizeSuppliers = (raw: any[]): any[] => {
+    return raw.map((s: any, idx: number) => {
+      const id = s._id || s.id || idx + 1;
+      return {
+        id,
+        _id: s._id || String(id),
+        name: s.name,
+        phone: s.phone || '',
+        address: s.address || '',
+        status: s.status || 'ACTIVE'
       };
     });
   };
@@ -321,6 +355,9 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
         promises.push(axios.get(`${API_BASE}/payments`, { headers: authHeaders }));
         promises.push(axios.get(`${API_BASE}/ingredients`, { headers: authHeaders }));
         promises.push(axios.get(`${API_BASE}/product-ingredients`, { headers: authHeaders }));
+        promises.push(axios.get(`${API_BASE}/suppliers`, { headers: authHeaders }));
+        promises.push(axios.get(`${API_BASE}/purchase-orders`, { headers: authHeaders }));
+        promises.push(axios.get(`${API_BASE}/inventory-transactions`, { headers: authHeaders }));
       }
 
       const results = await Promise.allSettled(promises);
@@ -353,6 +390,31 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
 
       if (results[6]?.status === 'fulfilled' && Array.isArray(results[6].value.data)) {
         setProductIngredients(normalizeProductIngredients(results[6].value.data));
+      }
+
+      if (results[7]?.status === 'fulfilled' && Array.isArray(results[7].value.data)) {
+        setSuppliers(normalizeSuppliers(results[7].value.data));
+      }
+
+      if (results[8]?.status === 'fulfilled' && Array.isArray(results[8].value.data)) {
+        setPurchaseOrders(results[8].value.data);
+        const poItems = results[8].value.data.flatMap((po: any) =>
+          (po.items || []).map((it: any) => ({
+            ...it,
+            order_id: po._id || po.id,
+            ingredient_id: it.ingredient?._id || it.ingredient || it.ingredient_id
+          }))
+        );
+        setPurchaseOrderItems(poItems);
+      }
+
+      if (results[9]?.status === 'fulfilled' && Array.isArray(results[9].value.data)) {
+        setInventoryTransactions(
+          results[9].value.data.map((tx: any) => ({
+            ...tx,
+            ingredient_id: tx.ingredient?._id || tx.ingredient || tx.ingredient_id
+          }))
+        );
       }
     } catch (err) {
       console.warn('DbContext refresh error:', err);
@@ -407,7 +469,11 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
         payments,
         order_items: orders.flatMap(o => o.items || []),
         ingredients,
-        product_ingredients: productIngredients
+        product_ingredients: productIngredients,
+        suppliers,
+        purchase_orders: purchaseOrders,
+        purchase_order_items: purchaseOrderItems,
+        inventory_transactions: inventoryTransactions
       }),
 
       insert: (table, row) => {
@@ -453,6 +519,48 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
             });
 
           return newCat as any;
+        }
+
+        if (table === 'ingredients') {
+          const tempId = 'temp_' + Date.now();
+          const suppId = row.supplier_id ?? row.supplier ?? null;
+          const newRow = {
+            id: tempId,
+            _id: tempId,
+            name: row.name,
+            unit: row.unit,
+            supplier_id: suppId,
+            supplier: suppId,
+            current_stock: Number(row.current_stock ?? row.currentStock ?? 0),
+            currentStock: Number(row.current_stock ?? row.currentStock ?? 0),
+            min_stock_level: Number(row.min_stock_level ?? row.minStockLevel ?? 0),
+            minStockLevel: Number(row.min_stock_level ?? row.minStockLevel ?? 0),
+            ...row
+          };
+
+          setIngredients(prev => [...prev, newRow]);
+
+          const payload: any = {
+            name: row.name,
+            unit: row.unit,
+            currentStock: Number(row.current_stock ?? row.currentStock ?? 0),
+            minStockLevel: Number(row.min_stock_level ?? row.minStockLevel ?? 0)
+          };
+          if (suppId) payload.supplier = suppId;
+
+          axios.post(`${API_BASE}/ingredients`, payload, { headers: getAuthHeader() })
+            .then(res => {
+              if (res.data?._id) {
+                setIngredients(prev =>
+                  prev.map(i => i.id === tempId ? { ...i, id: res.data._id, _id: res.data._id } : i)
+                );
+              }
+            })
+            .catch(err => {
+              console.error('Failed to insert ingredient on server:', err);
+            });
+
+          return newRow as any;
         }
 
         if (table === 'product_ingredients') {
@@ -526,6 +634,47 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
             .catch(err => {
               console.error('Failed to update category on server:', err);
             });
+        } else if (table === 'ingredients') {
+          setIngredients(prev =>
+            prev.map(i => {
+              if (i.id === id || i._id === id || String(i.id) === String(id)) {
+                const suppId = data.supplier_id !== undefined ? data.supplier_id : i.supplier_id;
+                return {
+                  ...i,
+                  ...data,
+                  currentStock: data.current_stock !== undefined ? data.current_stock : (data.currentStock !== undefined ? data.currentStock : i.currentStock),
+                  current_stock: data.current_stock !== undefined ? data.current_stock : (data.currentStock !== undefined ? data.currentStock : i.current_stock),
+                  minStockLevel: data.min_stock_level !== undefined ? data.min_stock_level : (data.minStockLevel !== undefined ? data.minStockLevel : i.minStockLevel),
+                  min_stock_level: data.min_stock_level !== undefined ? data.min_stock_level : (data.minStockLevel !== undefined ? data.minStockLevel : i.min_stock_level),
+                  supplier_id: suppId,
+                  supplier: suppId
+                };
+              }
+              return i;
+            })
+          );
+
+          const target = ingredients.find(i => i.id === id || i._id === id || String(i.id) === String(id));
+          const mongoId = target?._id || id;
+          const payload: any = {};
+          if (data.name !== undefined) payload.name = data.name;
+          if (data.unit !== undefined) payload.unit = data.unit;
+          if (data.current_stock !== undefined || data.currentStock !== undefined) {
+            payload.currentStock = Number(data.current_stock ?? data.currentStock);
+          }
+          if (data.min_stock_level !== undefined || data.minStockLevel !== undefined) {
+            payload.minStockLevel = Number(data.min_stock_level ?? data.minStockLevel);
+          }
+          if (data.supplier_id !== undefined) {
+            payload.supplier = data.supplier_id || null;
+          }
+
+          if (mongoId && !String(mongoId).startsWith('temp_')) {
+            axios.put(`${API_BASE}/ingredients/${mongoId}`, payload, { headers: getAuthHeader() })
+              .catch(err => {
+                console.error('Failed to update ingredient on server:', err);
+              });
+          }
         } else if (table === 'orders') {
           setOrders(prev =>
             prev.map(o => {
@@ -565,6 +714,19 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
               console.error('Failed to remove category on server:', err);
               refresh();
             });
+        } else if (table === 'ingredients') {
+          setIngredients(prev =>
+            prev.filter(i => i.id !== id && i._id !== id && String(i.id) !== String(id))
+          );
+
+          const target = ingredients.find(i => i.id === id || i._id === id || String(i.id) === String(id));
+          const mongoId = target?._id || id;
+          if (mongoId && !String(mongoId).startsWith('temp_')) {
+            axios.delete(`${API_BASE}/ingredients/${mongoId}`, { headers: getAuthHeader() })
+              .catch(err => {
+                console.error('Failed to remove ingredient on server:', err);
+              });
+          }
         } else if (table === 'product_ingredients') {
           setProductIngredients(prev =>
             prev.filter(pi => pi.id !== id && pi._id !== id && String(pi.id) !== String(id))
@@ -584,7 +746,7 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
 
     result = callback(tx);
     return result;
-  }, [categories, orders, refresh, ingredients, productIngredients, products, users, payments]);
+  }, [categories, orders, refresh, ingredients, productIngredients, products, users, payments, suppliers, purchaseOrders, purchaseOrderItems, inventoryTransactions]);
 
   const value: DbContextValue = {
     db: {
@@ -595,7 +757,11 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
       payments,
       order_items: orders.flatMap(o => o.items || []),
       ingredients,
-      product_ingredients: productIngredients
+      product_ingredients: productIngredients,
+      suppliers,
+      purchase_orders: purchaseOrders,
+      purchase_order_items: purchaseOrderItems,
+      inventory_transactions: inventoryTransactions
     },
     transact,
     refresh,
