@@ -16,6 +16,7 @@ export interface AdminLayoutProps {
   title: string;
   subtitle?: string;
   actions?: React.ReactNode;
+  beforeStats?: React.ReactNode;
   stats?: React.ReactNode;
   children: React.ReactNode;
 }
@@ -28,6 +29,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   title,
   subtitle,
   actions,
+  beforeStats,
   stats,
   children
 }) => {
@@ -51,6 +53,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           </div>
           {actions && <div className="flex items-center gap-2 flex-wrap text-xs">{actions}</div>}
         </div>
+
+        {beforeStats}
 
         {/* Stats Grid */}
         {stats && <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{stats}</div>}
