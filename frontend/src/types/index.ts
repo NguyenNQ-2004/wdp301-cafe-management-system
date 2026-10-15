@@ -79,3 +79,29 @@ export interface Product {
   variants_config?: any;
   recipe?: any[];
 }
+
+export interface Ingredient {
+  id: any;
+  _id?: string;
+  supplier_id?: any;
+  supplier?: any;
+  name: string;
+  unit: string;
+  current_stock: number;
+  currentStock?: number;
+  min_stock_level: number;
+  minStockLevel?: number;
+  cost_per_unit?: number;
+  latestUnitPrice?: number | null;
+}
+
+export interface Supplier {
+  id: any;
+  _id?: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  status?: string;
+}
+

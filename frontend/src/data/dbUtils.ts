@@ -266,3 +266,10 @@ export const productCost = (db: any, productId: any): number | null => {
   }
   return null;
 };
+
+export const isLowStock = (i: any): boolean => {
+  if (!i) return false;
+  const current = Number(i.current_stock ?? i.currentStock ?? 0);
+  const min = Number(i.min_stock_level ?? i.minStockLevel ?? 0);
+  return current <= min;
+};
