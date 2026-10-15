@@ -78,6 +78,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentRoute, active
         { route: 'admin-loyalty', path: '/admin/memberships', pageRoute: 'admin-loyalty', label: 'Tích điểm & Hạng thẻ', icon: 'loyalty', table: 'loyalty_transactions' },
         { route: 'admin-complaints', path: '/admin/complaints', pageRoute: 'admin-complaints', label: 'Đánh giá & Khiếu nại', icon: 'feedback', table: 'customer_reviews' },
       ]
+    },
+    {
+      title: 'HỆ THỐNG',
+      items: [
+        { route: 'admin-settings', path: '/admin/settings', pageRoute: 'admin-settings', label: 'Cài đặt cửa hàng', icon: 'settings', table: 'shop_settings' },
+      ]
     }
   ];
 
