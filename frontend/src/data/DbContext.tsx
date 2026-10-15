@@ -70,10 +70,39 @@ const DEFAULT_CATEGORIES: Category[] = [
   }
 ];
 
+const DEFAULT_INGREDIENTS = [
+  { id: 1, _id: 'ing-1', name: 'Coffee beans', unit: 'gram', currentStock: 10000, minStockLevel: 2000, cost_per_unit: 350 },
+  { id: 2, _id: 'ing-2', name: 'Fresh milk', unit: 'ml', currentStock: 20000, minStockLevel: 5000, cost_per_unit: 35 },
+  { id: 3, _id: 'ing-3', name: 'Peach syrup', unit: 'ml', currentStock: 5000, minStockLevel: 1000, cost_per_unit: 120 },
+  { id: 4, _id: 'ing-4', name: 'Black tea', unit: 'gram', currentStock: 8000, minStockLevel: 1500, cost_per_unit: 200 },
+  { id: 5, _id: 'ing-5', name: 'Tapioca pearls', unit: 'gram', currentStock: 4000, minStockLevel: 1000, cost_per_unit: 80 },
+  { id: 6, _id: 'ing-6', name: 'Cheesecake slice', unit: 'piece', currentStock: 30, minStockLevel: 5, cost_per_unit: 22000 },
+  { id: 7, _id: 'ing-7', name: 'Orange', unit: 'piece', currentStock: 100, minStockLevel: 20, cost_per_unit: 5000 },
+  { id: 8, _id: 'ing-8', name: 'Lemon', unit: 'piece', currentStock: 80, minStockLevel: 15, cost_per_unit: 2000 }
+];
+
+const DEFAULT_PRODUCT_INGREDIENTS = [
+  { id: 1, _id: 'pi-1', product_id: 1, ingredient_id: 1, quantity_required: 18 },
+  { id: 2, _id: 'pi-2', product_id: 2, ingredient_id: 1, quantity_required: 18 },
+  { id: 3, _id: 'pi-3', product_id: 2, ingredient_id: 2, quantity_required: 180 },
+  { id: 4, _id: 'pi-4', product_id: 3, ingredient_id: 1, quantity_required: 30 },
+  { id: 5, _id: 'pi-5', product_id: 4, ingredient_id: 1, quantity_required: 18 },
+  { id: 6, _id: 'pi-6', product_id: 4, ingredient_id: 2, quantity_required: 100 },
+  { id: 7, _id: 'pi-7', product_id: 5, ingredient_id: 3, quantity_required: 30 },
+  { id: 8, _id: 'pi-8', product_id: 5, ingredient_id: 4, quantity_required: 10 },
+  { id: 9, _id: 'pi-9', product_id: 5, ingredient_id: 7, quantity_required: 1 },
+  { id: 10, _id: 'pi-10', product_id: 8, ingredient_id: 4, quantity_required: 10 },
+  { id: 11, _id: 'pi-11', product_id: 9, ingredient_id: 1, quantity_required: 18 },
+  { id: 12, _id: 'pi-12', product_id: 10, ingredient_id: 1, quantity_required: 18 },
+  { id: 13, _id: 'pi-13', product_id: 10, ingredient_id: 2, quantity_required: 150 },
+  { id: 14, _id: 'pi-14', product_id: 12, ingredient_id: 6, quantity_required: 1 }
+];
+
 export interface Transaction {
   insert: <T extends Record<string, any>>(table: string, data: T) => T & { id: any; _id?: any };
   update: <T extends Record<string, any>>(table: string, id: any, data: Partial<T>) => void;
   remove: (table: string, id: any) => void;
+  db?: () => DbState;
 }
 
 export interface DbState {
@@ -83,6 +112,8 @@ export interface DbState {
   users: any[];
   payments: any[];
   order_items: any[];
+  ingredients: any[];
+  product_ingredients: any[];
   [key: string]: any[];
 }
 
@@ -102,13 +133,16 @@ const defaultContextValue: DbContextValue = {
     orders: [],
     users: [],
     payments: [],
-    order_items: []
+    order_items: [],
+    ingredients: DEFAULT_INGREDIENTS,
+    product_ingredients: DEFAULT_PRODUCT_INGREDIENTS
   },
   transact: <R = any>(callback: (tx: Transaction) => R): R => {
     const dummyTx: Transaction = {
       insert: (_table, row) => ({ ...row, id: Date.now() }),
       update: () => {},
-      remove: () => {}
+      remove: () => {},
+      db: () => defaultContextValue.db
     };
     return callback(dummyTx);
   },
@@ -126,6 +160,8 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [orders, setOrders] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
+  const [ingredients, setIngredients] = useState<any[]>(DEFAULT_INGREDIENTS);
+  const [productIngredients, setProductIngredients] = useState<any[]>(DEFAULT_PRODUCT_INGREDIENTS);
   const [loading, setLoading] = useState<boolean>(true);
 
   const getAuthHeader = () => {
@@ -235,6 +271,42 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
     });
   };
 
+  const normalizeIngredients = (raw: any[]): any[] => {
+    return raw.map((item: any, idx: number) => {
+      const id = item._id || item.id || idx + 1;
+      return {
+        id,
+        _id: item._id || String(id),
+        name: item.name,
+        unit: item.unit,
+        currentStock: item.currentStock ?? item.current_stock ?? 0,
+        current_stock: item.currentStock ?? item.current_stock ?? 0,
+        minStockLevel: item.minStockLevel ?? item.min_stock_level ?? 0,
+        min_stock_level: item.minStockLevel ?? item.min_stock_level ?? 0,
+        supplier: item.supplier,
+        supplier_id: item.supplier?._id || item.supplier
+      };
+    });
+  };
+
+  const normalizeProductIngredients = (raw: any[]): any[] => {
+    return raw.map((item: any, idx: number) => {
+      const id = item._id || item.id || idx + 1;
+      return {
+        id,
+        _id: item._id || String(id),
+        product_id: item.product?._id || item.product || item.productId || item.product_id,
+        productId: item.product?._id || item.product || item.productId || item.product_id,
+        ingredient_id: item.ingredient?._id || item.ingredient || item.ingredientId || item.ingredient_id,
+        ingredientId: item.ingredient?._id || item.ingredient || item.ingredientId || item.ingredient_id,
+        quantity_required: item.quantityRequired ?? item.quantity_required ?? 0,
+        quantityRequired: item.quantityRequired ?? item.quantity_required ?? 0,
+        product: item.product,
+        ingredient: item.ingredient
+      };
+    });
+  };
+
   const refresh = useCallback(async () => {
     try {
       const authHeaders = getAuthHeader();
@@ -247,6 +319,8 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
         promises.push(axios.get(`${API_BASE}/orders`, { headers: authHeaders }));
         promises.push(axios.get(`${API_BASE}/employees`, { headers: authHeaders }));
         promises.push(axios.get(`${API_BASE}/payments`, { headers: authHeaders }));
+        promises.push(axios.get(`${API_BASE}/ingredients`, { headers: authHeaders }));
+        promises.push(axios.get(`${API_BASE}/product-ingredients`, { headers: authHeaders }));
       }
 
       const results = await Promise.allSettled(promises);
@@ -271,6 +345,14 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
 
       if (results[4]?.status === 'fulfilled' && Array.isArray(results[4].value.data)) {
         setPayments(results[4].value.data);
+      }
+
+      if (results[5]?.status === 'fulfilled' && Array.isArray(results[5].value.data)) {
+        setIngredients(normalizeIngredients(results[5].value.data));
+      }
+
+      if (results[6]?.status === 'fulfilled' && Array.isArray(results[6].value.data)) {
+        setProductIngredients(normalizeProductIngredients(results[6].value.data));
       }
     } catch (err) {
       console.warn('DbContext refresh error:', err);
@@ -317,6 +399,17 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
     let result: any;
 
     const tx: Transaction = {
+      db: () => ({
+        categories,
+        products,
+        orders,
+        users,
+        payments,
+        order_items: orders.flatMap(o => o.items || []),
+        ingredients,
+        product_ingredients: productIngredients
+      }),
+
       insert: (table, row) => {
         if (table === 'categories') {
           const tempId = 'temp_' + Date.now();
@@ -360,6 +453,44 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
             });
 
           return newCat as any;
+        }
+
+        if (table === 'product_ingredients') {
+          const tempId = 'temp_' + Date.now();
+          const pId = row.product_id || row.productId || row.product;
+          const iId = row.ingredient_id || row.ingredientId || row.ingredient;
+          const qty = Number(row.quantity_required ?? row.quantityRequired ?? 1);
+          const newRow = {
+            id: tempId,
+            _id: tempId,
+            product_id: pId,
+            productId: pId,
+            ingredient_id: iId,
+            ingredientId: iId,
+            quantity_required: qty,
+            quantityRequired: qty,
+            ...row
+          };
+
+          setProductIngredients(prev => [...prev, newRow]);
+
+          axios.post(`${API_BASE}/product-ingredients`, {
+            product: pId,
+            ingredient: iId,
+            quantityRequired: qty
+          }, { headers: getAuthHeader() })
+            .then(res => {
+              if (res.data?._id) {
+                setProductIngredients(prev =>
+                  prev.map(pi => pi.id === tempId ? { ...pi, id: res.data._id, _id: res.data._id } : pi)
+                );
+              }
+            })
+            .catch(err => {
+              console.error('Failed to insert product-ingredient on server:', err);
+            });
+
+          return newRow as any;
         }
 
         // Generic insert fallback
@@ -434,13 +565,26 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
               console.error('Failed to remove category on server:', err);
               refresh();
             });
+        } else if (table === 'product_ingredients') {
+          setProductIngredients(prev =>
+            prev.filter(pi => pi.id !== id && pi._id !== id && String(pi.id) !== String(id))
+          );
+
+          const target = productIngredients.find(pi => pi.id === id || pi._id === id || String(pi.id) === String(id));
+          const mongoId = target?._id || id;
+          if (mongoId && !String(mongoId).startsWith('temp_')) {
+            axios.delete(`${API_BASE}/product-ingredients/${mongoId}`, { headers: getAuthHeader() })
+              .catch(err => {
+                console.error('Failed to remove product-ingredient on server:', err);
+              });
+          }
         }
       }
     };
 
     result = callback(tx);
     return result;
-  }, [categories, orders, refresh]);
+  }, [categories, orders, refresh, ingredients, productIngredients, products, users, payments]);
 
   const value: DbContextValue = {
     db: {
@@ -449,7 +593,9 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
       orders,
       users,
       payments,
-      order_items: orders.flatMap(o => o.items || [])
+      order_items: orders.flatMap(o => o.items || []),
+      ingredients,
+      product_ingredients: productIngredients
     },
     transact,
     refresh,

@@ -16,6 +16,7 @@ import AdminRestockPage from './pages/admin/AdminRestockPage';
 import AdminSuppliersPage from './pages/admin/AdminSuppliersPage';
 import AdminPurchasesPage from './pages/admin/AdminPurchasesPage';
 import AdminProductsPage from './pages/admin/AdminProductsPage';
+import AdminRecipesPage from './pages/admin/AdminRecipesPage';
 import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage';
 import AdminCustomersPage from './pages/admin/AdminCustomersPage';
 import AdminMembershipsPage from './pages/admin/AdminMembershipsPage';
@@ -161,13 +162,7 @@ const AppLayout = () => {
             path="/admin/recipes"
             element={
               user?.role === 'ADMIN' ? (
-                <AdminPlaceholderPage
-                  route="admin-recipes"
-                  title="17. Công thức pha chế (BOM)"
-                  subtitle="Màn hình thiết lập định mức nguyên vật liệu tiêu hao cho từng món đồ uống."
-                  table="product_ingredients"
-                  branch="feature/recipe-management"
-                />
+                <AdminRecipesPage onNavigate={handleNavigate} />
               ) : (
                 <Navigate to="/" />
               )
