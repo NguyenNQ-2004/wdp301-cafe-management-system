@@ -8,7 +8,7 @@ import { createServer } from 'vite';
 const memory = new Map([['user', '{invalid json']]);
 globalThis.localStorage = { getItem: key => memory.get(key) ?? null, setItem: (key, value) => memory.set(key, value), removeItem: key => memory.delete(key) };
 globalThis.window = { localStorage: globalThis.localStorage };
-let vite, auth, cart, api, options, BillPage, InterfaceContext, App, SourceScreen, Header;
+let vite, auth, cart, api, options, credentials, BillPage, InterfaceContext, App, SourceScreen, Header;
 const account = { _id: 'test-customer', fullName: 'Test Customer', phone: '0999999999', role: 'CUSTOMER', token: 'test-token' };
 const tables = ['users', 'work_schedules', 'categories', 'products', 'orders', 'order_items', 'payments', 'loyalty_transactions', 'customer_reviews', 'suppliers', 'ingredients', 'product_ingredients', 'purchase_orders', 'purchase_order_items', 'inventory_transactions', 'shop_settings'];
 const emptyDb = () => Object.fromEntries(tables.map(table => [table, []]));
@@ -19,6 +19,7 @@ before(async () => {
   cart = (await vite.ssrLoadModule('/src/store/cartStore.ts')).default;
   api = await vite.ssrLoadModule('/src/lib/shopApi.ts');
   options = await vite.ssrLoadModule('/src/lib/cartOptions.ts');
+  credentials = await vite.ssrLoadModule('/src/lib/authCredentials.ts');
   ({ BillPage } = await vite.ssrLoadModule('/src/interface/pages/BillPage.tsx'));
   ({ InterfaceContext } = await vite.ssrLoadModule('/src/interface/LiveProvider.tsx'));
   App = (await vite.ssrLoadModule('/src/ConnectedApp.tsx')).default;
@@ -100,6 +101,24 @@ test('Login route renders the password form', () => {
   auth.getState().logout();
   const html = renderToString(React.createElement(MemoryRouter, { initialEntries: ['/login'] }, React.createElement(App)));
   assert.match(html, /type="password"/); assert.match(html, /autoComplete="current-password"/i);
+  assert.match(html, /type="email"/);
+  assert.match(html, /name="email"/);
+  assert.match(html, /Gmail \/ Email đăng nhập/);
+  assert.doesNotMatch(html, /name="phone"/);
+});
+test('Email login payload normalizes email and preserves the account password', () => {
+  assert.deepEqual(credentials.loginCredentials(' My.Email@Gmail.com ', ' Case-Sensitive Password '), { email: 'my.email@gmail.com', password: ' Case-Sensitive Password ' });
+});
+test('Phone numbers and malformed emails cannot be used as login identifiers', () => {
+  for (const identifier of ['0901234567', 'bad-email', 'user@', 'a b@gmail.com']) assert.throws(() => credentials.loginCredentials(identifier, 'password'));
+  assert.throws(() => credentials.loginCredentials('valid@gmail.com', ''));
+});
+test('Registration sends email credentials and a separate normalized contact phone', () => {
+  assert.deepEqual(credentials.registrationPayload({ fullName: ' Test Customer ', email: ' TEST@gmail.com ', phone: '090 123 4567', password: 'account-password' }), { fullName: 'Test Customer', email: 'test@gmail.com', phone: '0901234567', password: 'account-password' });
+});
+test('Registration requires valid email, contact phone and an account password', () => {
+  const input = { fullName: 'Test Customer', email: 'test@gmail.com', phone: '0901234567', password: 'account-password' };
+  for (const patch of [{ email: '' }, { phone: 'invalid' }, { fullName: ' ' }, { password: 'short' }]) assert.throws(() => credentials.registrationPayload({ ...input, ...patch }));
 });
 test('Guest header exposes separate login and registration links and a mobile account row', () => {
   const html = renderToString(React.createElement(MemoryRouter, null, React.createElement(Header, { currentRoute: 'home', cartCount: 0, onNavigate() {}, onOpenAuth() {} })));
@@ -113,6 +132,7 @@ test('Registration route opens the registration form directly', () => {
   assert.match(html, /aria-label="Đăng ký tài khoản"/);
   assert.match(html, /Tạo tài khoản Aura/);
   assert.match(html, /autoComplete="new-password"/i);
+  assert.match(html, /Số điện thoại liên hệ/);
   assert.doesNotMatch(html, /autoComplete="current-password"/i);
 });
 test('Authenticated header exposes account and logout instead of guest links', () => {

@@ -170,22 +170,23 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Số điện thoại (Tài khoản)</label>
+                  <label className="font-bold text-stone-700 block mb-1">Số điện thoại liên hệ</label>
                   <input
                     type="text"
                     disabled
                     value={user.phone}
                     className="w-full px-3.5 py-2.5 border border-stone-200 bg-stone-50 rounded-xl outline-none text-stone-500 font-mono"
-                    title="Số điện thoại là định danh tài khoản, không thể thay đổi."
+                    title="Số điện thoại được lưu trong hồ sơ để liên hệ và giao hàng."
                   />
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Email</label>
+                  <label className="font-bold text-stone-700 block mb-1">Gmail / Email đăng nhập *</label>
                   <input
                     type="email"
-                    maxLength={150}
+                    required
+                    maxLength={254}
                     value={formData.email}
                     onChange={e => setFormData({ ...formData, email: e.target.value })}
                     className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl outline-none focus:border-primary text-stone-900"

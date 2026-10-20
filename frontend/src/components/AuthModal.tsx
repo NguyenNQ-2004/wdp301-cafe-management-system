@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { loginCredentials, registrationPayload } from '../lib/authCredentials';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -19,6 +20,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [registerError, setRegisterError] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -38,29 +41,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoggingIn) return;
-    const phone = loginIdentifier.trim().replace(/\s+/g, '');
     setLoginError('');
-    if (!phone || !loginPassword) {
-      setLoginError('Vui lòng nhập số điện thoại và mật khẩu.');
-      return;
-    }
-    if (phone.includes('@')) {
-      setLoginError('Hệ thống đăng nhập bằng số điện thoại đã đăng ký. Vui lòng không nhập email.');
-      return;
-    }
+    let credentials;
+    try { credentials = loginCredentials(loginIdentifier, loginPassword); }
+    catch (error) { setLoginError((error as Error).message); return; }
     setIsLoggingIn(true);
     try {
       const response = await fetch(`${(import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '')}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, password: loginPassword }),
+        body: JSON.stringify(credentials),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
         setLoginError(response.status === 401
-          ? 'Số điện thoại hoặc mật khẩu không đúng. Mật khẩu phân biệt chữ hoa và chữ thường.'
+          ? 'Gmail/email hoặc mật khẩu không đúng. Mật khẩu phân biệt chữ hoa và chữ thường.'
           : data.message || 'Không thể đăng nhập. Vui lòng thử lại.');
         return;
       }
@@ -76,40 +73,40 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isRegistering) return;
+    setRegisterError('');
+    let payload;
+    try { payload = registrationPayload({ fullName: regName, phone: regPhone, email: regEmail, password: regPassword }); }
+    catch (error) { setRegisterError((error as Error).message); return; }
+    setIsRegistering(true);
     try {
       const response = await fetch(`${(import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '')}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: regName,
-          phone: regPhone,
-          email: regEmail,
-          password: regPassword,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        triggerToast(data.message || 'Registration failed. Phone may already exist.');
+        setRegisterError(data.message || 'Không thể đăng ký. Vui lòng kiểm tra Gmail và số điện thoại liên hệ.');
         return;
       }
 
-      triggerToast('Registration successful! Please log in.');
-      setLoginIdentifier(regPhone);
+      triggerToast('Đăng ký thành công! Hãy đăng nhập bằng Gmail và mật khẩu vừa tạo.');
+      setLoginIdentifier(payload.email);
       setLoginPassword('');
+      setRegPassword('');
+      setLoginError('');
       setActiveTab('login');
     } catch {
-      triggerToast('Cannot connect to server. Please try again.');
-    }
+      setRegisterError('Không kết nối được máy chủ. Vui lòng thử lại.');
+    } finally { setIsRegistering(false); }
   };
 
   const handleForgotSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    triggerToast('Đã gửi liên kết khôi phục mật khẩu qua Gmail của bạn!');
-    setTimeout(() => {
-      setActiveTab('login');
-    }, 1500);
+    triggerToast('Khôi phục mật khẩu qua email chưa được hỗ trợ. Vui lòng liên hệ quản trị viên để được trợ giúp.');
   };
 
   return (
@@ -236,7 +233,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   Chào mừng trở lại
                 </h2>
                 <p className="font-body-sm text-body-sm text-secondary">
-                  Nhập số điện thoại và mật khẩu để tiếp tục
+                  Nhập Gmail và mật khẩu tài khoản Aura Café để tiếp tục
                 </p>
               </div>
 
@@ -244,21 +241,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div className="space-y-space-xs mt-space-xs">
                 <label className="font-label-md text-label-md text-on-surface font-medium block">
-                  Số điện thoại đăng nhập
+                  Gmail / Email đăng nhập
                 </label>
                 <div className="relative flex items-center">
                   <span className="material-symbols-outlined absolute left-space-md text-secondary pointer-events-none text-[20px]">
-                    phone_iphone
+                    alternate_email
                   </span>
                   <input
-                    type="text"
-                    name="phone"
+                    type="email"
+                    name="email"
                     autoComplete="username"
-                    inputMode="tel"
+                    inputMode="email"
+                    autoCapitalize="none"
+                    spellCheck={false}
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
                     required
-                    placeholder="VD: 0908123456"
+                    placeholder="tenban@gmail.com"
                     className="w-full h-11 pl-11 pr-space-md bg-surface-container-low rounded text-on-surface placeholder:text-secondary/60 font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary-container/20 transition-all border-0"
                   />
                 </div>
@@ -267,7 +266,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div className="space-y-space-xs">
                 <div className="flex items-center justify-between">
                   <label className="font-label-md text-label-md text-on-surface font-medium block">
-                    Mật khẩu
+                    Mật khẩu tài khoản Aura Café
                   </label>
                   <button
                     type="button"
@@ -327,52 +326,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </button>
 
-              {/* Divider */}
-              <div className="relative flex items-center justify-center my-space-xs">
-                <div className="w-full h-px bg-surface-container-highest" />
-                <span className="absolute px-space-md bg-surface-container-lowest font-label-sm text-label-sm text-secondary uppercase tracking-wider">
-                  Hình thức khác (chưa hỗ trợ)
-                </span>
-              </div>
-
-              {/* Fast auth buttons */}
-              <div className="grid grid-cols-2 gap-space-md">
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerToast('Đăng nhập Google chưa được hỗ trợ. Vui lòng dùng số điện thoại và mật khẩu.');
-                  }}
-                  className="h-11 px-space-md bg-surface-container-low hover:bg-surface-container rounded flex items-center justify-center gap-space-sm font-label-md text-label-md text-on-surface transition-all cursor-pointer"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path
-                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
-                      fill="#4285F4"
-                    />
-                    <path
-                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"
-                      fill="#34A853"
-                    />
-                    <path
-                      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                      fill="#FBBC05"
-                    />
-                    <path
-                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.93 6.72-4.93z"
-                      fill="#EA4335"
-                    />
-                  </svg>
-                  <span>Google (chưa hỗ trợ)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => triggerToast('Đăng nhập OTP chưa được hỗ trợ. Vui lòng dùng số điện thoại và mật khẩu.')}
-                  className="h-11 px-space-md bg-surface-container-low hover:bg-surface-container rounded flex items-center justify-center gap-space-sm font-label-md text-label-md text-on-surface transition-all cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[20px] text-primary">sms</span>
-                  <span>OTP SMS (chưa hỗ trợ)</span>
-                </button>
-              </div>
+              <p className="text-center text-sm text-secondary">Dùng mật khẩu bạn đã tạo khi đăng ký tài khoản Aura Café.</p>
             </form>
           )}
 
@@ -384,11 +338,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   Tạo tài khoản Aura
                 </h2>
                 <p className="font-body-sm text-body-sm text-secondary">
-                  Đăng ký tài khoản khách hàng để lưu giỏ hàng và theo dõi đơn
+                  Dùng Gmail để đăng nhập; số điện thoại chỉ dùng cho thông tin liên hệ và giao hàng.
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-space-md mt-space-xs">
+              {registerError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{registerError}</p>}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-md mt-space-xs">
                 <div className="space-y-space-xs">
                   <label className="font-label-md text-label-md text-on-surface font-medium block">
                     Họ và tên
@@ -406,7 +361,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
                 <div className="space-y-space-xs">
                   <label className="font-label-md text-label-md text-on-surface font-medium block">
-                    Số điện thoại
+                    Số điện thoại liên hệ
                   </label>
                   <input
                     type="tel"
@@ -423,7 +378,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div className="space-y-space-xs">
                 <label className="font-label-md text-label-md text-on-surface font-medium block">
-                  Địa chỉ Email (Gmail)
+                  Gmail / Email đăng nhập
                 </label>
                 <div className="relative flex items-center">
                   <span className="material-symbols-outlined absolute left-space-md text-secondary text-[20px]">
@@ -457,7 +412,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     autoComplete="new-password"
                     value={regPassword}
                     onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder="Tối thiểu 8 ký tự, có số và ký hiệu"
+                    minLength={8}
+                    placeholder="Mật khẩu tài khoản Aura Café, tối thiểu 8 ký tự"
                     className="w-full h-11 pl-11 pr-11 bg-surface-container-low rounded text-on-surface placeholder:text-secondary/60 font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary-container/20 border-0"
                   />
                   <button
@@ -488,9 +444,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <button
                 type="submit"
+                disabled={isRegistering}
                 className="w-full h-12 bg-primary-container hover:bg-primary text-white rounded font-label-lg text-label-lg font-semibold flex items-center justify-center gap-space-sm shadow-md transition-all mt-space-xs cursor-pointer"
               >
-                <span>Tạo tài khoản mới</span>
+                <span>{isRegistering ? 'Đang đăng ký...' : 'Tạo tài khoản mới'}</span>
                 <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
               </button>
 

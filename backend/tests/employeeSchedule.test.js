@@ -43,12 +43,12 @@ test('UC25 assigns weekly shifts and keeps staff schedules private', async (t) =
     return { status: response.status, data: await response.json() };
   };
   const passwordHash = await bcrypt.hash('test-password', 4);
-  const admin = await User.create({ fullName: 'Admin', phone: '0999000041', passwordHash, role: 'ADMIN' });
-  const staffA = await User.create({ fullName: 'Staff A', phone: '0999000042', passwordHash, role: 'STAFF', position: 'CASHIER' });
-  const staffB = await User.create({ fullName: 'Staff B', phone: '0999000043', passwordHash, role: 'STAFF', position: 'BARISTA' });
-  const inactive = await User.create({ fullName: 'Inactive', phone: '0999000044', passwordHash, role: 'STAFF', position: 'CASHIER', status: 'INACTIVE' });
-  const customer = await User.create({ fullName: 'Customer', phone: '0999000045', passwordHash, role: 'CUSTOMER' });
-  const tokenFor = async (user) => (await request('POST', '/api/auth/login', { phone: user.phone, password: 'test-password' })).data.token;
+  const admin = await User.create({ fullName: 'Admin', phone: '0999000041', email: 'test-0999000041@example.com', passwordHash, role: 'ADMIN' });
+  const staffA = await User.create({ fullName: 'Staff A', phone: '0999000042', email: 'test-0999000042@example.com', passwordHash, role: 'STAFF', position: 'CASHIER' });
+  const staffB = await User.create({ fullName: 'Staff B', phone: '0999000043', email: 'test-0999000043@example.com', passwordHash, role: 'STAFF', position: 'BARISTA' });
+  const inactive = await User.create({ fullName: 'Inactive', phone: '0999000044', email: 'test-0999000044@example.com', passwordHash, role: 'STAFF', position: 'CASHIER', status: 'INACTIVE' });
+  const customer = await User.create({ fullName: 'Customer', phone: '0999000045', email: 'test-0999000045@example.com', passwordHash, role: 'CUSTOMER' });
+  const tokenFor = async (user) => (await request('POST', '/api/auth/login', { email: user.email, password: 'test-password' })).data.token;
   const adminToken = await tokenFor(admin);
   const staffToken = await tokenFor(staffA);
   const otherToken = await tokenFor(staffB);

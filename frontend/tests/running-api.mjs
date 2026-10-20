@@ -19,7 +19,8 @@ async function check(name, path, expected, token, body) {
   }
 }
 await check('Reject missing credentials', '/api/auth/login', 400, null, {});
-await check('Reject wrong password', '/api/auth/login', 401, null, { phone: '0900000001', password: 'incorrect-test-password' });
+await check('Reject wrong password', '/api/auth/login', 401, null, { email: process.env.TEST_ADMIN_EMAIL || 'admin@auracafe.vn', password: 'incorrect-test-password' });
+await check('Phone is contact information, not a login credential', '/api/auth/login', 400, null, { phone: '0900000001', password });
 await check('Protect account details', '/api/auth/me', 401);
 await check('Protect order list', '/api/orders', 401);
 await check('Public categories', '/api/categories', 200);
@@ -27,8 +28,9 @@ await check('Public products', '/api/products', 200);
 await check('Public settings', '/api/shop-settings', 200);
 await check('Payment configuration', '/api/payments/config', 200);
 const accounts = {};
-for (const [role, phone] of Object.entries({ admin: '0900000001', barista: '0900000002', cashier: '0900000003', customer: '0900000004', shipper: '0900000006' })) {
-  const result = await check(`${role} login`, '/api/auth/login', 200, null, { phone, password });
+for (const [role, defaultEmail] of Object.entries({ admin: 'admin@auracafe.vn', barista: 'an@auracafe.vn', cashier: 'binh@auracafe.vn', customer: 'anh@gmail.com', shipper: 'nam@auracafe.vn' })) {
+  const email = process.env[`TEST_${role.toUpperCase()}_EMAIL`] || defaultEmail;
+  const result = await check(`${role} email login`, '/api/auth/login', 200, null, { email, password });
   if (!result.data?.token) continue;
   accounts[role] = result.data;
   await check(`${role} account`, '/api/auth/me', 200, result.data.token);

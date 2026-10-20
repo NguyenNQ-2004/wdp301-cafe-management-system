@@ -350,6 +350,7 @@ const AppLayout = () => {
             _id: userData._id,
             fullName: userData.fullName,
             phone: userData.phone,
+            email: userData.email,
             address: userData.address,
             role: userData.role,
             position: userData.position,

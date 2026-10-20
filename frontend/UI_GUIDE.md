@@ -6,7 +6,7 @@ Chạy `npm.cmd run dev` trong thư mục `frontend`, rồi mở địa chỉ Vi
 
 | Nhóm | Đường dẫn |
 |---|---|
-| Trang chủ, đăng nhập | `/`, `/login` |
+| Trang chủ, đăng nhập, đăng ký | `/`, `/login`, `/register` |
 | Thực đơn, chi tiết món | `/menu`, `/products/:id` |
 | Giỏ hàng, đặt hàng, thanh toán | `/cart`, `/checkout`, `/payment?orderId=...` |
 | Hồ sơ, đơn hàng, hóa đơn, phản hồi | `/profile`, `/orders`, `/bill?orderId=...`, `/feedback` |
@@ -21,6 +21,8 @@ Chạy `npm.cmd run dev` trong thư mục `frontend`, rồi mở địa chỉ Vi
 | Lịch và chấm công cá nhân | `/my-schedule`, `/my-attendance` |
 
 Các trang nghiệp vụ yêu cầu đăng nhập và vai trò tương ứng. Luồng đăng nhập dùng API thật; tài khoản giao hàng được chuyển đến `/delivery`.
+
+Đăng nhập bằng Gmail/email và mật khẩu tài khoản Aura Café. Số điện thoại được nhập khi đăng ký và lưu làm thông tin liên hệ/giao hàng, không dùng để đăng nhập. Email được chuẩn hóa chữ thường; đăng ký trùng email bị từ chối. Các tài khoản cũ thiếu hoặc dùng chung email cần quản trị viên cập nhật email riêng trong phần nhân viên/khách hàng.
 
 Các màn hình mới dùng `src/interface/LiveProvider.tsx` để chuyển dữ liệu MongoDB sang cấu trúc giao diện. Không sử dụng seed hoặc đơn hàng mẫu. Biểu mẫu chỉ thông báo lưu thành công sau khi API xác nhận; yêu cầu thất bại giữ dữ liệu thật và hiển thị lỗi.
 

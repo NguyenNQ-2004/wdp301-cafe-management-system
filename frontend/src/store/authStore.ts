@@ -5,6 +5,7 @@ interface User {
   _id: string;
   fullName: string;
   phone: string;
+  email?: string;
   address?: string;
   role: string;
   position?: string;
