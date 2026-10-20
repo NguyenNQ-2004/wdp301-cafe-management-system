@@ -394,9 +394,13 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ onNavigate, onReorder, o
               <button
                 type="button"
                 onClick={() => {
-                  cancelOrder(cancelTarget.id, cancelReason);
-                  onShowToast?.(`Đã hủy đơn ${cancelTarget.order_code}.`);
-                  setCancelTarget(null);
+                  void (async () => {
+                    const orderCode = cancelTarget.order_code;
+                    if (await cancelOrder(cancelTarget.id, cancelReason)) {
+                      onShowToast?.(`Đã hủy đơn ${orderCode}.`);
+                      setCancelTarget(null);
+                    }
+                  })();
                 }}
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold"
               >
