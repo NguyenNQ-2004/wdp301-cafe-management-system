@@ -23,6 +23,7 @@ export default function CheckoutPage({ onRequestAuth }: CheckoutPageProps) {
   const removeSelected = useCartStore((state) => state.removeSelected);
   const [mode, setMode] = useState<'ONLINE' | 'TAKEAWAY'>('ONLINE');
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'DEMO_ONLINE'>('COD');
+  const [demoProvider, setDemoProvider] = useState<'MOMO' | 'VNPAY' | 'BANK_TRANSFER'>('MOMO');
   const [demoEnabled, setDemoEnabled] = useState(false);
   const [name, setName] = useState(user?.fullName || '');
   const [phone, setPhone] = useState(user?.phone || '');
@@ -75,7 +76,7 @@ export default function CheckoutPage({ onRequestAuth }: CheckoutPageProps) {
     try {
       const order = await shopApi<OrderRecord>('/api/orders', {
         method: 'POST', token: user.token,
-        body: { items: cartPayload(items), orderType: mode, recipientName, recipientPhone, deliveryAddress: mode === 'ONLINE' ? deliveryAddress : undefined, orderNote: [note.trim(), ...items.filter(item => item.customization).map(item => `${item.name} (${item.size}): ${[item.customization?.sugar && `đường ${item.customization.sugar}`, item.customization?.ice, item.customization?.note].filter(Boolean).join(', ')}`)].filter(Boolean).join('; '), rewardId: rewardValid ? rewardId : undefined, paymentMethod: mode === 'ONLINE' ? paymentMethod : undefined, expectedTotal: subtotal - discount + fee }
+        body: { items: cartPayload(items), orderType: mode, recipientName, recipientPhone, deliveryAddress: mode === 'ONLINE' ? deliveryAddress : undefined, orderNote: [note.trim(), ...items.filter(item => item.customization).map(item => `${item.name} (${item.size}): ${[item.customization?.sugar && `đường ${item.customization.sugar}`, item.customization?.ice, item.customization?.note].filter(Boolean).join(', ')}`)].filter(Boolean).join('; '), rewardId: rewardValid ? rewardId : undefined, paymentMethod: mode === 'ONLINE' ? paymentMethod : undefined, demoProvider: mode === 'ONLINE' && paymentMethod === 'DEMO_ONLINE' ? demoProvider : undefined, expectedTotal: subtotal - discount + fee }
       });
       setRewardId(null);
       removeSelected();
@@ -127,6 +128,7 @@ export default function CheckoutPage({ onRequestAuth }: CheckoutPageProps) {
             {mode === 'TAKEAWAY' ? <p className="mt-3 text-sm text-slate-700">Thanh toán tại quầy khi đến nhận món.</p> : <div className="mt-4 space-y-3 text-sm">
               <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-blue-100 p-3"><input type="radio" name="payment-method" checked={paymentMethod === 'COD'} onChange={() => setPaymentMethod('COD')} className="mt-1 accent-primary" /><span><strong>Thanh toán khi nhận hàng (COD)</strong><span className="block text-slate-600">Trả tiền cho nhân viên giao hàng.</span></span></label>
               {demoEnabled && <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-blue-100 p-3"><input type="radio" name="payment-method" checked={paymentMethod === 'DEMO_ONLINE'} onChange={() => setPaymentMethod('DEMO_ONLINE')} className="mt-1 accent-primary" /><span><strong>Thanh toán online mô phỏng</strong><span className="block text-slate-600">Dành cho bài tập: xác nhận trên trang mô phỏng, không thu tiền thật.</span></span></label>}
+              {demoEnabled && paymentMethod === 'DEMO_ONLINE' && <label className="block rounded-lg border border-blue-100 bg-blue-50 p-3 font-semibold">Kênh thanh toán mô phỏng<select value={demoProvider} onChange={(event) => setDemoProvider(event.target.value as 'MOMO' | 'VNPAY' | 'BANK_TRANSFER')} className="mt-2 block w-full rounded-lg border border-blue-100 bg-white p-2.5"><option value="MOMO">MoMo QR mô phỏng</option><option value="VNPAY">VNPay QR mô phỏng</option><option value="BANK_TRANSFER">Chuyển khoản mô phỏng</option></select><span className="mt-2 block text-xs font-normal text-slate-600">QR dẫn tới trang xác nhận thử nghiệm; không chuyển tiền thật.</span></label>}
             </div>}
           </section>
 

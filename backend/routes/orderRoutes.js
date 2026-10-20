@@ -86,6 +86,7 @@ router.post('/', async (req, res) => {
       orderNote,
       tableNumber,
       paymentMethod,
+      demoProvider,
       rewardId
     } = req.body;
 
@@ -115,6 +116,7 @@ router.post('/', async (req, res) => {
       : (orderType === 'ONLINE' ? (paymentMethod === 'DEMO_ONLINE' ? 'DEMO_ONLINE' : 'COD') : 'PAY_AT_COUNTER');
     if (!['COD', 'PAY_AT_COUNTER', 'CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER', 'DEMO_ONLINE'].includes(finalPaymentMethod)) throw orderError('Phương thức thanh toán không hợp lệ.');
     if (finalPaymentMethod === 'DEMO_ONLINE' && (orderType !== 'ONLINE' || req.user.role !== 'CUSTOMER' || !demoPaymentsEnabled())) throw orderError('Thanh toán mô phỏng hiện không khả dụng.', 403);
+    if (demoProvider != null && (finalPaymentMethod !== 'DEMO_ONLINE' || !['MOMO', 'VNPAY', 'BANK_TRANSFER'].includes(demoProvider))) throw orderError('Kênh thanh toán mô phỏng không hợp lệ.');
 
     const totalAmount = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
     let reward = null;
@@ -176,7 +178,8 @@ router.post('/', async (req, res) => {
       deliveryAddress: orderType === 'ONLINE' ? finalDeliveryAddress : undefined,
       tableNumber: orderType === 'DINE_IN' ? tableNumber?.trim() : undefined,
       orderNote: orderNote?.trim() || undefined,
-      paymentMethod: finalPaymentMethod
+      paymentMethod: finalPaymentMethod,
+      ...(finalPaymentMethod === 'DEMO_ONLINE' && demoProvider ? { demoProvider } : {})
     };
 
     const order = await Order.create(orderData);
@@ -200,6 +203,7 @@ router.post('/', async (req, res) => {
     await Payment.create({
       order: order._id,
       paymentMethod: finalPaymentMethod === 'DEMO_ONLINE' ? 'DEMO_ONLINE' : ['CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER'].includes(finalPaymentMethod) ? finalPaymentMethod : 'CASH',
+      ...(finalPaymentMethod === 'DEMO_ONLINE' && demoProvider ? { demoProvider } : {}),
       amount: finalAmount,
       status: 'PENDING',
       paymentNote: finalPaymentMethod === 'DEMO_ONLINE' ? 'Giao dịch mô phỏng, không thu tiền thật' : orderType === 'ONLINE' ? 'Đơn đặt online' : 'Thanh toán tại quầy'

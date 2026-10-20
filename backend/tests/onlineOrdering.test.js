@@ -141,11 +141,19 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   assert.equal((await put(placedPath, { status: 'DELIVERING' }, token)).status, 409);
   assert.equal((await put(placedPath, { status: 'CANCELLED', cancelReason: 'Đổi kế hoạch' }, token)).status, 200);
   assert.equal((await get('/api/payments/config')).data.demoEnabled, true);
-  const demoOrder = await request('/api/orders', { ...delivery, paymentMethod: 'DEMO_ONLINE' }, token);
+  process.env.PAYMENT_DEMO_ENABLED = 'false';
+  assert.equal((await get('/api/payments/config')).data.demoEnabled, false);
+  assert.equal((await request('/api/orders', { ...delivery, paymentMethod: 'DEMO_ONLINE', demoProvider: 'MOMO' }, token)).status, 403);
+  process.env.PAYMENT_DEMO_ENABLED = 'true';
+  assert.equal((await request('/api/orders', { ...delivery, paymentMethod: 'DEMO_ONLINE', demoProvider: 'UNKNOWN' }, token)).status, 400);
+  assert.equal((await request('/api/orders', { ...delivery, demoProvider: 'MOMO' }, token)).status, 400);
+  const demoOrder = await request('/api/orders', { ...delivery, paymentMethod: 'DEMO_ONLINE', demoProvider: 'VNPAY' }, token);
   assert.equal(demoOrder.status, 201, JSON.stringify(demoOrder.data));
   assert.equal(demoOrder.data.paymentMethod, 'DEMO_ONLINE');
+  assert.equal(demoOrder.data.demoProvider, 'VNPAY');
   const demoPayment = await Payment.findOne({ order: demoOrder.data._id });
   assert.equal(demoPayment.paymentMethod, 'DEMO_ONLINE');
+  assert.equal(demoPayment.demoProvider, 'VNPAY');
   assert.equal(demoPayment.status, 'PENDING');
   assert.equal((await get(`/api/payments/order/${demoOrder.data._id}`, otherToken)).status, 403);
   assert.equal((await request(`/api/payments/${demoPayment._id}/demo-confirm`, {}, otherToken)).status, 403);
@@ -180,6 +188,22 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   assert.equal((await request(pickupPath, { paymentMethod: 'BANK_TRANSFER', transactionCode: 'BANK-TEST-001' }, cashierToken)).data.payment.transactionCode, 'BANK-TEST-001');
   assert.equal((await request(pickupPath, { paymentMethod: 'CASH' }, cashierToken)).status, 409);
   assert.equal((await Order.findById(pickup.data._id)).paymentMethod, 'BANK_TRANSFER');
+
+  for (const method of ['MOMO', 'VNPAY']) {
+    const counterOrder = await request('/api/orders', {
+      items: [item], orderType: 'TAKEAWAY', recipientName: 'Khách thử',
+      recipientPhone: '0901234567', expectedTotal: 50000
+    }, token);
+    assert.equal(counterOrder.status, 201);
+    const counterPayment = await Payment.findOne({ order: counterOrder.data._id });
+    const path = `/api/payments/${counterPayment._id}/counter-confirm`;
+    assert.equal((await request(path, { paymentMethod: method }, cashierToken)).status, 400);
+    const confirmedCounter = await request(path, { paymentMethod: method, transactionCode: `${method}-TEST-001` }, cashierToken);
+    assert.equal(confirmedCounter.status, 200);
+    assert.equal(confirmedCounter.data.payment.paymentMethod, method);
+    assert.equal(confirmedCounter.data.payment.transactionCode, `${method}-TEST-001`);
+    assert.equal((await Order.findById(counterOrder.data._id)).paymentMethod, method);
+  }
 
   const dineIn = await request('/api/orders', { items: [item], orderType: 'DINE_IN', tableNumber: 'B01', paymentMethod: 'CASH' }, cashierToken);
   assert.equal(dineIn.status, 201);

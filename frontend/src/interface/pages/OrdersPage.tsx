@@ -20,6 +20,7 @@ interface OrdersPageProps {
   onNavigate: (route: PageRoute) => void;
   onReorder: (orderId: number) => void;
   onOpenBill: (orderId: number) => void;
+  onOpenPayment: (orderId: number) => void;
   onShowToast?: (msg: string) => void;
 }
 
@@ -47,7 +48,7 @@ const STEP_ICON: Partial<Record<OrderStatus, string>> = {
   COMPLETED: 'flag'
 };
 
-export const OrdersPage: React.FC<OrdersPageProps> = ({ onNavigate, onReorder, onOpenBill, onShowToast }) => {
+export const OrdersPage: React.FC<OrdersPageProps> = ({ onNavigate, onReorder, onOpenBill, onOpenPayment, onShowToast }) => {
   const { db, session, cancelOrder } = useDb();
   const [activeTab, setActiveTab] = useState<Tab>('all');
   const [searchCode, setSearchCode] = useState('');
@@ -309,6 +310,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ onNavigate, onReorder, o
                     <span className="font-headline-md text-headline-md font-tabular-data font-bold text-primary">{fmtMoney(o.final_amount)}</span>
                   </div>
                   <div className="flex items-center gap-space-xs flex-wrap justify-end">
+                    {o.payment_method === 'DEMO_ONLINE' && o.status !== 'CANCELLED' && <button type="button" onClick={() => onOpenPayment(o.id)} className="h-9 px-space-md rounded-lg bg-primary text-white font-label-md flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">qr_code_2</span>Xem thanh toán</button>}
                     <button
                       type="button"
                       onClick={() => onOpenBill(o.id)}

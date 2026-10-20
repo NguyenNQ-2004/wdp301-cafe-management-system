@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { PageRoute, PaymentMethod, Product, User, OrderCustomization } from '../../types';
 import { PosHeader } from './PosHeader';
 import { useDb } from '../../data/DbContext';
@@ -37,7 +38,8 @@ const ICE_LEVELS = ['Không đá', 'Ít đá', 'Đá chuẩn'];
 const METHODS: PaymentMethod[] = ['CASH', 'BANK_TRANSFER', 'VNPAY', 'MOMO'];
 
 export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNavigate, onShowToast }) => {
-  const { db, session, placeOrder, transact } = useDb();
+  const navigate = useNavigate();
+  const { db, session, placeOrder, transact, rawId } = useDb();
   const [activeCategory, setActiveCategory] = useState<number | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -185,20 +187,14 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
         quantity: i.quantity,
         unit_price: i.unit_price,
         customization: i.customization
-      })),
-      payment: {
-        method: paymentMethod,
-        status: 'SUCCESS',
-        transaction_code: paymentMethod === 'CASH' ? null : `${paymentMethod}-${Date.now()}`,
-        note: 'Thanh toán tại quầy'
-      }
+      }))
     });
-    onShowToast?.(`Đã tạo đơn ${order.order_code} (${fmtMoney(order.final_amount)}). Vui lòng xác nhận thanh toán tại quầy.`);
     setCartItems([]);
     setOrderNote('');
     setPointsToRedeem(0);
     setCustomerId(null);
     setPhoneQuery('');
+    navigate(`/cashier/payments?orderId=${encodeURIComponent(rawId(order.id))}&method=${paymentMethod}`);
     } catch (error) { onShowToast?.((error as Error).message); }
   };
 
@@ -487,7 +483,7 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
                 className="w-full py-3.5 rounded-xl bg-primary text-white font-bold text-sm shadow-md hover:bg-primary-container active:scale-[0.99] transition-all flex items-center justify-center gap-2"
               >
                 <span className="material-symbols-outlined text-[20px]">receipt</span>
-                <span>THANH TOÁN & GỬI PHA CHẾ</span>
+                <span>TẠO ĐƠN & ĐẾN THANH TOÁN</span>
               </button>
               <button
                 type="button"
