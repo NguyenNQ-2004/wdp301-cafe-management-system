@@ -259,7 +259,7 @@ router.put('/:id/status', async (req, res) => {
     }
     const { status, cancelReason, shipperId } = req.body;
     const validStatuses = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'DELIVERING', 'COMPLETED', 'CANCELLED'];
-    if (Object.keys(req.body || {}).some((key) => !['status', 'cancelReason', 'shipperId'].includes(key))) {
+    if (Object.keys(req.body || {}).some((key) => !['status', 'cancelReason', 'shipperId', 'orderNote'].includes(key))) {
       return res.status(400).json({ message: 'Dữ liệu cập nhật đơn hàng không hợp lệ.' });
     }
     if (!validStatuses.includes(status)) {
@@ -267,6 +267,9 @@ router.put('/:id/status', async (req, res) => {
     }
     if (cancelReason !== undefined && (typeof cancelReason !== 'string' || cancelReason.trim().length > 500)) {
       return res.status(400).json({ message: 'Lý do hủy phải có tối đa 500 ký tự.' });
+    }
+    if (req.body.orderNote !== undefined && (typeof req.body.orderNote !== 'string' || req.body.orderNote.trim().length > 500)) {
+      return res.status(400).json({ message: 'Ghi chú đơn hàng phải có tối đa 500 ký tự.' });
     }
     if (shipperId !== undefined && shipperId !== null && !mongoose.isValidObjectId(shipperId)) {
       return res.status(400).json({ message: 'Mã nhân viên giao hàng không hợp lệ.' });
@@ -289,6 +292,9 @@ router.put('/:id/status', async (req, res) => {
         return res.status(409).json({ message: 'Khách hàng chỉ có thể hủy đơn trước khi quán bắt đầu pha chế.' });
       }
       if (shipperId !== undefined) return res.status(403).json({ message: 'Khách hàng không được thay đổi nhân viên giao hàng.' });
+    }
+    if (req.body.orderNote !== undefined && !(isAdmin || (isStaff && position === 'MANAGER') || (isShipper && String(order.shipper || '') === String(req.user._id) && status === 'READY' && shipperId === null))) {
+      return res.status(403).json({ message: 'Bạn không có quyền ghi chú sự cố cho đơn hàng này.' });
     }
 
     const allowedNext = {
@@ -358,6 +364,7 @@ router.put('/:id/status', async (req, res) => {
 
     order.status = status;
     if (cancelReason !== undefined) order.cancelReason = cancelReason.trim();
+    if (req.body.orderNote !== undefined) order.orderNote = req.body.orderNote.trim();
 
     // COD được thu khi giao xong; đơn tại quầy và demo có bước xác nhận riêng.
     if (status === 'COMPLETED') {

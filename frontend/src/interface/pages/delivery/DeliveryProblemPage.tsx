@@ -20,7 +20,7 @@ const REASONS = [
 const PROBLEM_TAG = '[Sự cố giao]';
 
 export const DeliveryProblemPage: React.FC<DeliveryProblemPageProps> = ({ onNavigate, onShowToast }) => {
-  const { db, session, transact, cancelOrder } = useDb();
+  const { db, session, saveDeliveryOrder, cancelOrder, busy } = useDb();
   const me = session.shipperId;
   const myOrders = db.orders.filter(o => o.shipper_id === me && (o.status === 'READY' || o.status === 'DELIVERING'));
 
@@ -42,29 +42,27 @@ export const DeliveryProblemPage: React.FC<DeliveryProblemPageProps> = ({ onNavi
     )
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!order) {
       onShowToast?.('Bạn không có đơn nào đang giao để báo sự cố.');
       return;
     }
-    const detail = `${reason}${note.trim() ? ` - ${note.trim()}` : ''}`;
-    if (outcome === 'cancel') {
-      cancelOrder(order.id, `Giao thất bại: ${detail}`);
-      onShowToast?.(`Đã báo giao thất bại và hủy đơn ${order.order_code}.`);
-    } else {
-      // Trả đơn về quán: bỏ gán shipper, đưa về READY để giao lại, ghi chú sự cố vào order_note
-      transact(tx =>
-        tx.update('orders', order.id, {
-          status: 'READY',
-          shipper_id: null,
-          order_note: [order.order_note, `${PROBLEM_TAG} ${myName}: ${detail}`].filter(Boolean).join(' | ')
-        })
-      );
-      onShowToast?.(`Đã trả đơn ${order.order_code} về quán để giao lại.`);
+    if (note.trim().length > 300) {
+      onShowToast?.('Ghi chú sự cố không được quá 300 ký tự.');
+      return;
     }
-    setNote('');
-    setOrderId('');
+    const detail = `${reason}${note.trim() ? ` - ${note.trim()}` : ''}`;
+    let saved = false;
+    if (outcome === 'cancel') {
+      saved = await cancelOrder(order.id, `Giao thất bại: ${detail}`);
+      if (saved) onShowToast?.(`Đã báo giao thất bại và hủy đơn ${order.order_code}.`);
+    } else {
+      const orderNote = [order.order_note, `${PROBLEM_TAG} ${myName}: ${detail}`].filter(Boolean).join(' | ').slice(-500);
+      saved = await saveDeliveryOrder(order.id, { status: 'READY', shipperId: null, orderNote });
+      if (saved) onShowToast?.(`Đã trả đơn ${order.order_code} về quán để giao lại.`);
+    }
+    if (saved) { setNote(''); setOrderId(''); }
   };
 
   return (
@@ -172,9 +170,9 @@ export const DeliveryProblemPage: React.FC<DeliveryProblemPageProps> = ({ onNavi
               </div>
             </div>
 
-            <button
+            <button disabled={busy}
               type="submit"
-              className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary-container text-white font-bold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2"
+              className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary-container text-white font-bold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-[18px]">send</span>
               GỬI BÁO CÁO SỰ CỐ

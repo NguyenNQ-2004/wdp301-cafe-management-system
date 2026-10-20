@@ -10,7 +10,6 @@ import {
   fmtDate,
   fmtDateTime,
   fmtMoney,
-  nowSql,
   paymentOf
 } from '../../data/dbUtils';
 
@@ -22,7 +21,7 @@ interface DeliveryCodPageProps {
 const DENOMS = [500000, 200000, 100000, 50000, 20000, 10000];
 
 export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, onShowToast }) => {
-  const { db, session, transact } = useDb();
+  const { db, session, remitCod, busy } = useDb();
   const me = session.shipperId;
   const schedules = db.work_schedules.filter(s => s.user_id === me).sort((a, b) => (a.work_date < b.work_date ? 1 : -1));
   const [scheduleId, setScheduleId] = useState<number | null>(
@@ -46,21 +45,18 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
   const counted = DENOMS.reduce((s, d) => s + d * (denoms[d] ?? 0), 0);
   const isClosed = schedule?.status === 'COMPLETED';
 
-  const handleRemit = () => {
+  const handleRemit = async () => {
     if (!schedule) {
       onShowToast?.('Bạn chưa có lịch ca để ghi nhận nộp tiền.');
       return;
     }
-    transact(tx =>
-      tx.update('work_schedules', schedule.id, {
-        ending_cash_system: codCollected,
-        ending_cash_actual: counted,
-        check_out_time: nowSql(),
-        status: 'COMPLETED',
-        note: [schedule.note, `Nộp COD ${fmtMoney(counted)}`, note.trim()].filter(Boolean).join(' | ')
-      })
-    );
-    onShowToast?.(`Đã ghi nhận nộp ${fmtMoney(counted)} tiền COD và đóng ca giao hàng.`);
+    if (isClosed || busy) return;
+    if (!Number.isSafeInteger(counted) || counted < 0 || note.trim().length > 300) {
+      onShowToast?.('Số tiền hoặc ghi chú nộp COD không hợp lệ.');
+      return;
+    }
+    if (!confirm(`Xác nhận nộp ${fmtMoney(counted)} và chốt ca giao hàng?`)) return;
+    if (await remitCod(schedule.id, counted, note)) onShowToast?.(`Đã ghi nhận nộp ${fmtMoney(counted)} tiền COD và đóng ca giao hàng.`);
   };
 
   return (
@@ -161,7 +157,10 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
                     type="number"
                     min={0}
                     value={denoms[d] ?? 0}
-                    onChange={e => setDenoms({ ...denoms, [d]: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                    step={1}
+                    max={100000}
+                    disabled={isClosed || busy}
+                    onChange={e => setDenoms({ ...denoms, [d]: Math.min(100000, Math.max(0, parseInt(e.target.value, 10) || 0)) })}
                     className="w-16 h-8 text-center rounded-lg bg-white border border-stone-300 font-bold"
                   />
                 </div>
@@ -177,6 +176,8 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
             <textarea
               rows={2}
               value={note}
+              maxLength={300}
+              disabled={isClosed || busy}
               onChange={e => setNote(e.target.value)}
               placeholder="Ghi chú nộp tiền..."
               className="w-full p-2.5 rounded-xl bg-stone-50 border border-stone-200 focus:outline-none focus:border-primary resize-none"
@@ -184,7 +185,7 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
             <button
               type="button"
               onClick={handleRemit}
-              disabled={isClosed}
+              disabled={isClosed || busy}
               className="w-full py-3 rounded-xl bg-primary hover:bg-primary-container text-white font-bold text-xs sm:text-sm shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-[18px]">check_circle</span>
