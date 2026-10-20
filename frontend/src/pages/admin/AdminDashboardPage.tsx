@@ -1,17 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useAuthStore from '../../store/authStore';
 import axios from 'axios';
-
-import { AdminLayout, StatCard } from './AdminUi';
+import useAuthStore from '../../store/authStore';
+import { AdminLayout } from './AdminUi';
 
 const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
-  
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [msg, setMsg] = useState({ text: '', type: '' });
+  const [message, setMessage] = useState({ text: '', type: '' });
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   if (!user) {
@@ -24,22 +22,22 @@ const AdminDashboard: React.FC = () => {
     navigate('/');
   };
 
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setMsg({ text: '', type: '' });
-    
+  const handleChangePassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setMessage({ text: '', type: '' });
+
     try {
       await axios.put(
         'http://localhost:5000/api/auth/change-password',
         { oldPassword, newPassword },
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
-      setMsg({ text: 'Đổi mật khẩu thành công!', type: 'success' });
+      setMessage({ text: 'Đổi mật khẩu thành công.', type: 'success' });
       setOldPassword('');
       setNewPassword('');
       setIsChangingPassword(false);
-    } catch (err: any) {
-      setMsg({ text: err.response?.data?.message || 'Đổi mật khẩu thất bại', type: 'error' });
+    } catch (error: any) {
+      setMessage({ text: error.response?.data?.message || 'Đổi mật khẩu thất bại.', type: 'error' });
     }
   };
 
@@ -48,316 +46,125 @@ const AdminDashboard: React.FC = () => {
       route="admin"
       table="dashboard"
       title="Tổng quan hệ thống"
-      subtitle={`Xin chào, ${user.fullName}! Quản lý toàn diện thực đơn, doanh thu ca bán, chuỗi cung ứng và nhân sự.`}
+      subtitle="Trung tâm điều hành cửa hàng Aura Café."
       actions={
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => navigate('/cashier')}
-            className="px-3 py-2 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 cursor-pointer transition-colors flex items-center gap-1.5"
+            className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100"
           >
             <span className="material-symbols-outlined text-[16px]">point_of_sale</span>
-            <span>POS Thu ngân</span>
+            POS Thu ngân
           </button>
           <button
+            type="button"
             onClick={() => navigate('/barista')}
-            className="px-3 py-2 rounded-xl text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 cursor-pointer transition-colors flex items-center gap-1.5"
+            className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100"
           >
             <span className="material-symbols-outlined text-[16px]">soup_kitchen</span>
-            <span>KDS Pha chế</span>
+            KDS Pha chế
           </button>
           <button
+            type="button"
             onClick={handleLogout}
-            className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200 cursor-pointer transition-colors"
+            className="flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-100"
           >
             <span className="material-symbols-outlined text-[14px]">logout</span>
-            <span>Đăng xuất</span>
+            Đăng xuất
           </button>
         </div>
       }
-      stats={
-        <>
-          <StatCard label="PHÂN HỆ ERP" value="16 Bảng" tone="default" />
-          <StatCard label="TRẠNG THÁI CA" value="Đang mở" tone="success" />
-          <StatCard label="CẢNH BÁO KHO" value="0 Mục" tone="default" />
-          <StatCard label="QUẢN TRỊ VIÊN" value={user.fullName || 'Admin'} tone="default" />
-        </>
-      }
-    >
-      <div className="space-y-6">
-        {/* Header Banner */}
-        <div className="bg-gradient-to-r from-red-900 to-primary p-6 sm:p-8 rounded-2xl text-white mb-8 shadow-md relative overflow-hidden">
-          <div className="relative z-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur text-xs font-semibold mb-3">
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-              Hệ thống Quản trị Tập trung • Aura Central Admin
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold">Xin chào, {user.fullName}!</h1>
-            <p className="text-white/80 text-sm mt-1 max-w-xl">
-              Quản lý toàn diện thực đơn, doanh thu ca bán, chuỗi cung ứng và nhân sự chuỗi cà phê Aura.
-            </p>
-          </div>
-        </div>
-
-        {/* Grid: Quick Actions & Operations Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div 
-            onClick={() => navigate('/admin/categories')}
-            className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm hover:shadow-md transition-all cursor-pointer group"
-          >
-            <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[24px]">category</span>
-            </div>
-            <h3 className="font-bold text-base text-on-surface mb-1">15. Quản lý Danh mục</h3>
-            <p className="text-secondary text-xs leading-relaxed">
-              Thêm, sửa, xóa, tạm ẩn danh mục thực đơn (đồng bộ POS & KDS).
-            </p>
-            <div className="mt-4 flex items-center text-xs font-semibold text-purple-700 group-hover:underline">
-              <span>Vào màn hình 15</span>
-              <span className="material-symbols-outlined text-[16px] ml-1">east</span>
-            </div>
-          </div>
-
-          <div
-            onClick={() => navigate('/admin/reports')}
-            className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm hover:shadow-md transition-all cursor-pointer group"
-          >
-            <div className="w-12 h-12 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[24px]">analytics</span>
-            </div>
-            <h3 className="font-bold text-base text-on-surface mb-1">31. Báo cáo kinh doanh</h3>
-            <p className="text-secondary text-xs leading-relaxed">
-              Theo dõi doanh thu, phương thức thanh toán và tình trạng tồn kho.
-            </p>
-            <div className="mt-4 flex items-center text-xs font-semibold text-rose-700 group-hover:underline">
-              <span>Mở Reports Dashboard</span>
-              <span className="material-symbols-outlined text-[16px] ml-1">east</span>
-            </div>
-          </div>
-
-          <div 
-            onClick={() => navigate('/menu')}
-            className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm hover:shadow-md transition-all cursor-pointer group"
-          >
-            <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[24px]">coffee</span>
-            </div>
-            <h3 className="font-bold text-base text-on-surface mb-1">Quản lý Menu & Đồ uống</h3>
-            <p className="text-secondary text-xs leading-relaxed">
-              Kiểm tra các món cà phê, bánh ngọt, cập nhật giá bán và trạng thái còn món.
-            </p>
-            <div className="mt-4 flex items-center text-xs font-semibold text-primary group-hover:underline">
-              <span>Xem thực đơn ngay</span>
-              <span className="material-symbols-outlined text-[16px] ml-1">east</span>
-            </div>
-          </div>
-
-          <div 
-            onClick={() => navigate('/cashier')}
-            className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm hover:shadow-md transition-all cursor-pointer group"
-          >
-            <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[24px]">point_of_sale</span>
-            </div>
-            <h3 className="font-bold text-base text-on-surface mb-1">Màn hình Thu ngân POS</h3>
-            <p className="text-secondary text-xs leading-relaxed">
-              Xem quầy bán lẻ, tạo đơn hàng tại chỗ, in hóa đơn và thanh toán nhanh.
-            </p>
-            <div className="mt-4 flex items-center text-xs font-semibold text-blue-600 group-hover:underline">
-              <span>Mở POS Thu ngân</span>
-              <span className="material-symbols-outlined text-[16px] ml-1">east</span>
-            </div>
-          </div>
-
-          <div 
-            onClick={() => navigate('/barista')}
-            className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm hover:shadow-md transition-all cursor-pointer group"
-          >
-            <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[24px]">soup_kitchen</span>
-            </div>
-            <h3 className="font-bold text-base text-on-surface mb-1">Màn hình Pha chế KDS</h3>
-            <p className="text-secondary text-xs leading-relaxed">
-              Điều phối hàng đợi chế biến, thông báo món sẵn sàng phục vụ cho khách.
-            </p>
-            <div className="mt-4 flex items-center text-xs font-semibold text-emerald-600 group-hover:underline">
-              <span>Mở KDS Pha chế</span>
-              <span className="material-symbols-outlined text-[16px] ml-1">east</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Section: Nhân sự (Màn hình 23) */}
-        <section className="mb-8 rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+      beforeStats={
+        <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-red-900 to-primary px-6 py-6 text-white shadow-md sm:px-8">
+          <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-primary">Màn hình 23 · Nhân sự</p>
-              <h2 className="mt-1 text-xl font-bold text-on-surface">Quản lý nhân viên</h2>
-              <p className="mt-1 text-sm text-secondary">Thêm, sửa, phân vị trí và bật/tắt tài khoản nhân viên.</p>
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">
+                <span className="h-2 w-2 rounded-full bg-emerald-300"></span>
+                Quản trị tập trung
+              </div>
+              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Xin chào, {user.fullName}!</h2>
+              <p className="mt-1 max-w-2xl text-sm text-white/85">
+                Theo dõi vận hành và xử lý các việc cần ưu tiên của cửa hàng từ một nơi.
+              </p>
             </div>
             <button
-              onClick={() => navigate('/admin/employees')}
-              className="rounded-lg bg-primary px-5 py-2.5 font-semibold text-white hover:bg-primary-container transition-colors cursor-pointer"
+              type="button"
+              onClick={() => navigate('/admin/reports')}
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-[#800020] transition-colors hover:bg-rose-50"
             >
-              Mở quản lý nhân viên
+              Xem báo cáo vận hành
+              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
             </button>
           </div>
         </section>
-
-        {/* Grid: Customer, Loyalty & Complaints (Cụm 4) */}
-        <div className="mb-4">
-          <h2 className="text-sm font-bold text-secondary uppercase tracking-wider mb-3">
-            Phân hệ Quản lý Đơn hàng, Hội viên & Phản hồi (Cụm 4)
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div 
-              onClick={() => navigate('/admin/customers')}
-              className="bg-surface-container-lowest p-6 rounded-xl border-2 border-red-200/80 shadow-sm hover:shadow-md transition-all cursor-pointer group bg-gradient-to-br from-white to-red-50/40"
-            >
-              <div className="w-12 h-12 rounded-xl bg-red-100 text-red-800 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[24px]">contact_page</span>
+      }
+    >
+      <div className="space-y-5">
+        <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-2xs">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+                <span className="material-symbols-outlined">priority_high</span>
               </div>
-              <div className="inline-block px-2 py-0.5 rounded bg-red-100 text-red-800 text-[10px] font-bold mb-1">Screen 28</div>
-              <h3 className="font-bold text-base text-on-surface mb-1">Khách hàng & Hội viên (CRM)</h3>
-              <p className="text-secondary text-xs leading-relaxed">
-                Quản lý danh sách hội viên, tra cứu lịch sử mua hàng thật, chi tiêu tích lũy và điểm thưởng.
-              </p>
-              <div className="mt-4 flex items-center text-xs font-semibold text-red-700 group-hover:underline">
-                <span>Mở quản trị Khách hàng</span>
-                <span className="material-symbols-outlined text-[16px] ml-1">east</span>
-              </div>
-            </div>
-
-            <div 
-              onClick={() => navigate('/admin/memberships')}
-              className="bg-surface-container-lowest p-6 rounded-xl border-2 border-amber-300 shadow-sm hover:shadow-md transition-all cursor-pointer group bg-gradient-to-br from-white to-amber-50/40"
-            >
-              <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[24px]">loyalty</span>
-              </div>
-              <div className="inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold mb-1">Screen 29</div>
-              <h3 className="font-bold text-base text-on-surface mb-1">Tích điểm & Hạng thẻ</h3>
-              <p className="text-secondary text-xs leading-relaxed">
-                Cấu hình hạng thẻ Đồng-Bạc-Vàng-Kim Cương, tra cứu điểm theo SĐT và nhật ký tích điểm.
-              </p>
-              <div className="mt-4 flex items-center text-xs font-semibold text-amber-700 group-hover:underline">
-                <span>Mở chương trình Hội viên</span>
-                <span className="material-symbols-outlined text-[16px] ml-1">east</span>
-              </div>
-            </div>
-
-            <div 
-              onClick={() => navigate('/admin/complaints')}
-              className="bg-surface-container-lowest p-6 rounded-xl border-2 border-purple-300 shadow-sm hover:shadow-md transition-all cursor-pointer group bg-gradient-to-br from-white to-purple-50/40"
-            >
-              <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[24px]">feedback</span>
-              </div>
-              <div className="inline-block px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-bold mb-1">Screen 30</div>
-              <h3 className="font-bold text-base text-on-surface mb-1">Đánh giá & Khiếu nại</h3>
-              <p className="text-secondary text-xs leading-relaxed">
-                Tiếp nhận đánh giá sao, khiếu nại sự cố đơn hàng, viết phản hồi và đổi trạng thái xử lý.
-              </p>
-              <div className="mt-4 flex items-center text-xs font-semibold text-purple-700 group-hover:underline">
-                <span>Mở xử lý Khiếu nại</span>
-                <span className="material-symbols-outlined text-[16px] ml-1">east</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Thông tin tài khoản & Đổi mật khẩu */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm">
-            <h3 className="font-bold text-base text-on-surface mb-4 flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-[20px]">badge</span>
-              Thông tin Quản trị viên
-            </h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between py-2 border-b border-surface-container-high">
-                <span className="text-secondary">Họ và tên:</span>
-                <span className="font-semibold text-on-surface">{user.fullName}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-surface-container-high">
-                <span className="text-secondary">Số điện thoại:</span>
-                <span className="font-semibold text-on-surface">{user.phone}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-surface-container-high">
-                <span className="text-secondary">Vai trò hệ thống:</span>
-                <span className="px-2 py-0.5 rounded bg-red-100 text-red-700 font-semibold text-xs">
-                  {user.role} {user.position && `(${user.position})`}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Form Đổi mật khẩu */}
-          <div className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container-high shadow-sm">
-            <h3 className="font-bold text-base text-on-surface mb-4 flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-[20px]">lock_reset</span>
-              Bảo mật tài khoản
-            </h3>
-
-            {msg.text && (
-              <div className={`p-3 rounded-lg text-xs mb-4 ${
-                msg.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
-              }`}>
-                {msg.text}
-              </div>
-            )}
-
-            {!isChangingPassword ? (
               <div>
-                <p className="text-secondary text-xs mb-4">
-                  Bạn nên đổi mật khẩu định kỳ để đảm bảo tính an toàn cho quyền quản trị hệ thống.
-                </p>
-                <button
-                  onClick={() => setIsChangingPassword(true)}
-                  className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-container text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
-                >
-                  Đổi mật khẩu
-                </button>
+                <h2 className="font-bold text-stone-900">Điều hành nhanh</h2>
+                <p className="mt-0.5 text-xs text-stone-500">Kiểm tra đơn hàng, tồn kho và các đề xuất cần xử lý.</p>
               </div>
-            ) : (
-              <form onSubmit={handleChangePassword} className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-secondary mb-1">Mật khẩu hiện tại</label>
-                  <input
-                    type="password"
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-surface-container-high bg-surface text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
-                    value={oldPassword}
-                    onChange={(e) => setOldPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-secondary mb-1">Mật khẩu mới</label>
-                  <input
-                    type="password"
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-surface-container-high bg-surface text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-container text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
-                  >
-                    Xác nhận đổi
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsChangingPassword(false)}
-                    className="px-4 py-2 rounded-lg border border-surface-container-high text-secondary hover:bg-surface text-xs font-medium transition-colors cursor-pointer"
-                  >
-                    Hủy
-                  </button>
-                </div>
-              </form>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => navigate('/admin/orders')} className="rounded-lg border border-stone-200 px-3 py-2 text-xs font-semibold text-stone-700 transition-colors hover:border-[#800020] hover:text-[#800020]">Đơn hàng</button>
+              <button type="button" onClick={() => navigate('/admin/inventory')} className="rounded-lg border border-stone-200 px-3 py-2 text-xs font-semibold text-stone-700 transition-colors hover:border-[#800020] hover:text-[#800020]">Tồn kho</button>
+              <button type="button" onClick={() => navigate('/admin/restock')} className="rounded-lg border border-stone-200 px-3 py-2 text-xs font-semibold text-stone-700 transition-colors hover:border-[#800020] hover:text-[#800020]">Đề xuất nhập hàng</button>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-2xs">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-[#800020]">
+                <span className="material-symbols-outlined">lock</span>
+              </div>
+              <div>
+                <h2 className="font-bold text-stone-900">Bảo mật tài khoản</h2>
+                <p className="mt-0.5 text-xs text-stone-500">Đổi mật khẩu quản trị khi cần thiết.</p>
+              </div>
+            </div>
+            {!isChangingPassword && (
+              <button
+                type="button"
+                onClick={() => setIsChangingPassword(true)}
+                className="rounded-lg bg-[#800020] px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-[#68001a]"
+              >
+                Đổi mật khẩu
+              </button>
             )}
           </div>
-        </div>
+
+          {message.text && (
+            <div className={`mt-4 rounded-xl border px-3 py-2 text-xs ${message.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`}>
+              {message.text}
+            </div>
+          )}
+
+          {isChangingPassword && (
+            <form onSubmit={handleChangePassword} className="mt-5 grid gap-3 border-t border-stone-100 pt-5 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+              <label className="text-xs font-semibold text-stone-700">
+                Mật khẩu hiện tại
+                <input type="password" value={oldPassword} onChange={(event) => setOldPassword(event.target.value)} required className="mt-1.5 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none transition focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/15" />
+              </label>
+              <label className="text-xs font-semibold text-stone-700">
+                Mật khẩu mới
+                <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required className="mt-1.5 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none transition focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/15" />
+              </label>
+              <div className="flex gap-2">
+                <button type="submit" className="rounded-xl bg-[#800020] px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-[#68001a]">Lưu</button>
+                <button type="button" onClick={() => setIsChangingPassword(false)} className="rounded-xl border border-stone-200 px-4 py-2.5 text-xs font-bold text-stone-600 transition-colors hover:bg-stone-50">Hủy</button>
+              </div>
+            </form>
+          )}
+        </section>
       </div>
     </AdminLayout>
   );
