@@ -134,6 +134,12 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   const otherLogin = await request('/api/auth/login', { email: otherCustomer.email, password: 'test-password' });
   assert.equal(otherLogin.status, 200);
   const otherToken = otherLogin.data.token;
+  const placedPath = `/api/orders/${placed.data._id}/status`;
+  assert.equal((await put(placedPath, { status: 'CANCELLED' }, token)).status, 400);
+  assert.equal((await put(placedPath, { status: 'CANCELLED', cancelReason: 'not my order' }, otherToken)).status, 403);
+  assert.equal((await put('/api/orders/not-an-id/status', { status: 'CANCELLED', cancelReason: 'test' }, token)).status, 400);
+  assert.equal((await put(placedPath, { status: 'DELIVERING' }, token)).status, 409);
+  assert.equal((await put(placedPath, { status: 'CANCELLED', cancelReason: 'Đổi kế hoạch' }, token)).status, 200);
   assert.equal((await get('/api/payments/config')).data.demoEnabled, true);
   process.env.PAYMENT_DEMO_ENABLED = 'false';
   assert.equal((await get('/api/payments/config')).data.demoEnabled, false);
@@ -142,7 +148,7 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   assert.equal((await request('/api/orders', { ...delivery, paymentMethod: 'DEMO_ONLINE', demoProvider: 'UNKNOWN' }, token)).status, 400);
   assert.equal((await request('/api/orders', { ...delivery, demoProvider: 'MOMO' }, token)).status, 400);
   const demoOrder = await request('/api/orders', { ...delivery, paymentMethod: 'DEMO_ONLINE', demoProvider: 'VNPAY' }, token);
-  assert.equal(demoOrder.status, 201);
+  assert.equal(demoOrder.status, 201, JSON.stringify(demoOrder.data));
   assert.equal(demoOrder.data.paymentMethod, 'DEMO_ONLINE');
   assert.equal(demoOrder.data.demoProvider, 'VNPAY');
   const demoPayment = await Payment.findOne({ order: demoOrder.data._id });
@@ -204,6 +210,10 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   const dineInPayment = await Payment.findOne({ order: dineIn.data._id });
   assert.equal(dineInPayment.status, 'PENDING');
   assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'COMPLETED' }, token)).status, 403);
+  assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'DELIVERING' }, cashierToken)).status, 409);
+  assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'READY' }, cashierToken)).status, 403);
+  assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'PREPARING', shipperId: null }, baristaToken)).status, 403);
+  assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'READY' }, baristaToken)).status, 200);
   assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'COMPLETED' }, cashierToken)).status, 200);
   assert.equal((await Payment.findById(dineInPayment._id)).status, 'PENDING');
   assert.equal((await request(`/api/payments/${dineInPayment._id}/counter-confirm`, { paymentMethod: 'CASH' }, cashierToken)).status, 200);
