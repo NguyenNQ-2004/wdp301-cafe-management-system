@@ -37,7 +37,7 @@ interface Value {
   transact: <R>(fn: (tx: Tx) => R) => R;
   placeOrder: (input: PlaceOrderInput) => Promise<Order>;
   setOrderStatus: (id: number, status: OrderStatus, patch?: Partial<Order>) => void;
-  cancelOrder: (id: number, reason: string) => void;
+  cancelOrder: (id: number, reason: string) => Promise<boolean>;
   adjustPoints: (id: number, delta: number) => void;
 }
 const Context = createContext<Value | null>(null);
@@ -222,11 +222,31 @@ export function DbProvider({ children }: { children: ReactNode }) {
       throw failure;
     } finally { inFlight.current--; setPending(inFlight.current); }
   };
+  const cancelOrder = async (id: number, reason: string): Promise<boolean> => {
+    if (!user?.token) return false;
+    if (typeof reason !== 'string' || !reason.trim() || reason.trim().length > 500) {
+      setError('Vui lòng chọn lý do hủy đơn hợp lệ.');
+      return false;
+    }
+    const order = dbRef.current.orders.find(item => item.id === id);
+    if (!order) { setError('Không tìm thấy đơn hàng cần hủy.'); return false; }
+    inFlight.current++; setPending(inFlight.current); setError(''); setNotice('');
+    try {
+      await shopApi(`/api/orders/${rawId(id)}/status`, { method: 'PUT', token: user.token, body: { status: 'CANCELLED', cancelReason: reason.trim() } });
+      await refresh();
+      return true;
+    } catch (failure) {
+      setError(failure instanceof ShopApiError && failure.status === 404 ? 'Chưa hủy được: API cập nhật đơn hàng chưa được kết nối.' : failure instanceof Error ? failure.message : 'Không thể hủy đơn hàng.');
+      return false;
+    } finally {
+      inFlight.current--; setPending(inFlight.current);
+    }
+  };
   const sessionId = user ? idFor('users', user._id) : 0;
   const session = useMemo(() => ({ customerId: sessionId, cashierId: sessionId, baristaId: sessionId, shipperId: sessionId, adminId: sessionId }), [sessionId]);
   return <Context.Provider value={{ db, session, loading, busy: pending > 0, revision, error, notice, unavailable, refresh, notify, rawId, idFor, setSession: () => {}, transact, placeOrder,
     setOrderStatus: (id, status, patch = {}) => { transact(tx => tx.update('orders', id, { ...patch, status })); },
-    cancelOrder: (id, reason) => { transact(tx => tx.update('orders', id, { status: 'CANCELLED', cancel_reason: reason })); },
+    cancelOrder,
     adjustPoints: (id, delta) => { perform(async () => { await shopApi('/api/loyalty-transactions/adjust', { method: 'POST', token: user?.token, body: { customerId: rawId(id), points: delta, reason: 'Điều chỉnh điểm tại quầy' } }); }); },
   }}>{children}</Context.Provider>;
 }
