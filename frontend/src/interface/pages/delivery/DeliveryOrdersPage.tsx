@@ -20,7 +20,7 @@ interface DeliveryOrdersPageProps {
 }
 
 export const DeliveryOrdersPage: React.FC<DeliveryOrdersPageProps> = ({ onNavigate, onShowToast }) => {
-  const { db, session, transact, setOrderStatus } = useDb();
+  const { db, session, saveDeliveryOrder, busy } = useDb();
   const me = session.shipperId;
   const online = db.orders.filter(o => o.order_type === 'ONLINE').sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
 
@@ -41,21 +41,18 @@ export const DeliveryOrdersPage: React.FC<DeliveryOrdersPageProps> = ({ onNaviga
     return p && p.payment_method === 'CASH' && p.status === 'PENDING' ? p.amount : 0;
   };
 
-  const handleClaim = (o: Order) => {
-    transact(tx => tx.update('orders', o.id, { shipper_id: me }));
-    onShowToast?.(`Đã nhận đơn ${o.order_code}.`);
+  const handleClaim = async (o: Order) => {
+    if (await saveDeliveryOrder(o.id, { status: 'READY', shipperId: me })) onShowToast?.(`Đã nhận đơn ${o.order_code}.`);
   };
 
-  const handleStart = (o: Order) => {
-    setOrderStatus(o.id, 'DELIVERING');
-    onShowToast?.(`Bắt đầu giao đơn ${o.order_code}.`);
+  const handleStart = async (o: Order) => {
+    if (await saveDeliveryOrder(o.id, { status: 'DELIVERING' })) onShowToast?.(`Bắt đầu giao đơn ${o.order_code}.`);
   };
 
-  const handleDelivered = (o: Order) => {
+  const handleDelivered = async (o: Order) => {
     const cod = codAmount(o);
     if (cod > 0 && !confirm(`Xác nhận đã thu ${fmtMoney(cod)} tiền mặt của ${o.recipient_name}?`)) return;
-    setOrderStatus(o.id, 'COMPLETED');
-    onShowToast?.(`Giao thành công đơn ${o.order_code}${cod > 0 ? `, đã thu ${fmtMoney(cod)}` : ''}.`);
+    if (await saveDeliveryOrder(o.id, { status: 'COMPLETED' })) onShowToast?.(`Giao thành công đơn ${o.order_code}${cod > 0 ? `, đã thu ${fmtMoney(cod)}` : ''}.`);
   };
 
   const OrderRow: React.FC<{ o: Order; action?: React.ReactNode }> = ({ o, action }) => {
@@ -188,7 +185,8 @@ export const DeliveryOrdersPage: React.FC<DeliveryOrdersPageProps> = ({ onNaviga
                   </button>
                   {spotlight.status === 'READY' ? (
                     <button
-                      onClick={() => handleStart(spotlight)}
+                      disabled={busy}
+                      onClick={() => void handleStart(spotlight)}
                       className="px-4 py-2.5 rounded-xl bg-primary hover:bg-primary-container text-white font-bold shadow-xs flex items-center gap-1.5"
                     >
                       <span className="material-symbols-outlined text-[18px]">two_wheeler</span>
@@ -196,7 +194,8 @@ export const DeliveryOrdersPage: React.FC<DeliveryOrdersPageProps> = ({ onNaviga
                     </button>
                   ) : (
                     <button
-                      onClick={() => handleDelivered(spotlight)}
+                      disabled={busy}
+                      onClick={() => void handleDelivered(spotlight)}
                       className="px-4 py-2.5 rounded-xl bg-primary hover:bg-primary-container text-white font-bold shadow-xs flex items-center gap-1.5"
                     >
                       <span className="material-symbols-outlined text-[18px]">task_alt</span>
@@ -219,11 +218,11 @@ export const DeliveryOrdersPage: React.FC<DeliveryOrdersPageProps> = ({ onNaviga
                   o={o}
                   action={
                     o.status === 'READY' ? (
-                      <button onClick={() => handleStart(o)} className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-primary hover:text-white font-semibold transition-colors">
+                      <button disabled={busy} onClick={() => void handleStart(o)} className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-primary hover:text-white font-semibold transition-colors disabled:opacity-50">
                         Bắt đầu giao
                       </button>
                     ) : (
-                      <button onClick={() => handleDelivered(o)} className="px-3 py-1.5 rounded-xl bg-emerald-700 text-white font-bold">
+                      <button disabled={busy} onClick={() => void handleDelivered(o)} className="px-3 py-1.5 rounded-xl bg-emerald-700 text-white font-bold disabled:opacity-50">
                         Đã giao
                       </button>
                     )
@@ -241,7 +240,7 @@ export const DeliveryOrdersPage: React.FC<DeliveryOrdersPageProps> = ({ onNaviga
                   key={o.id}
                   o={o}
                   action={
-                    <button onClick={() => handleClaim(o)} className="px-3 py-1.5 rounded-xl bg-emerald-700 text-white font-bold hover:bg-emerald-800">
+                    <button disabled={busy} onClick={() => void handleClaim(o)} className="px-3 py-1.5 rounded-xl bg-emerald-700 text-white font-bold hover:bg-emerald-800 disabled:opacity-50">
                       Nhận đơn
                     </button>
                   }

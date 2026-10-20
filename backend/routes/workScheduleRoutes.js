@@ -2,6 +2,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const WorkSchedule = require('../models/WorkSchedule');
 const User = require('../models/User');
+const Order = require('../models/Order');
+const Payment = require('../models/Payment');
 const ShopSetting = require('../models/ShopSetting');
 const { protect, adminOnly, authorize } = require('../middlewares/authMiddleware');
 
@@ -167,14 +169,31 @@ router.put('/:id/shift-action', async (req, res) => {
     if (!schedule) return res.status(404).json({ message: 'Không tìm thấy ca làm.' });
     if (req.user.role !== 'STAFF' || String(schedule.user) !== String(req.user._id)) return res.status(403).json({ message: 'Bạn chỉ được chấm công ca của mình.' });
     const { action, cash, note } = req.body || {};
-    if (!['CHECK_IN', 'CHECK_OUT'].includes(action)) throw badRequest('Thao tác ca làm không hợp lệ.');
+    if (!['CHECK_IN', 'CHECK_OUT', 'REMIT_COD'].includes(action)) throw badRequest('Thao tác ca làm không hợp lệ.');
     if (Object.keys(req.body || {}).some((key) => !['action', 'cash', 'note'].includes(key))) throw badRequest('Dữ liệu chấm công không hợp lệ.');
-    if (cash !== undefined && (typeof cash !== 'number' || !Number.isFinite(cash) || cash < 0)) throw badRequest('Số tiền không hợp lệ.');
-    if (note !== undefined && (typeof note !== 'string' || note.trim().length > 300)) throw badRequest('Ghi chú không hợp lệ.');
+    if (cash !== undefined && (typeof cash !== 'number' || !Number.isSafeInteger(cash) || cash < 0)) throw badRequest('Số tiền phải là số nguyên không âm hợp lệ.');
+    if (note !== undefined && (typeof note !== 'string' || note.trim().length > 500)) throw badRequest('Ghi chú không hợp lệ.');
     const now = new Date();
     const workDay = schedule.workDate.toISOString().slice(0, 10);
     const today = vietnamDay(now);
     const changes = {};
+    if (action === 'REMIT_COD') {
+      if (req.user.position !== 'SHIPPER') return res.status(403).json({ message: 'Chỉ shipper được nộp tiền COD của ca giao hàng.' });
+      if (schedule.status !== 'PRESENT' || !schedule.checkInTime || schedule.checkOutTime) return res.status(409).json({ message: 'Ca phải đang mở để nộp COD.' });
+      if (cash === undefined) throw badRequest('Cần nhập số tiền mặt thực nộp.');
+      const dayStart = new Date(schedule.workDate.getTime() - 7 * 60 * 60 * 1000);
+      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+      const orders = await Order.find({ shipper: req.user._id, orderType: 'ONLINE', status: 'COMPLETED', createdAt: { $gte: dayStart, $lt: dayEnd } }).select('_id');
+      const payments = await Payment.find({ order: { $in: orders.map(order => order._id) }, paymentMethod: 'CASH', status: 'SUCCESS' }).select('amount');
+      const expectedCash = payments.reduce((sum, payment) => sum + payment.amount, 0);
+      const updated = await WorkSchedule.findOneAndUpdate(
+        { _id: schedule._id, user: req.user._id, status: 'PRESENT', checkInTime: { $exists: true }, checkOutTime: { $exists: false } },
+        { $set: { endingCashSystem: expectedCash, endingCashActual: cash, checkOutTime: now, status: 'COMPLETED', note: [schedule.note, `Nộp COD ${cash}`, note?.trim()].filter(Boolean).join(' | ') } },
+        { returnDocument: 'after' }
+      ).populate('user', 'fullName phone position status');
+      if (!updated) return res.status(409).json({ message: 'Ca đã được chốt hoặc không còn mở.' });
+      return res.json({ message: 'Đã ghi nhận tiền COD và chốt ca giao hàng.', schedule: updated, expectedCash });
+    }
     if (action === 'CHECK_IN') {
       const [start, end] = (await getShiftTime(schedule.shiftName)).split('-');
       const startMinutes = Number(start.slice(0, 2)) * 60 + Number(start.slice(3));

@@ -38,6 +38,8 @@ interface Value {
   placeOrder: (input: PlaceOrderInput) => Promise<Order>;
   setOrderStatus: (id: number, status: OrderStatus, patch?: Partial<Order>) => void;
   cancelOrder: (id: number, reason: string) => Promise<boolean>;
+  saveDeliveryOrder: (id: number, body: { status: OrderStatus; shipperId?: number | null; cancelReason?: string; orderNote?: string }) => Promise<boolean>;
+  remitCod: (scheduleId: number, cash: number, note: string) => Promise<boolean>;
   adjustPoints: (id: number, delta: number) => void;
 }
 const Context = createContext<Value | null>(null);
@@ -171,7 +173,6 @@ export function DbProvider({ children }: { children: ReactNode }) {
     if (table === 'ingredients' && data.supplier_id !== undefined) { body.supplier = data.supplier_id ? rawId(data.supplier_id) : null; delete body.supplierId; }
     if (table === 'product_ingredients') { body.product = rawId(data.product_id); body.ingredient = rawId(data.ingredient_id); delete body.productId; delete body.ingredientId; }
     if (table === 'orders') {
-      if (data.order_note !== undefined) throw new Error('Chức năng ghi nhận sự cố giao hàng chưa có API hỗ trợ.');
       endpoint = `/api/orders/${rawId(id!)}/status`;
       body.status = data.status || dbRef.current.orders.find(order => order.id === id)?.status;
       if (data.shipper_id !== undefined) body.shipperId = data.shipper_id ? rawId(data.shipper_id) : null;
@@ -242,11 +243,35 @@ export function DbProvider({ children }: { children: ReactNode }) {
       inFlight.current--; setPending(inFlight.current);
     }
   };
+  const saveDeliveryOrder = async (id: number, body: { status: OrderStatus; shipperId?: number | null; cancelReason?: string; orderNote?: string }): Promise<boolean> => {
+    if (!user?.token || !dbRef.current.orders.some(item => item.id === id)) return false;
+    inFlight.current++; setPending(inFlight.current); setError(''); setNotice('');
+    try {
+      await shopApi(`/api/orders/${rawId(id)}/status`, { method: 'PUT', token: user.token, body: { ...body, ...(body.shipperId !== undefined ? { shipperId: body.shipperId === null ? null : rawId(body.shipperId) } : {}) } });
+      await refresh(); return true;
+    } catch (failure) {
+      setError(failure instanceof ShopApiError && failure.status === 404 ? 'Chưa lưu được: API cập nhật đơn hàng chưa được kết nối.' : failure instanceof Error ? failure.message : 'Không thể cập nhật đơn giao hàng.');
+      return false;
+    } finally { inFlight.current--; setPending(inFlight.current); }
+  };
+  const remitCod = async (scheduleId: number, cash: number, note: string): Promise<boolean> => {
+    if (!user?.token || !Number.isSafeInteger(cash) || cash < 0 || note.trim().length > 300) { setError('Số tiền hoặc ghi chú nộp COD không hợp lệ.'); return false; }
+    const schedule = dbRef.current.work_schedules.find(item => item.id === scheduleId);
+    if (!schedule) { setError('Không tìm thấy ca giao hàng cần chốt.'); return false; }
+    inFlight.current++; setPending(inFlight.current); setError(''); setNotice('');
+    try {
+      await shopApi(`/api/work-schedules/${rawId(scheduleId)}/shift-action`, { method: 'PUT', token: user.token, body: { action: 'REMIT_COD', cash, ...(note.trim() ? { note: note.trim() } : {}) } });
+      await refresh(); return true;
+    } catch (failure) {
+      setError(failure instanceof ShopApiError && failure.status === 404 ? 'Chưa lưu được: API chốt ca giao hàng chưa được kết nối.' : failure instanceof Error ? failure.message : 'Không thể nộp tiền COD.');
+      return false;
+    } finally { inFlight.current--; setPending(inFlight.current); }
+  };
   const sessionId = user ? idFor('users', user._id) : 0;
   const session = useMemo(() => ({ customerId: sessionId, cashierId: sessionId, baristaId: sessionId, shipperId: sessionId, adminId: sessionId }), [sessionId]);
   return <Context.Provider value={{ db, session, loading, busy: pending > 0, revision, error, notice, unavailable, refresh, notify, rawId, idFor, setSession: () => {}, transact, placeOrder,
     setOrderStatus: (id, status, patch = {}) => { transact(tx => tx.update('orders', id, { ...patch, status })); },
-    cancelOrder,
+    cancelOrder, saveDeliveryOrder, remitCod,
     adjustPoints: (id, delta) => { perform(async () => { await shopApi('/api/loyalty-transactions/adjust', { method: 'POST', token: user?.token, body: { customerId: rawId(id), points: delta, reason: 'Điều chỉnh điểm tại quầy' } }); }); },
   }}>{children}</Context.Provider>;
 }
