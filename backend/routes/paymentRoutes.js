@@ -82,8 +82,8 @@ router.post('/:id/counter-confirm', async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã giao dịch không hợp lệ.' });
     const method = req.body.paymentMethod;
     const reference = typeof req.body.transactionCode === 'string' ? req.body.transactionCode.trim() : '';
-    if (!['CASH', 'BANK_TRANSFER'].includes(method)) return res.status(400).json({ message: 'Chọn tiền mặt hoặc chuyển khoản.' });
-    if (method === 'BANK_TRANSFER' && (!reference || reference.length > 100)) return res.status(400).json({ message: 'Nhập mã giao dịch chuyển khoản (tối đa 100 ký tự).' });
+    if (!['CASH', 'BANK_TRANSFER', 'MOMO', 'VNPAY'].includes(method)) return res.status(400).json({ message: 'Phương thức thanh toán tại quầy không hợp lệ.' });
+    if (method !== 'CASH' && (!reference || reference.length > 100)) return res.status(400).json({ message: 'Nhập mã giao dịch đã đối chiếu (tối đa 100 ký tự).' });
     const payment = await Payment.findById(req.params.id);
     if (!payment) return res.status(404).json({ message: 'Không tìm thấy giao dịch.' });
     const order = await Order.findById(payment.order);
@@ -92,13 +92,13 @@ router.post('/:id/counter-confirm', async (req, res) => {
     if (order.status === 'CANCELLED') return res.status(409).json({ message: 'Đơn hàng đã hủy.' });
     if (payment.amount !== order.finalAmount) return res.status(409).json({ message: 'Số tiền thanh toán không khớp đơn hàng.' });
     if (payment.status === 'SUCCESS') {
-      if (payment.paymentMethod !== method || (method === 'BANK_TRANSFER' && payment.transactionCode !== reference)) return res.status(409).json({ message: 'Giao dịch đã được thanh toán bằng hình thức khác.' });
+      if (payment.paymentMethod !== method || (method !== 'CASH' && payment.transactionCode !== reference)) return res.status(409).json({ message: 'Giao dịch đã được thanh toán bằng hình thức khác.' });
       return res.json({ payment });
     }
     if (payment.status !== 'PENDING') return res.status(409).json({ message: 'Giao dịch không còn chờ thanh toán.' });
     const updated = await Payment.findOneAndUpdate(
       { _id: payment._id, status: 'PENDING' },
-      { $set: { paymentMethod: method, status: 'SUCCESS', paidAt: new Date(), receivedBy: req.user._id, paymentNote: `Thu ngân ${req.user.fullName} xác nhận đã nhận tiền tại quầy`, ...(method === 'BANK_TRANSFER' ? { transactionCode: reference } : {}) }, ...(method === 'CASH' ? { $unset: { transactionCode: 1 } } : {}) },
+      { $set: { paymentMethod: method, status: 'SUCCESS', paidAt: new Date(), receivedBy: req.user._id, paymentNote: `Thu ngân ${req.user.fullName} xác nhận đã nhận tiền tại quầy và tự đối soát giao dịch`, ...(method !== 'CASH' ? { transactionCode: reference } : {}) }, ...(method === 'CASH' ? { $unset: { transactionCode: 1 } } : {}) },
       { returnDocument: 'after', runValidators: true }
     );
     if (!updated) return res.status(409).json({ message: 'Giao dịch đã được xử lý. Vui lòng tải lại trạng thái.' });

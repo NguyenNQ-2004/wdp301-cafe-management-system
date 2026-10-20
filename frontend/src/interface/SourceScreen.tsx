@@ -80,6 +80,7 @@ export default function SourceScreen({ screen }: { screen: PageRoute }) {
     if (goToCart) navigate('/cart');
   };
   const openBill = (id: number) => navigate('/bill?orderId=' + rawId(id));
+  const openPayment = (id: number) => navigate('/payment?orderId=' + rawId(id));
   const orderId = query.get('orderId');
   const requestedProduct = params.id || query.get('productId');
   const productId = requestedProduct ? idFor('products', requestedProduct) : db.products[0]?.id;
@@ -108,7 +109,7 @@ export default function SourceScreen({ screen }: { screen: PageRoute }) {
       {screen === 'menu' && <MenuPage onSelectProduct={selectProduct} searchFilter={query.get('search') || ''} />}
       {screen === 'customize' && (db.products.some(product => product.id === productId) ? <CustomizePage key={productId} productId={productId!} onNavigate={onNavigate} onAddToCart={addCustom} /> : <div className="p-12 text-center text-stone-500">Không tìm thấy sản phẩm. <button onClick={() => navigate('/menu')} className="text-primary underline">Về thực đơn</button></div>)}
       {screen === 'profile' && <ProfilePage {...props} />}
-      {screen === 'orders' && <OrdersPage {...props} onOpenBill={openBill} onReorder={id => { for (const line of db.order_items.filter(line => line.order_id === id)) { const product = db.products.find(product => product.id === line.product_id && product.is_available); if (product) add(product, line.customization?.size, line.quantity); } navigate('/cart'); }} />}
+      {screen === 'orders' && <OrdersPage {...props} onOpenBill={openBill} onOpenPayment={openPayment} onReorder={id => { for (const line of db.order_items.filter(line => line.order_id === id)) { const product = db.products.find(product => product.id === line.product_id && product.is_available); if (product) add(product, line.customization?.size, line.quantity); } navigate('/cart'); }} />}
       {screen === 'bill' && <BillPage {...props} orderId={orderId ? idFor('orders', orderId) : null} onSelectOrder={openBill} />}
       {screen === 'pos-create' && <PosCreateOrderPage {...props} />}
       {screen === 'pos-orders' && <PosOrdersPage {...props} onOpenBill={openBill} />}

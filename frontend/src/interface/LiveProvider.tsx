@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import useAuthStore from '../store/authStore';
 import { shopApi, ShopApiError } from '../lib/shopApi';
 import { groupOrderItems } from '../lib/cartOptions';
-import type { DbState, IdTable, Row, Order, OrderStatus, OrderType, OrderCustomization, PaymentMethod, PaymentStatus } from './types';
+import type { DbState, IdTable, Row, Order, OrderStatus, OrderType, OrderCustomization } from './types';
 
 type RecordData = Record<string, any>;
 const TABLES: (keyof DbState)[] = ['users', 'work_schedules', 'categories', 'products', 'orders', 'order_items', 'payments', 'loyalty_transactions', 'customer_reviews', 'suppliers', 'ingredients', 'product_ingredients', 'purchase_orders', 'purchase_order_items', 'inventory_transactions', 'shop_settings'];
@@ -25,7 +25,6 @@ export interface PlaceOrderInput {
   table_number?: string | null; recipient_name?: string | null; recipient_phone?: string | null;
   delivery_address?: string | null; order_note?: string | null; delivery_fee: number; points_to_redeem: number;
   items: { product_id: number; quantity: number; unit_price: number; customization: OrderCustomization | null }[];
-  payment: { method: PaymentMethod; status: PaymentStatus; transaction_code?: string | null; note?: string | null };
 }
 interface Session { customerId: number; cashierId: number; baristaId: number; shipperId: number; adminId: number }
 interface Value {

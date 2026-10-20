@@ -91,14 +91,16 @@ export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   CASH: 'Tiền mặt',
   VNPAY: 'VNPAY',
   MOMO: 'Ví MoMo',
-  BANK_TRANSFER: 'Chuyển khoản'
+  BANK_TRANSFER: 'Chuyển khoản',
+  DEMO_ONLINE: 'Online mô phỏng'
 };
 
 export const PAYMENT_METHOD_ICON: Record<PaymentMethod, string> = {
   CASH: 'payments',
   VNPAY: 'qr_code_2',
   MOMO: 'account_balance_wallet',
-  BANK_TRANSFER: 'account_balance'
+  BANK_TRANSFER: 'account_balance',
+  DEMO_ONLINE: 'qr_code_2'
 };
 
 export const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {

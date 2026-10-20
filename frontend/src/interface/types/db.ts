@@ -98,6 +98,7 @@ export interface Order {
   discount_amount: number;
   delivery_fee: number;
   final_amount: number;
+  payment_method?: PaymentMethod | 'COD' | 'PAY_AT_COUNTER' | 'DEMO_ONLINE';
   recipient_name: string | null;
   recipient_phone: string | null;
   delivery_address: string | null;
@@ -130,7 +131,7 @@ export interface OrderItem {
   is_prepared: boolean; // [Bổ sung]
 }
 
-export type PaymentMethod = 'CASH' | 'VNPAY' | 'MOMO' | 'BANK_TRANSFER';
+export type PaymentMethod = 'CASH' | 'VNPAY' | 'MOMO' | 'BANK_TRANSFER' | 'DEMO_ONLINE';
 export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED';
 
 // 7. payments
