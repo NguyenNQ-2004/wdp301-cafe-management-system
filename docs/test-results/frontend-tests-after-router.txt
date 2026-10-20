@@ -1,0 +1,56 @@
+
+> frontend@0.0.0 test
+> node --test tests/*.test.mjs
+
+✔ Corrupt stored authentication does not crash startup (2700.2615ms)
+✔ Login and logout tolerate browser storage being blocked (1.5676ms)
+✔ Switching accounts clears the previous owner cart (0.9249ms)
+✔ Cart computes size price and merges the same product and size (1.618ms)
+✔ Cart quantity is capped at 99 and zero removes an item (0.6642ms)
+✔ Removing selected cart lines preserves unselected lines (1.2472ms)
+✔ Customization comparison detects changes without depending on key order (0.5377ms)
+✔ POS consolidates repeated product and size for the actual API (0.4839ms)
+✔ POS rejects excess and invalid quantities before sending a request (0.6381ms)
+✔ Cart API payload contains the supported fields only (0.4853ms)
+✔ Missing API routes produce an actionable error for an HTML 404 response (3.5001ms)
+✔ An unknown bill ID never displays another order (15.0821ms)
+✔ Valid and empty bills render safely (13.1857ms)
+✔ Login route renders the password form (25.1923ms)
+✔ Unknown product ID never falls back to the first catalog product (1.3653ms)
+✔ Load error names the failed data and exposes retry without preview messaging (6.1476ms)
+✔ Unrelated endpoint failures do not show an error on the menu (4.9167ms)
+✔ Successful data loads do not show a warning (3.782ms)
+✔ Render home with empty data (1560.0275ms)
+✔ Render menu with empty data (5.5549ms)
+✔ Render customize with empty data (1.1615ms)
+✔ Render profile with empty data (5.6451ms)
+✔ Render orders with empty data (4.0791ms)
+✔ Render bill with empty data (2.4168ms)
+✔ Render pos-create with empty data (23.0499ms)
+✔ Render pos-orders with empty data (10.1993ms)
+✔ Render kds-terminal with empty data (9.4783ms)
+✔ Render delivery-orders with empty data (6.7319ms)
+✔ Render delivery-report with empty data (13.8785ms)
+✔ Render delivery-cod with empty data (10.4258ms)
+✔ Render admin-products with empty data (9.8368ms)
+✔ Render home with populated data (7.1008ms)
+✔ Render menu with populated data (6.5605ms)
+✔ Render customize with populated data (10.1975ms)
+✔ Render profile with populated data (5.1405ms)
+✔ Render orders with populated data (8.957ms)
+✔ Render bill with populated data (8.3059ms)
+✔ Render pos-create with populated data (9.7228ms)
+✔ Render pos-orders with populated data (7.5961ms)
+✔ Render kds-terminal with populated data (5.972ms)
+✔ Render delivery-orders with populated data (8.1634ms)
+✔ Render delivery-report with populated data (7.4907ms)
+✔ Render delivery-cod with populated data (14.1271ms)
+✔ Render admin-products with populated data (15.3594ms)
+ℹ tests 44
+ℹ suites 0
+ℹ pass 44
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3270.7434

@@ -106,6 +106,7 @@ export default function CartPage() {
                   <button type="button" onClick={() => removeItem(item.cartId)} aria-label={`Xóa ${item.name}`} className="text-slate-500 hover:text-primary self-start"><span className="material-symbols-outlined">close</span></button>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5"><span className="rounded bg-blue-50 px-2 py-0.5 text-xs text-slate-700">Size {item.size}</span></div>
+                {item.customization && <p className="mt-1 text-xs text-slate-500">{[item.customization.sugar && `Đường ${item.customization.sugar}`, item.customization.ice, item.customization.note].filter(Boolean).join(' · ')}</p>}
                 <div className="mt-4 rounded-lg border border-blue-100 bg-slate-50 p-2 flex flex-wrap justify-between items-end gap-3">
                   <div className="text-xs text-slate-600">Đơn giá <strong className="block text-slate-900">{formatVnd(item.unitPrice)}</strong></div>
                   <div className="flex items-center gap-4">

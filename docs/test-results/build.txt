@@ -1,0 +1,28 @@
+
+> frontend@0.0.0 build
+> tsc -b && vite build
+
+vite v8.3.3 building client environment for production...
+transforming...
+✓ 2026 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                          1.12 kB │ gzip:   0.63 kB
+dist/assets/ConnectedApp-ClWMD52G.css    0.36 kB │ gzip:   0.21 kB
+dist/assets/index-DL4X9QJ5.css          67.49 kB │ gzip:  11.89 kB
+dist/assets/index-yVt10grj.js          261.11 kB │ gzip:  83.13 kB
+dist/assets/ConnectedApp-COp2uq4l.js   634.59 kB │ gzip: 140.41 kB
+
+npm.cmd : [plugin builtin:vite-reporter]
+At line:2 char:1
++ npm.cmd run build > node_modules/.tmp/ui-review/build.txt 2>&1; $buil ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([plugin builtin:vite-reporter] :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking:
+https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2.33s

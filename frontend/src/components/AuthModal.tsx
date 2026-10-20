@@ -2,19 +2,23 @@ import React, { useState } from 'react';
 
 interface AuthModalProps {
   isOpen: boolean;
+  initialTab?: 'login' | 'register';
   onClose: () => void;
   onLoginSuccess?: (user: any) => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
+  initialTab = 'login',
   onClose,
   onLoginSuccess
 }) => {
-  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'forgot'>('login');
+  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'forgot'>(initialTab);
   const [showPassword, setShowPassword] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState('');
 
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -33,29 +37,40 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoggingIn) return;
+    const phone = loginIdentifier.trim().replace(/\s+/g, '');
+    setLoginError('');
+    if (!phone || !loginPassword) {
+      setLoginError('Vui lòng nhập số điện thoại và mật khẩu.');
+      return;
+    }
+    if (phone.includes('@')) {
+      setLoginError('Hệ thống đăng nhập bằng số điện thoại đã đăng ký. Vui lòng không nhập email.');
+      return;
+    }
+    setIsLoggingIn(true);
     try {
       const response = await fetch(`${(import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '')}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: loginIdentifier, password: loginPassword }),
+        body: JSON.stringify({ phone, password: loginPassword }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        triggerToast(data.message || 'Login failed. Check your phone and password.');
+        setLoginError(response.status === 401
+          ? 'Số điện thoại hoặc mật khẩu không đúng. Mật khẩu phân biệt chữ hoa và chữ thường.'
+          : data.message || 'Không thể đăng nhập. Vui lòng thử lại.');
         return;
       }
 
-      triggerToast('Đăng nhập thành công vào Hệ thống!');
-      setTimeout(() => {
-        if (onLoginSuccess) {
-          onLoginSuccess({ name: data.fullName, role: data.role, ...data });
-        }
-        onClose();
-      }, 700);
-    } catch (error) {
-      triggerToast('Lỗi kết nối đến máy chủ. Vui lòng thử lại sau.');
+      onLoginSuccess?.({ name: data.fullName, role: data.role, ...data });
+      onClose();
+    } catch {
+      setLoginError('Không kết nối được API. Kiểm tra backend đang chạy ở cổng 5000.');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -84,7 +99,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setLoginIdentifier(regPhone);
       setLoginPassword('');
       setActiveTab('login');
-    } catch (error) {
+    } catch {
       triggerToast('Cannot connect to server. Please try again.');
     }
   };
@@ -98,20 +113,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-gutter md:p-gutter-lg bg-black/60 backdrop-blur-sm animate-fadeIn">
+    <div role="dialog" aria-modal="true" aria-label={activeTab === 'register' ? 'Đăng ký tài khoản' : activeTab === 'login' ? 'Đăng nhập tài khoản' : 'Khôi phục mật khẩu'} className="fixed inset-0 z-[100] flex items-center justify-center p-gutter md:p-gutter-lg bg-black/60 backdrop-blur-sm animate-fadeIn">
       {/* Container card */}
-      <div className="w-full max-w-4xl bg-surface-container-lowest rounded-xl shadow-2xl overflow-hidden flex flex-col md:flex-row relative">
+      <div className="max-h-[90dvh] w-full max-w-4xl bg-surface-container-lowest rounded-xl shadow-2xl overflow-y-auto flex flex-col md:flex-row relative">
         {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant transition-colors cursor-pointer"
           title="Đóng"
+          aria-label="Đóng form tài khoản"
         >
           <span className="material-symbols-outlined text-[18px]">close</span>
         </button>
 
         {/* Left Atmospheric Brand Showcase (Visual Richness) */}
-        <div className="relative w-full md:w-5/12 bg-surface-container p-space-xl flex flex-col justify-between overflow-hidden min-h-[260px] md:min-h-[580px]">
+        <div className="relative hidden w-5/12 shrink-0 bg-surface-container p-space-xl md:flex flex-col justify-between overflow-hidden min-h-[580px]">
           <div
             className="absolute inset-0 bg-cover bg-center opacity-30 mix-blend-multiply"
             style={{
@@ -224,6 +240,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </p>
               </div>
 
+              {loginError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm leading-relaxed text-red-700">{loginError}</p>}
+
               <div className="space-y-space-xs mt-space-xs">
                 <label className="font-label-md text-label-md text-on-surface font-medium block">
                   Số điện thoại đăng nhập
@@ -234,6 +252,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </span>
                   <input
                     type="text"
+                    name="phone"
+                    autoComplete="username"
+                    inputMode="tel"
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
                     required
@@ -262,6 +283,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </span>
                   <input
                     type={showPassword ? 'text' : 'password'}
+                    name="password"
+                    autoComplete="current-password"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     required
@@ -297,9 +320,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {/* Primary Action Button */}
               <button
                 type="submit"
-                className="w-full h-12 bg-primary-container hover:bg-primary text-white rounded font-label-lg text-label-lg font-semibold flex items-center justify-center gap-space-sm shadow-md transition-all active:scale-[0.99] cursor-pointer"
+                disabled={isLoggingIn}
+                className="w-full h-12 bg-primary-container hover:bg-primary text-white rounded font-label-lg text-label-lg font-semibold flex items-center justify-center gap-space-sm shadow-md transition-all active:scale-[0.99] cursor-pointer disabled:opacity-60"
               >
-                <span>Đăng nhập hệ thống</span>
+                <span>{isLoggingIn ? 'Đang đăng nhập...' : 'Đăng nhập hệ thống'}</span>
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </button>
 
@@ -372,6 +396,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <input
                     type="text"
                     required
+                    name="fullName"
+                    autoComplete="name"
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
                     placeholder="Nguyễn Văn A"
@@ -385,6 +411,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <input
                     type="tel"
                     required
+                    name="phone"
+                    autoComplete="tel"
                     value={regPhone}
                     onChange={(e) => setRegPhone(e.target.value)}
                     placeholder="0908xxxxxx"
@@ -404,6 +432,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <input
                     type="email"
                     required
+                    name="email"
+                    autoComplete="email"
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
                     placeholder="khachhang@gmail.com"
@@ -423,6 +453,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <input
                     type={showRegPassword ? 'text' : 'password'}
                     required
+                    name="password"
+                    autoComplete="new-password"
                     value={regPassword}
                     onChange={(e) => setRegPassword(e.target.value)}
                     placeholder="Tối thiểu 8 ký tự, có số và ký hiệu"

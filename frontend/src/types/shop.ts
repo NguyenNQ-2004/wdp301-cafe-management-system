@@ -21,6 +21,7 @@ export interface CartItem {
   unitPrice: number;
   quantity: number;
   checked: boolean;
+  customization?: { size?: string; sugar?: string; ice?: string; note?: string; topping?: string[] };
 }
 
 export interface RewardOffer {

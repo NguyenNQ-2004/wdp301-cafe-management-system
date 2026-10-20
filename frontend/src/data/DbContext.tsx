@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import axios from 'axios';
 import type { Category, Product, ActiveStatus, OrderStatus, OrderType } from '../types';
@@ -6,104 +6,6 @@ import type { Category, Product, ActiveStatus, OrderStatus, OrderType } from '..
 import useAuthStore from '../store/authStore';
 
 const API_BASE = 'http://localhost:5000/api';
-
-const DEFAULT_CATEGORIES: Category[] = [
-  {
-    id: 1,
-    _id: 'cat-1',
-    name: 'Cà phê máy',
-    icon: 'coffee_maker',
-    description: 'Espresso, Caramel Macchiato đậm đà chuẩn gu hiện đại.',
-    image_url: 'https://images.unsplash.com/photo-1485808191679-5f86510681a2?w=600&auto=format&fit=crop&q=80',
-    imageUrl: 'https://images.unsplash.com/photo-1485808191679-5f86510681a2?w=600&auto=format&fit=crop&q=80',
-    status: 'ACTIVE'
-  },
-  {
-    id: 2,
-    _id: 'cat-2',
-    name: 'Cà phê truyền thống',
-    icon: 'local_cafe',
-    description: 'Cà phê muối, sữa đá Sài Gòn ủ phin nguyên bản ngọt êm.',
-    image_url: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&auto=format&fit=crop&q=80',
-    imageUrl: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&auto=format&fit=crop&q=80',
-    status: 'ACTIVE'
-  },
-  {
-    id: 3,
-    _id: 'cat-3',
-    name: 'Trà trái cây',
-    icon: 'emoji_food_beverage',
-    description: 'Trà đào cam sả, hoa quả nhiệt đới tươi mát thanh nhiệt.',
-    image_url: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=600&auto=format&fit=crop&q=80',
-    imageUrl: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=600&auto=format&fit=crop&q=80',
-    status: 'ACTIVE'
-  },
-  {
-    id: 4,
-    _id: 'cat-4',
-    name: 'Đá xay & Matcha',
-    icon: 'icecream',
-    description: 'Matcha Uji thơm bùi, đá xay mát lạnh đánh tan ngày hè.',
-    image_url: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?w=600&auto=format&fit=crop&q=80',
-    imageUrl: 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?w=600&auto=format&fit=crop&q=80',
-    status: 'ACTIVE'
-  },
-  {
-    id: 5,
-    _id: 'cat-5',
-    name: 'Bánh ngọt',
-    icon: 'bakery_dining',
-    description: 'Bánh Croissant nướng bơ Pháp, cheesecake mềm béo hấp dẫn.',
-    image_url: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=600&auto=format&fit=crop&q=80',
-    imageUrl: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=600&auto=format&fit=crop&q=80',
-    status: 'ACTIVE'
-  },
-  {
-    id: 6,
-    _id: 'cat-6',
-    name: 'Đóng chai',
-    icon: 'liquor',
-    description: 'Cold brew ủ lạnh 16h đóng chai tiện lợi mang đi bất cứ đâu.',
-    image_url: 'https://images.unsplash.com/photo-1517701550927-30cf4ba1dba5?w=600&auto=format&fit=crop&q=80',
-    imageUrl: 'https://images.unsplash.com/photo-1517701550927-30cf4ba1dba5?w=600&auto=format&fit=crop&q=80',
-    status: 'ACTIVE'
-  }
-];
-
-const DEFAULT_SUPPLIERS = [
-  { id: 1, _id: 'sup-1', name: 'Đà Lạt Farm Coffee', phone: '0901234567', address: 'Đà Lạt, Lâm Đồng', status: 'ACTIVE' },
-  { id: 2, _id: 'sup-2', name: 'Vinamilk Dairy Corp', phone: '0902345678', address: 'Quận 7, TP.HCM', status: 'ACTIVE' },
-  { id: 3, _id: 'sup-3', name: 'Trà Việt & Nông sản', phone: '0903456789', address: 'Bảo Lộc, Lâm Đồng', status: 'ACTIVE' },
-  { id: 4, _id: 'sup-4', name: 'Nguyên liệu Pha chế Monin', phone: '0904567890', address: 'Bình Thạnh, TP.HCM', status: 'ACTIVE' }
-];
-
-const DEFAULT_INGREDIENTS = [
-  { id: 1, _id: 'ing-1', name: 'Coffee beans', unit: 'gram', currentStock: 10000, current_stock: 10000, minStockLevel: 2000, min_stock_level: 2000, supplier_id: 1, cost_per_unit: 350 },
-  { id: 2, _id: 'ing-2', name: 'Fresh milk', unit: 'ml', currentStock: 20000, current_stock: 20000, minStockLevel: 5000, min_stock_level: 5000, supplier_id: 2, cost_per_unit: 35 },
-  { id: 3, _id: 'ing-3', name: 'Peach syrup', unit: 'ml', currentStock: 5000, current_stock: 5000, minStockLevel: 1000, min_stock_level: 1000, supplier_id: 4, cost_per_unit: 120 },
-  { id: 4, _id: 'ing-4', name: 'Black tea', unit: 'gram', currentStock: 8000, current_stock: 8000, minStockLevel: 1500, min_stock_level: 1500, supplier_id: 3, cost_per_unit: 200 },
-  { id: 5, _id: 'ing-5', name: 'Tapioca pearls', unit: 'gram', currentStock: 4000, current_stock: 4000, minStockLevel: 1000, min_stock_level: 1000, supplier_id: 4, cost_per_unit: 80 },
-  { id: 6, _id: 'ing-6', name: 'Cheesecake slice', unit: 'piece', currentStock: 30, current_stock: 30, minStockLevel: 5, min_stock_level: 5, supplier_id: 4, cost_per_unit: 22000 },
-  { id: 7, _id: 'ing-7', name: 'Orange', unit: 'piece', currentStock: 100, current_stock: 100, minStockLevel: 20, min_stock_level: 20, supplier_id: 3, cost_per_unit: 5000 },
-  { id: 8, _id: 'ing-8', name: 'Lemon', unit: 'piece', currentStock: 80, current_stock: 80, minStockLevel: 15, min_stock_level: 15, supplier_id: 3, cost_per_unit: 2000 }
-];
-
-const DEFAULT_PRODUCT_INGREDIENTS = [
-  { id: 1, _id: 'pi-1', product_id: 1, ingredient_id: 1, quantity_required: 18 },
-  { id: 2, _id: 'pi-2', product_id: 2, ingredient_id: 1, quantity_required: 18 },
-  { id: 3, _id: 'pi-3', product_id: 2, ingredient_id: 2, quantity_required: 180 },
-  { id: 4, _id: 'pi-4', product_id: 3, ingredient_id: 1, quantity_required: 30 },
-  { id: 5, _id: 'pi-5', product_id: 4, ingredient_id: 1, quantity_required: 18 },
-  { id: 6, _id: 'pi-6', product_id: 4, ingredient_id: 2, quantity_required: 100 },
-  { id: 7, _id: 'pi-7', product_id: 5, ingredient_id: 3, quantity_required: 30 },
-  { id: 8, _id: 'pi-8', product_id: 5, ingredient_id: 4, quantity_required: 10 },
-  { id: 9, _id: 'pi-9', product_id: 5, ingredient_id: 7, quantity_required: 1 },
-  { id: 10, _id: 'pi-10', product_id: 8, ingredient_id: 4, quantity_required: 10 },
-  { id: 11, _id: 'pi-11', product_id: 9, ingredient_id: 1, quantity_required: 18 },
-  { id: 12, _id: 'pi-12', product_id: 10, ingredient_id: 1, quantity_required: 18 },
-  { id: 13, _id: 'pi-13', product_id: 10, ingredient_id: 2, quantity_required: 150 },
-  { id: 14, _id: 'pi-14', product_id: 12, ingredient_id: 6, quantity_required: 1 }
-];
 
 export interface Transaction {
   insert: <T extends Record<string, any>>(table: string, data: T) => T & { id: any; _id?: any };
@@ -139,15 +41,15 @@ export interface DbContextValue {
 
 const defaultContextValue: DbContextValue = {
   db: {
-    categories: DEFAULT_CATEGORIES,
+    categories: [],
     products: [],
     orders: [],
     users: [],
     payments: [],
     order_items: [],
-    ingredients: DEFAULT_INGREDIENTS,
-    product_ingredients: DEFAULT_PRODUCT_INGREDIENTS,
-    suppliers: DEFAULT_SUPPLIERS,
+    ingredients: [],
+    product_ingredients: [],
+    suppliers: [],
     purchase_orders: [],
     purchase_order_items: [],
     inventory_transactions: []
@@ -170,18 +72,28 @@ const defaultContextValue: DbContextValue = {
 export const DbContext = createContext<DbContextValue>(defaultContextValue);
 
 export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
-  const [ingredients, setIngredients] = useState<any[]>(DEFAULT_INGREDIENTS);
-  const [productIngredients, setProductIngredients] = useState<any[]>(DEFAULT_PRODUCT_INGREDIENTS);
-  const [suppliers, setSuppliers] = useState<any[]>(DEFAULT_SUPPLIERS);
+  const [ingredients, setIngredients] = useState<any[]>([]);
+  const [productIngredients, setProductIngredients] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [purchaseOrderItems, setPurchaseOrderItems] = useState<any[]>([]);
   const [inventoryTransactions, setInventoryTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [mutationError, setMutationError] = useState('');
+  const sessionToken = useAuthStore(state => state.user?.token);
+  const refreshVersion = useRef(0);
+  const dataToken = useRef<string | undefined>(undefined);
+  const reportMutationError = useCallback((error: unknown) => {
+    const response = axios.isAxiosError(error) ? error.response : undefined;
+    setMutationError(response?.data?.message || (response?.status === 404
+      ? 'Chưa lưu được thay đổi: API cho chức năng này chưa được kết nối (404).'
+      : 'Chưa lưu được thay đổi lên máy chủ. Dữ liệu vừa sửa đã được khôi phục.'));
+  }, []);
 
   const getAuthHeader = () => {
     const user = useAuthStore.getState().user;
@@ -342,6 +254,16 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
   };
 
   const refresh = useCallback(async () => {
+    const version = ++refreshVersion.current;
+    const token = useAuthStore.getState().user?.token;
+    setLoading(true);
+    if (dataToken.current !== token) {
+      dataToken.current = token;
+      setOrders([]); setUsers([]); setPayments([]); setIngredients([]);
+      setProductIngredients([]); setSuppliers([]); setPurchaseOrders([]);
+      setPurchaseOrderItems([]); setInventoryTransactions([]);
+      setMutationError('');
+    }
     try {
       const authHeaders = getAuthHeader();
       const promises: Promise<any>[] = [
@@ -361,10 +283,11 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
       }
 
       const results = await Promise.allSettled(promises);
+      if (version !== refreshVersion.current || token !== useAuthStore.getState().user?.token) return;
       const catRes = results[0];
       const prodRes = results[1];
 
-      if (catRes.status === 'fulfilled' && Array.isArray(catRes.value.data) && catRes.value.data.length > 0) {
+      if (catRes.status === 'fulfilled' && Array.isArray(catRes.value.data)) {
         setCategories(normalizeCategories(catRes.value.data));
       }
 
@@ -419,13 +342,13 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
     } catch (err) {
       console.warn('DbContext refresh error:', err);
     } finally {
-      setLoading(false);
+      if (version === refreshVersion.current && token === useAuthStore.getState().user?.token) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     refresh();
-  }, [refresh]);
+  }, [refresh, sessionToken]);
 
   const setOrderStatus = useCallback(async (orderId: any, status: OrderStatus) => {
     setOrders(prev =>
@@ -436,9 +359,10 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
       const mongoId = target?._id || orderId;
       await axios.put(`${API_BASE}/orders/${mongoId}/status`, { status }, { headers: getAuthHeader() });
     } catch (err) {
-      console.error('Failed to update order status on server:', err);
+      setOrders(orders);
+      reportMutationError(err);
     }
-  }, [orders]);
+  }, [orders, reportMutationError]);
 
   const cancelOrder = useCallback(async (orderId: any, reason: string) => {
     setOrders(prev =>
@@ -453,9 +377,10 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
       const mongoId = target?._id || orderId;
       await axios.put(`${API_BASE}/orders/${mongoId}/status`, { status: 'CANCELLED', cancelReason: reason }, { headers: getAuthHeader() });
     } catch (err) {
-      console.error('Failed to cancel order on server:', err);
+      setOrders(orders);
+      reportMutationError(err);
     }
-  }, [orders]);
+  }, [orders, reportMutationError]);
 
   const transact = useCallback(<R = any>(callback: (tx: Transaction) => R): R => {
     let result: any;
@@ -515,7 +440,8 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
               }
             })
             .catch(err => {
-              console.error('Failed to insert category on server:', err);
+              setCategories(prev => prev.filter(category => category.id !== tempId));
+              reportMutationError(err);
             });
 
           return newCat as any;
@@ -557,7 +483,8 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
               }
             })
             .catch(err => {
-              console.error('Failed to insert ingredient on server:', err);
+              setIngredients(prev => prev.filter(ingredient => ingredient.id !== tempId));
+              reportMutationError(err);
             });
 
           return newRow as any;
@@ -595,7 +522,8 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
               }
             })
             .catch(err => {
-              console.error('Failed to insert product-ingredient on server:', err);
+              setProductIngredients(prev => prev.filter(recipe => recipe.id !== tempId));
+              reportMutationError(err);
             });
 
           return newRow as any;
@@ -632,7 +560,8 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
             image_url: data.image_url !== undefined ? data.image_url : data.imageUrl
           }, { headers: getAuthHeader() })
             .catch(err => {
-              console.error('Failed to update category on server:', err);
+              setCategories(categories);
+              reportMutationError(err);
             });
         } else if (table === 'ingredients') {
           setIngredients(prev =>
@@ -672,7 +601,8 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
           if (mongoId && !String(mongoId).startsWith('temp_')) {
             axios.put(`${API_BASE}/ingredients/${mongoId}`, payload, { headers: getAuthHeader() })
               .catch(err => {
-                console.error('Failed to update ingredient on server:', err);
+                setIngredients(ingredients);
+                reportMutationError(err);
               });
           }
         } else if (table === 'orders') {
@@ -696,7 +626,8 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
               },
               { headers: getAuthHeader() }
             ).catch(err => {
-              console.error('Failed to update shipper on server:', err);
+              setOrders(orders);
+              reportMutationError(err);
             });
           }
         }
@@ -711,7 +642,8 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
 
           axios.delete(`${API_BASE}/categories/${mongoId}`, { headers: getAuthHeader() })
             .catch(err => {
-              console.error('Failed to remove category on server:', err);
+              setCategories(categories);
+              reportMutationError(err);
               refresh();
             });
         } else if (table === 'ingredients') {
@@ -724,7 +656,8 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
           if (mongoId && !String(mongoId).startsWith('temp_')) {
             axios.delete(`${API_BASE}/ingredients/${mongoId}`, { headers: getAuthHeader() })
               .catch(err => {
-                console.error('Failed to remove ingredient on server:', err);
+                setIngredients(ingredients);
+                reportMutationError(err);
               });
           }
         } else if (table === 'product_ingredients') {
@@ -737,7 +670,8 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
           if (mongoId && !String(mongoId).startsWith('temp_')) {
             axios.delete(`${API_BASE}/product-ingredients/${mongoId}`, { headers: getAuthHeader() })
               .catch(err => {
-                console.error('Failed to remove product-ingredient on server:', err);
+                setProductIngredients(productIngredients);
+                reportMutationError(err);
               });
           }
         }
@@ -746,7 +680,7 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
 
     result = callback(tx);
     return result;
-  }, [categories, orders, refresh, ingredients, productIngredients, products, users, payments, suppliers, purchaseOrders, purchaseOrderItems, inventoryTransactions]);
+  }, [categories, orders, refresh, ingredients, productIngredients, products, users, payments, suppliers, purchaseOrders, purchaseOrderItems, inventoryTransactions, reportMutationError]);
 
   const value: DbContextValue = {
     db: {
@@ -770,7 +704,7 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
     cancelOrder
   };
 
-  return <DbContext.Provider value={value}>{children}</DbContext.Provider>;
+  return <DbContext.Provider value={value}>{children}{mutationError && <div role="alert" className="fixed bottom-4 left-4 right-4 z-[200] mx-auto flex max-w-2xl items-center justify-between gap-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 shadow-lg"><span>{mutationError}</span><button onClick={() => setMutationError('')} className="shrink-0 font-bold underline">Đóng</button></div>}</DbContext.Provider>;
 };
 
 export const useDb = () => {

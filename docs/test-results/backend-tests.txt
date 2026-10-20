@@ -1,0 +1,74 @@
+◇ injected env (2) from .env
+✔ UC26 records own attendance once and lets admin review and mark absence (750.2921ms)
+◇ injected env (2) from .env
+✔ Screen 28: Customer CRM management flow and access control (569.9562ms)
+◇ injected env (2) from .env
+✖ UC23 allows admin to manage staff without exposing credentials or affecting customers (727.135ms)
+◇ injected env (2) from .env
+✔ UC25 assigns weekly shifts and keeps staff schedules private (653.9993ms)
+◇ injected env (2) from .env
+✔ Screen 30: Feedback & complaints submission, filtering, and admin response flow (543.943ms)
+◇ injected env (2) from .env
+✔ inventory overview, filters and stock adjustments (453.3435ms)
+◇ injected env (2) from .env
+✔ Screen 29: Loyalty rules, phone lookup, point adjust, and tier upgrade flow (506.5355ms)
+◇ injected env (2) from .env
+✖ UC11 order creation, UC12 demo payment and UC13 counter payment (933.6234ms)
+◇ injected env (2) from .env
+✔ purchase order creation, ordering and receiving update real stock once (571.3016ms)
+◇ injected env (2) from .env
+✔ restock overview and proposal approval flow (476.1882ms)
+◇ injected env (2) from .env
+✔ UC27 reconciles only cashier cash payments and saves one printable snapshot (776.5068ms)
+◇ injected env (2) from .env
+✔ supplier overview and protected CRUD flow (491.291ms)
+◇ injected env (2) from .env
+✔ UC24 configures three non-overlapping shifts in shop settings (479.4438ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 11
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 18659.7374
+
+✖ failing tests:
+
+test at tests\employeeManagement.test.js:13:1
+✖ UC23 allows admin to manage staff without exposing credentials or affecting customers (727.135ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + undefined
+  - null
+
+      at TestContext.<anonymous> (C:\Users\nguye\Desktop\wdp301-cafe-management-system\backend\tests\employeeManagement.test.js:81:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\onlineOrdering.test.js:22:1
+✖ UC11 order creation, UC12 demo payment and UC13 counter payment (933.6234ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  400 !== 201
+
+      at TestContext.<anonymous> (C:\Users\nguye\Desktop\wdp301-cafe-management-system\backend\tests\onlineOrdering.test.js:139:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 400,
+    expected: 201,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
