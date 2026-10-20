@@ -46,14 +46,7 @@ app.use('/api/purchase-orders', require('./routes/purchaseOrderRoutes'));
 app.use('/api/shop-settings', require('./routes/shopSettingRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
 
-// ==========================================
-// CÁC API GET CƠ BẢN CÒN LẠI (SẼ ĐƯỢC TÁCH SAU NÀY)
-// ==========================================
-const Voucher = require('./models/Voucher');
-app.get('/api/vouchers', async (req, res) => {
-  try { res.status(200).json(await Voucher.find({})); }
-  catch (error) { res.status(500).json({ error: error.message }); }
-});
+app.use('/api/vouchers', require('./routes/voucherRoutes'));
 
 // Middleware xử lý lỗi chung (JSON không hợp lệ, lỗi server)
 app.use((err, req, res, next) => {

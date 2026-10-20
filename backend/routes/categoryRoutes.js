@@ -6,13 +6,13 @@ const { protect, adminOnly } = require('../middlewares/authMiddleware');
 
 // 1. GET ALL - Lấy toàn bộ danh mục
 router.get('/', async (req, res) => {
-  try { res.json(await Category.find({}).sort({ createdAt: 1 })); } 
+  try { res.json(await Category.find({}).sort({ createdAt: 1 })); }
   catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 // 2. GET ONE - Lấy 1 danh mục theo ID
 router.get('/:id', async (req, res) => {
-  try { res.json(await Category.findById(req.params.id)); } 
+  try { res.json(await Category.findById(req.params.id)); }
   catch (error) { res.status(500).json({ error: error.message }); }
 });
 
@@ -38,7 +38,7 @@ router.post('/', protect, adminOnly, async (req, res) => {
       status: status || 'ACTIVE'
     });
     res.status(201).json(created);
-  } 
+  }
   catch (error) { res.status(500).json({ error: error.message }); }
 });
 
@@ -65,24 +65,24 @@ router.put('/:id', protect, adminOnly, async (req, res) => {
       updateData.image_url = finalImg;
     }
     const updated = await Category.findByIdAndUpdate(req.params.id, updateData, { returnDocument: 'after' });
-    res.json(updated); 
-  } 
+    res.json(updated);
+  }
   catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 // 5. DELETE - Xóa danh mục
 router.delete('/:id', protect, adminOnly, async (req, res) => {
-  try { 
+  try {
     // Kiểm tra ràng buộc khóa ngoại fk_product_category
     const count = await Product.countDocuments({ category: req.params.id });
     if (count > 0) {
-      return res.status(400).json({ 
-        message: 'Không thể xóa: danh mục đang có sản phẩm (ràng buộc fk_product_category).' 
+      return res.status(400).json({
+        message: 'Không thể xóa: danh mục đang có sản phẩm (ràng buộc fk_product_category).'
       });
     }
     await Category.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Đã xóa danh mục thành công!' }); 
-  } 
+    res.json({ message: 'Đã xóa danh mục thành công!' });
+  }
   catch (error) { res.status(500).json({ error: error.message }); }
 });
 

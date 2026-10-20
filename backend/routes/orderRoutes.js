@@ -8,6 +8,12 @@ const LoyaltyTransaction = require('../models/LoyaltyTransaction');
 const User = require('../models/User');
 const Cart = require('../models/Cart');
 const RewardItem = require('../models/RewardItem');
+const ProductIngredient = require('../models/ProductIngredient');
+const Ingredient = require('../models/Ingredient');
+const InventoryTransaction = require('../models/InventoryTransaction');
+const Voucher = require('../models/Voucher');
+const ShopSetting = require('../models/ShopSetting');
+const { evaluateAndUpdateTier } = require('../utils/membershipTier');
 const { protect } = require('../middlewares/authMiddleware');
 const { normalizeCartItems } = require('../utils/cartItems');
 const { demoPaymentsEnabled } = require('../utils/paymentMode');
@@ -86,10 +92,25 @@ router.post('/', async (req, res) => {
       orderNote,
       tableNumber,
       paymentMethod,
-      rewardId
+      rewardId,
+      customerId,
+      customerPhone,
+      pointsToRedeem,
+      voucherCode
     } = req.body;
 
     const isStaffOrAdmin = ['ADMIN', 'STAFF'].includes(req.user.role);
+
+    // Xác định khách hàng liên kết (nếu có tài khoản, SĐT hoặc chọn từ quầy)
+    let targetCustomer = null;
+    if (req.user.role === 'CUSTOMER') {
+      targetCustomer = req.user;
+    } else if (customerId && mongoose.isValidObjectId(customerId)) {
+      targetCustomer = await User.findById(customerId);
+    } else if (customerPhone && typeof customerPhone === 'string' && customerPhone.trim()) {
+      const cleanPhone = customerPhone.trim().replace(/\s/g, '');
+      targetCustomer = await User.findOne({ phone: cleanPhone, role: 'CUSTOMER' });
+    }
 
     // Chuẩn hóa danh sách món
     let items;
@@ -103,7 +124,7 @@ router.post('/', async (req, res) => {
     if (req.user.role === 'CUSTOMER' && orderType === 'DINE_IN') throw orderError('Phương thức nhận hàng không hợp lệ.');
     const needsContact = req.user.role === 'CUSTOMER' || orderType === 'ONLINE';
     const finalRecipientName = typeof recipientName === 'string' ? recipientName.trim() : '';
-    const finalRecipientPhone = typeof recipientPhone === 'string' ? recipientPhone.trim() : '';
+    const finalRecipientPhone = typeof recipientPhone === 'string' ? recipientPhone.trim() : (targetCustomer?.phone || '');
     const finalDeliveryAddress = typeof deliveryAddress === 'string' ? deliveryAddress.trim() : '';
     if (needsContact && (!finalRecipientName || finalRecipientName.length > 100)) throw orderError('Tên người nhận phải từ 1 đến 100 ký tự.');
     if (needsContact && !validPhone(finalRecipientPhone)) throw orderError('Số điện thoại nhận hàng không hợp lệ.');
@@ -128,6 +149,56 @@ router.post('/', async (req, res) => {
       if (totalAmount < reward.minOrderValue) throw orderError('Đơn hàng chưa đạt mức tối thiểu để đổi ưu đãi điểm.', 409);
       discountAmount = Math.min(reward.discountValue, totalAmount);
     }
+
+    // Đổi điểm tích lũy trực tiếp theo số điện thoại
+    let directPointsDeducted = 0;
+    const requestedPoints = Number(pointsToRedeem);
+    if (requestedPoints > 0 && Number.isInteger(requestedPoints)) {
+      if (!targetCustomer) {
+        throw orderError('Vui lòng cung cấp số điện thoại khách hàng để đổi điểm.');
+      }
+      const currentPoints = targetCustomer.totalPoints || 0;
+      if (currentPoints < requestedPoints) {
+        throw orderError(`Khách hàng chỉ có ${currentPoints} điểm, không đủ để đổi ${requestedPoints} điểm.`, 409);
+      }
+      const [stepSetting, valueSetting] = await Promise.all([
+        ShopSetting.findOne({ settingKey: 'points_step' }),
+        ShopSetting.findOne({ settingKey: 'points_step_value' })
+      ]);
+      const step = stepSetting ? Number(stepSetting.settingValue) : 10;
+      const stepVal = valueSetting ? Number(valueSetting.settingValue) : 2000;
+      const unitValue = stepVal / (step || 1);
+      const pointDiscount = Math.min(Math.floor(requestedPoints * unitValue), totalAmount - discountAmount);
+      discountAmount += pointDiscount;
+      pointsReserved += requestedPoints;
+      directPointsDeducted = requestedPoints;
+
+      await User.findByIdAndUpdate(targetCustomer._id, { $inc: { totalPoints: -requestedPoints } });
+    }
+
+    // Áp dụng mã Voucher giảm giá nếu có
+    let appliedVoucher = null;
+    if (voucherCode && typeof voucherCode === 'string' && voucherCode.trim()) {
+      const cleanCode = voucherCode.trim().toUpperCase();
+      const v = await Voucher.findOne({ code: cleanCode, status: 'ACTIVE' });
+      if (!v) throw orderError('Mã voucher giảm giá không hợp lệ hoặc đã hết hạn.');
+      if (v.minOrderValue && totalAmount < v.minOrderValue) {
+        throw orderError(`Đơn hàng phải từ ${v.minOrderValue.toLocaleString('vi-VN')}đ để sử dụng voucher này.`);
+      }
+      if (v.usageLimit && v.usedCount >= v.usageLimit) {
+        throw orderError('Mã voucher đã hết lượt sử dụng.');
+      }
+      let voucherDiscount = 0;
+      if (v.discountType === 'PERCENT') {
+        voucherDiscount = Math.min(Math.floor((totalAmount * v.discountValue) / 100), v.maxDiscount || Infinity);
+      } else {
+        voucherDiscount = Math.min(v.discountValue, totalAmount);
+      }
+      discountAmount += Math.min(voucherDiscount, totalAmount - discountAmount);
+      appliedVoucher = v;
+      await Voucher.findByIdAndUpdate(v._id, { $inc: { usedCount: 1 } });
+    }
+
     if (isStaffOrAdmin && req.body.discountAmount != null) {
       const staffDiscount = Number(req.body.discountAmount);
       if (!Number.isInteger(staffDiscount) || staffDiscount < 0 || staffDiscount > totalAmount) throw orderError('Số tiền giảm giá không hợp lệ.');
@@ -139,7 +210,7 @@ router.post('/', async (req, res) => {
     if (reward) {
       const customer = await User.findOneAndUpdate({ _id: req.user._id, role: 'CUSTOMER', totalPoints: { $gte: reward.pointsCost } }, { $inc: { totalPoints: -reward.pointsCost } }, { returnDocument: 'after' });
       if (!customer) throw orderError('Bạn không còn đủ điểm để đổi ưu đãi này.', 409);
-      pointsReserved = reward.pointsCost;
+      pointsReserved += reward.pointsCost;
       if (reward.stock !== -1) {
         const claimed = await RewardItem.findOneAndUpdate({ _id: reward._id, status: 'ACTIVE', stock: { $gt: 0 } }, { $inc: { stock: -1 } });
         if (!claimed) throw orderError('Ưu đãi điểm vừa hết số lượng.', 409);
@@ -152,8 +223,9 @@ router.post('/', async (req, res) => {
 
     const orderData = {
       orderCode,
-      customer: req.user.role === 'CUSTOMER' ? req.user._id : (req.body.customerId || undefined),
+      customer: targetCustomer ? targetCustomer._id : (req.user.role === 'CUSTOMER' ? req.user._id : (req.body.customerId || undefined)),
       cashier: isStaffOrAdmin ? req.user._id : undefined,
+      voucher: appliedVoucher ? appliedVoucher._id : undefined,
       orderType,
       status: orderType === 'DINE_IN' && isStaffOrAdmin ? 'PREPARING' : 'PENDING',
       items: items.map(({ product, quantity, size, unitPrice }) => ({
@@ -206,6 +278,15 @@ router.post('/', async (req, res) => {
     });
 
     if (reward) await LoyaltyTransaction.create({ customer: req.user._id, order: order._id, pointsChange: -pointsReserved, transactionType: 'REDEEM' });
+    if (directPointsDeducted > 0 && targetCustomer) {
+      await LoyaltyTransaction.create({
+        customer: targetCustomer._id,
+        order: order._id,
+        pointsChange: -directPointsDeducted,
+        transactionType: 'REDEEM',
+        reason: `Đổi ${directPointsDeducted} điểm giảm trực tiếp vào đơn ${order.orderCode}`
+      });
+    }
     committed = true;
 
     // Dọn dẹp giỏ hàng nếu là customer
@@ -246,19 +327,46 @@ router.post('/', async (req, res) => {
   }
 });
 
-// 4. UPDATE ORDER STATUS (Dành cho Thu ngân, Pha chế, Shipper, Quản lý)
+// 4. UPDATE ORDER STATUS (Dành cho Thu ngân, Pha chế, Shipper, Quản lý & Khách tự hủy đơn PENDING)
 router.put('/:id/status', async (req, res) => {
   try {
-    if (!['ADMIN', 'STAFF'].includes(req.user.role)) return res.status(403).json({ message: 'Chỉ nhân viên được cập nhật trạng thái đơn hàng.' });
     const { status, cancelReason, shipperId } = req.body;
     const validStatuses = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'DELIVERING', 'COMPLETED', 'CANCELLED'];
-    
+
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: 'Trạng thái đơn hàng không hợp lệ.' });
     }
 
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Không tìm thấy đơn hàng.' });
+
+    // Khách hàng được phép tự hủy đơn PENDING của chính mình
+    const isCustomerOwner = req.user.role === 'CUSTOMER' && String(order.customer?._id || order.customer) === String(req.user._id);
+    if (!['ADMIN', 'STAFF'].includes(req.user.role)) {
+      if (isCustomerOwner && status === 'CANCELLED' && order.status === 'PENDING') {
+        // Khách hàng tự hủy đơn thành công
+      } else {
+        return res.status(403).json({ message: 'Chỉ nhân viên được cập nhật trạng thái đơn hàng.' });
+      }
+    }
+
+    // Hoàn lại điểm tích lũy và voucher nếu hủy đơn
+    if (status === 'CANCELLED' && order.status !== 'CANCELLED') {
+      if (order.pointsRedeemed > 0 && order.customer) {
+        await User.findByIdAndUpdate(order.customer, { $inc: { totalPoints: order.pointsRedeemed } });
+        await LoyaltyTransaction.create({
+          customer: order.customer,
+          order: order._id,
+          pointsChange: order.pointsRedeemed,
+          transactionType: 'EARN',
+          reason: `Hoàn điểm do hủy đơn hàng ${order.orderCode}`
+        });
+      }
+      if (order.voucher) {
+        await Voucher.findByIdAndUpdate(order.voucher, { $inc: { usedCount: -1 } });
+      }
+      await Payment.updateMany({ order: order._id, status: 'PENDING' }, { $set: { status: 'FAILED', paymentNote: 'Đơn hàng bị hủy' } });
+    }
 
     order.status = status;
     if (cancelReason !== undefined) order.cancelReason = cancelReason;
@@ -284,13 +392,44 @@ router.put('/:id/status', async (req, res) => {
               customer: order.customer,
               order: order._id,
               pointsChange: pointsEarned,
-              transactionType: 'EARN'
+              transactionType: 'EARN',
+              reason: `Tích điểm đơn hàng ${order.orderCode}`
             });
-            await User.findByIdAndUpdate(order.customer, {
+            const updatedCustomer = await User.findByIdAndUpdate(order.customer, {
               $inc: { totalPoints: pointsEarned }
-            });
+            }, { returnDocument: 'after' });
+            if (updatedCustomer) {
+              await evaluateAndUpdateTier(updatedCustomer);
+            }
           }
         }
+      }
+
+      // Tự động trừ kho nguyên liệu theo định mức công thức (BOM)
+      try {
+        const alreadyDeducted = await InventoryTransaction.exists({ referenceId: order._id, transactionType: 'OUT_ORDER' });
+        if (!alreadyDeducted && Array.isArray(order.items)) {
+          for (const item of order.items) {
+            if (!item.product) continue;
+            const boms = await ProductIngredient.find({ product: item.product });
+            for (const bom of boms) {
+              const qty = bom.quantityRequired * item.quantity;
+              await Ingredient.findByIdAndUpdate(bom.ingredient, { $inc: { currentStock: -qty } });
+              await InventoryTransaction.create({
+                ingredient: bom.ingredient,
+                transactionType: 'OUT_ORDER',
+                quantity: qty,
+                stockDelta: -qty,
+                referenceType: 'ORDER',
+                referenceId: order._id,
+                note: `Xuất kho tự động theo đơn ${order.orderCode} (${item.productNameAtTime || 'Món'})`,
+                createdBy: req.user._id
+              });
+            }
+          }
+        }
+      } catch (stockErr) {
+        console.error('Lỗi tự động trừ kho nguyên liệu:', stockErr);
       }
     }
 

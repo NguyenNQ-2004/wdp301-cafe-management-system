@@ -31,6 +31,7 @@ const userSchema = new mongoose.Schema(
       enum: ['MANAGER', 'BARISTA', 'CASHIER', 'SHIPPER']
     },
     baseSalary: { type: Number, default: 0 },
+    hireDate: { type: Date },
     // Thuộc tính riêng của Customer (Membership)
     tierName: {
       type: String,

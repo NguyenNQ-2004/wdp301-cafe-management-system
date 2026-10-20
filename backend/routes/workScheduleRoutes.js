@@ -109,6 +109,8 @@ router.post('/', adminOnly, async (req, res) => {
     const data = parseAssignment(req.body, true);
     const employee = await User.findOne({ _id: data.user, role: 'STAFF', status: 'ACTIVE' });
     if (!employee) return res.status(400).json({ message: 'Chỉ phân ca cho nhân viên đang hoạt động.' });
+    const existing = await WorkSchedule.findOne({ user: data.user, workDate: data.workDate, shiftName: data.shiftName });
+    if (existing) return res.status(409).json({ message: 'Nhân viên đã được phân vào ca này trong ngày.' });
     const schedule = await WorkSchedule.create(data);
     await schedule.populate('user', 'fullName phone position status');
     res.status(201).json(schedule);
