@@ -45,10 +45,10 @@ test('UC24 configures three non-overlapping shifts in shop settings', async (t) 
   };
 
   const passwordHash = await bcrypt.hash('test-password', 4);
-  const admin = await User.create({ fullName: 'UC24 Admin', phone: '0999000031', passwordHash, role: 'ADMIN' });
-  const staff = await User.create({ fullName: 'UC24 Staff', phone: '0999000032', passwordHash, role: 'STAFF', position: 'CASHIER' });
-  const customer = await User.create({ fullName: 'UC24 Customer', phone: '0999000033', passwordHash, role: 'CUSTOMER' });
-  const tokenFor = async (user) => (await request('POST', '/api/auth/login', { phone: user.phone, password: 'test-password' })).data.token;
+  const admin = await User.create({ fullName: 'UC24 Admin', phone: '0999000031', email: 'test-0999000031@example.com', passwordHash, role: 'ADMIN' });
+  const staff = await User.create({ fullName: 'UC24 Staff', phone: '0999000032', email: 'test-0999000032@example.com', passwordHash, role: 'STAFF', position: 'CASHIER' });
+  const customer = await User.create({ fullName: 'UC24 Customer', phone: '0999000033', email: 'test-0999000033@example.com', passwordHash, role: 'CUSTOMER' });
+  const tokenFor = async (user) => (await request('POST', '/api/auth/login', { email: user.email, password: 'test-password' })).data.token;
   const adminToken = await tokenFor(admin);
   const staffToken = await tokenFor(staff);
   const customerToken = await tokenFor(customer);

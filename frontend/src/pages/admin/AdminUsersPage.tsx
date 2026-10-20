@@ -6,11 +6,11 @@ import { AdminLayout } from './AdminUi';
 
 type Position = 'MANAGER' | 'BARISTA' | 'CASHIER' | 'SHIPPER';
 type Status = 'ACTIVE' | 'INACTIVE' | 'LOCKED';
-interface Employee { _id: string; fullName: string; phone: string; position: Position; status: Status; baseSalary: number; hireDate?: string }
-interface EmployeeForm { fullName: string; phone: string; password: string; position: Position; status: Status; baseSalary: string; hireDate: string }
+interface Employee { _id: string; fullName: string; phone: string; email?: string; position: Position; status: Status; baseSalary: number; hireDate?: string }
+interface EmployeeForm { fullName: string; phone: string; email: string; password: string; position: Position; status: Status; baseSalary: string; hireDate: string }
 const positionNames: Record<Position, string> = { MANAGER: 'Quản lý', BARISTA: 'Pha chế', CASHIER: 'Thu ngân', SHIPPER: 'Giao hàng' };
 const statusNames: Record<Status, string> = { ACTIVE: 'Đang làm việc', INACTIVE: 'Ngừng hoạt động', LOCKED: 'Bị khóa' };
-const blankForm = (): EmployeeForm => ({ fullName: '', phone: '', password: '', position: 'CASHIER', status: 'ACTIVE', baseSalary: '0', hireDate: '' });
+const blankForm = (): EmployeeForm => ({ fullName: '', phone: '', email: '', password: '', position: 'CASHIER', status: 'ACTIVE', baseSalary: '0', hireDate: '' });
 const fetchEmployees = (token: string) => shopApi<Employee[]>('/api/employees', { token });
 
 export default function AdminUsersPage() {
@@ -47,7 +47,7 @@ export default function AdminUsersPage() {
 
   const visible = useMemo(() => employees.filter((employee) => {
     const query = search.trim().toLocaleLowerCase('vi');
-    return (!query || `${employee.fullName} ${employee.phone}`.toLocaleLowerCase('vi').includes(query))
+    return (!query || `${employee.fullName} ${employee.phone} ${employee.email || ''}`.toLocaleLowerCase('vi').includes(query))
       && (positionFilter === 'ALL' || employee.position === positionFilter)
       && (statusFilter === 'ALL' || employee.status === statusFilter);
   }), [employees, search, positionFilter, statusFilter]);
@@ -55,7 +55,7 @@ export default function AdminUsersPage() {
   const startCreate = () => { setEditingId(null); setForm(blankForm()); setError(''); setFormOpen(true); };
   const startEdit = (employee: Employee) => {
     setEditingId(employee._id);
-    setForm({ fullName: employee.fullName, phone: employee.phone, password: '', position: employee.position, status: employee.status, baseSalary: String(employee.baseSalary), hireDate: employee.hireDate?.slice(0, 10) || '' });
+    setForm({ fullName: employee.fullName, phone: employee.phone, email: employee.email || '', password: '', position: employee.position, status: employee.status, baseSalary: String(employee.baseSalary), hireDate: employee.hireDate?.slice(0, 10) || '' });
     setError(''); setFormOpen(true);
   };
 
@@ -69,7 +69,7 @@ export default function AdminUsersPage() {
     try {
       const employee = await shopApi<Employee>(editingId ? `/api/employees/${editingId}` : '/api/employees', {
         method: editingId ? 'PUT' : 'POST', token,
-        body: { fullName: form.fullName.trim(), phone: form.phone.trim(), position: form.position, status: form.status,
+        body: { fullName: form.fullName.trim(), phone: form.phone.trim(), email: form.email.trim().toLowerCase(), position: form.position, status: form.status,
           baseSalary: salary, hireDate: form.hireDate || null, ...(form.password ? { password: form.password } : {}) }
       });
       setEmployees((current) => editingId ? current.map((item) => item._id === employee._id ? employee : item) : [employee, ...current]);
@@ -102,6 +102,7 @@ export default function AdminUsersPage() {
       <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <label className="text-sm font-semibold">Họ và tên<input value={form.fullName} onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))} required maxLength={100} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5" /></label>
         <label className="text-sm font-semibold">Số điện thoại<input value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} required inputMode="numeric" pattern="[0-9]{9,15}" maxLength={15} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5" /></label>
+        <label className="text-sm font-semibold">Gmail / Email đăng nhập<input type="email" autoComplete="off" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} required maxLength={254} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5" /></label>
         <label className="text-sm font-semibold">Vị trí<select value={form.position} onChange={(event) => setForm((current) => ({ ...current, position: event.target.value as Position }))} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5">{Object.entries(positionNames).map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label>
         <label className="text-sm font-semibold">Lương cơ bản (đ)<input type="number" min="0" step="1" value={form.baseSalary} onChange={(event) => setForm((current) => ({ ...current, baseSalary: event.target.value }))} required className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5" /></label>
         <label className="text-sm font-semibold">Ngày vào làm<input type="date" value={form.hireDate} onChange={(event) => setForm((current) => ({ ...current, hireDate: event.target.value }))} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5" /></label>
@@ -112,7 +113,7 @@ export default function AdminUsersPage() {
     </form>}
 
     <div className="mt-7 grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
-      <input aria-label="Tìm nhân viên" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo tên hoặc số điện thoại" className="rounded-lg border border-blue-100 bg-white p-2.5" />
+      <input aria-label="Tìm nhân viên" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo tên, số điện thoại hoặc email" className="rounded-lg border border-blue-100 bg-white p-2.5" />
       <select aria-label="Lọc vị trí" value={positionFilter} onChange={(event) => setPositionFilter(event.target.value)} className="rounded-lg border border-blue-100 bg-white p-2.5"><option value="ALL">Mọi vị trí</option>{Object.entries(positionNames).map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select>
       <select aria-label="Lọc trạng thái" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-lg border border-blue-100 bg-white p-2.5"><option value="ALL">Mọi trạng thái</option>{Object.entries(statusNames).map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select>
       <button onClick={() => void refresh()} disabled={loading} className="rounded-lg border border-blue-100 bg-white px-4 py-2.5 font-semibold text-primary disabled:opacity-50">Làm mới</button>

@@ -44,11 +44,11 @@ test('UC26 records own attendance once and lets admin review and mark absence', 
   };
 
   const hash = await bcrypt.hash('test-password', 4);
-  const admin = await User.create({ fullName: 'Admin', phone: '0999000051', passwordHash: hash, role: 'ADMIN' });
-  const staffA = await User.create({ fullName: 'Staff A', phone: '0999000052', passwordHash: hash, role: 'STAFF', position: 'CASHIER' });
-  const staffB = await User.create({ fullName: 'Staff B', phone: '0999000053', passwordHash: hash, role: 'STAFF', position: 'BARISTA' });
-  const customer = await User.create({ fullName: 'Customer', phone: '0999000054', passwordHash: hash, role: 'CUSTOMER' });
-  const tokenFor = async (user) => (await request('POST', '/api/auth/login', { phone: user.phone, password: 'test-password' })).data.token;
+  const admin = await User.create({ fullName: 'Admin', phone: '0999000051', email: 'test-0999000051@example.com', passwordHash: hash, role: 'ADMIN' });
+  const staffA = await User.create({ fullName: 'Staff A', phone: '0999000052', email: 'test-0999000052@example.com', passwordHash: hash, role: 'STAFF', position: 'CASHIER' });
+  const staffB = await User.create({ fullName: 'Staff B', phone: '0999000053', email: 'test-0999000053@example.com', passwordHash: hash, role: 'STAFF', position: 'BARISTA' });
+  const customer = await User.create({ fullName: 'Customer', phone: '0999000054', email: 'test-0999000054@example.com', passwordHash: hash, role: 'CUSTOMER' });
+  const tokenFor = async (user) => (await request('POST', '/api/auth/login', { email: user.email, password: 'test-password' })).data.token;
   const adminToken = await tokenFor(admin);
   const aToken = await tokenFor(staffA);
   const bToken = await tokenFor(staffB);

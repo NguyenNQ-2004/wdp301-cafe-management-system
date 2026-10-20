@@ -8,6 +8,7 @@
     "dev": "nodemon server.js",
     "seed:reports-demo": "node seedReportDemo.js",
     "test:online-ordering": "node --test tests/onlineOrdering.test.js",
+    "test:email-auth": "node --test tests/emailAuthentication.test.js",
     "test:inventory": "node --test tests/inventory.test.js",
     "test:restock": "node --test tests/restock.test.js",
     "test:suppliers": "node --test tests/suppliers.test.js",

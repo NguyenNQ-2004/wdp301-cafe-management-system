@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { cartPayload, mergeCartItems, productToCartItem, shopApi } from '../lib/shopApi';
+import { cartPayload, mergeCartItems, productToCartItem, shopApi, ShopApiError } from '../lib/shopApi';
 import useCartStore from '../store/cartStore';
 import type { CartItem, CatalogProduct } from '../types/shop';
 
@@ -36,16 +36,23 @@ export default function useCartSync(user: { _id: string; token: string } | null)
       try {
         const response = await shopApi<CartResponse>('/api/cart', { token: userToken });
         if (!active) return;
-        const remote = response.items.filter((line) => line.product).map((line) => ({
-          ...productToCartItem(line.product!, line.size), quantity: line.quantity, checked: line.checked
-        }));
         const current = useCartStore.getState();
+        const remote = response.items.filter((line) => line.product).map((line) => ({
+          ...productToCartItem(line.product!, line.size), quantity: line.quantity, checked: line.checked,
+          customization: current.items.find(item => item.productId === line.product!._id && item.size === line.size)?.customization
+        }));
         const next: CartItem[] = current.ownerId === null ? mergeCartItems(remote, current.items) : remote;
         current.replace(next, userId);
         current.setSyncError(null);
         current.setReady(true);
-      } catch {
+      } catch (error) {
         if (!active) return;
+        if (error instanceof ShopApiError && [401, 403, 404].includes(error.status)) {
+          useCartStore.getState().setSyncError(error.status === 404
+            ? 'API giỏ hàng chưa được kết nối (404). Chưa thể đặt đơn; hãy tải lại trang sau khi backend được sửa.'
+            : 'Phiên đăng nhập không có quyền truy cập giỏ hàng. Vui lòng đăng nhập lại.');
+          return;
+        }
         useCartStore.getState().setSyncError('Không tải được giỏ hàng. Hệ thống sẽ tự thử lại.');
         retryTimer = window.setTimeout(() => retryLoad((attempt) => attempt + 1), 3000);
       }
@@ -56,10 +63,11 @@ export default function useCartSync(user: { _id: string; token: string } | null)
 
   useEffect(() => {
     if (!userId || !userToken || !ready || ownerId !== userId) return;
+    let active = true;
     const token = userToken;
     const timer = window.setTimeout(() => {
       saveChain.current = saveChain.current.catch(() => {}).then(async () => {
-        while (true) {
+        while (active) {
           const current = useCartStore.getState();
           if (!current.ready || current.ownerId !== userId) return;
           const payload = JSON.stringify(cartPayload(current.items));
@@ -67,16 +75,21 @@ export default function useCartSync(user: { _id: string; token: string } | null)
           if (lastSaved.current === key) return;
           try {
             await shopApi('/api/cart', { method: 'PUT', token, body: { items: JSON.parse(payload) } });
+            if (!active) return;
             lastSaved.current = key;
             if (useCartStore.getState().ownerId === userId) useCartStore.getState().setSyncError(null);
-          } catch {
-            if (useCartStore.getState().ownerId !== userId) return;
+          } catch (error) {
+            if (!active || useCartStore.getState().ownerId !== userId) return;
+            if (error instanceof ShopApiError && [400, 401, 403, 404].includes(error.status)) {
+              useCartStore.getState().setSyncError(error.message);
+              return;
+            }
             useCartStore.getState().setSyncError('Không lưu được giỏ hàng. Hệ thống sẽ tự thử lại.');
             await retryDelay();
           }
         }
       });
     }, 350);
-    return () => window.clearTimeout(timer);
+    return () => { active = false; window.clearTimeout(timer); };
   }, [items, ownerId, ready, userId, userToken]);
 }

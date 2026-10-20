@@ -75,7 +75,7 @@ export default function CheckoutPage({ onRequestAuth }: CheckoutPageProps) {
     try {
       const order = await shopApi<OrderRecord>('/api/orders', {
         method: 'POST', token: user.token,
-        body: { items: cartPayload(items), orderType: mode, recipientName, recipientPhone, deliveryAddress: mode === 'ONLINE' ? deliveryAddress : undefined, orderNote: note.trim(), rewardId: rewardValid ? rewardId : undefined, paymentMethod: mode === 'ONLINE' ? paymentMethod : undefined, expectedTotal: subtotal - discount + fee }
+        body: { items: cartPayload(items), orderType: mode, recipientName, recipientPhone, deliveryAddress: mode === 'ONLINE' ? deliveryAddress : undefined, orderNote: [note.trim(), ...items.filter(item => item.customization).map(item => `${item.name} (${item.size}): ${[item.customization?.sugar && `đường ${item.customization.sugar}`, item.customization?.ice, item.customization?.note].filter(Boolean).join(', ')}`)].filter(Boolean).join('; '), rewardId: rewardValid ? rewardId : undefined, paymentMethod: mode === 'ONLINE' ? paymentMethod : undefined, expectedTotal: subtotal - discount + fee }
       });
       setRewardId(null);
       removeSelected();

@@ -22,7 +22,7 @@ export async function shopApi<T>(path: string, options: { method?: string; token
     body: options.body ? JSON.stringify(options.body) : undefined
   });
   const data = await response.json().catch(() => null);
-  if (!response.ok) throw new ShopApiError(data?.message || 'Không kết nối được với máy chủ.', response.status);
+  if (!response.ok) throw new ShopApiError(data?.message || (response.status === 404 ? 'API cho chức năng này chưa được kết nối (404).' : 'Không kết nối được với máy chủ.'), response.status);
   return data as T;
 }
 

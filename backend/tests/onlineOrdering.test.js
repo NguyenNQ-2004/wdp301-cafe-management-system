@@ -67,16 +67,16 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   };
 
   const customer = await User.create({
-    fullName: 'UC11 Customer', phone: '0999000011',
+    fullName: 'UC11 Customer', phone: '0999000011', email: 'test-0999000011@example.com',
     passwordHash: await bcrypt.hash('test-password', 4), role: 'CUSTOMER', totalPoints: 200
   });
   const category = await Category.create({ name: 'UC11 Test Category' });
   const product = await Product.create({ category: category._id, name: 'UC11 Test Coffee', basePrice: 50000, isAvailable: true });
   await Cart.create({ customer: customer._id, items: [{ product: product._id, quantity: 1, size: 'M', checked: true }] });
 
-  assert.equal((await request('/api/auth/login', { phone: customer.phone, password: 'demo_hash' })).status, 401);
+  assert.equal((await request('/api/auth/login', { email: customer.email, password: 'demo_hash' })).status, 401);
   assert.equal((await request('/api/auth/login', { phone: customer.phone })).status, 400);
-  const login = await request('/api/auth/login', { phone: customer.phone, password: 'test-password' });
+  const login = await request('/api/auth/login', { email: customer.email, password: 'test-password' });
   assert.equal(login.status, 200);
   const token = login.data.token;
   const item = { productId: String(product._id), quantity: 1, size: 'M' };
@@ -130,8 +130,8 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   assert.equal((await RewardItem.findById(reward._id)).stock, 0);
   assert.equal(await LoyaltyTransaction.countDocuments({ order: redeemed.data._id, transactionType: 'REDEEM' }), 1);
 
-  const otherCustomer = await User.create({ fullName: 'Other Customer', phone: '0999000012', passwordHash: await bcrypt.hash('test-password', 4), role: 'CUSTOMER' });
-  const otherLogin = await request('/api/auth/login', { phone: otherCustomer.phone, password: 'test-password' });
+  const otherCustomer = await User.create({ fullName: 'Other Customer', phone: '0999000012', email: 'test-0999000012@example.com', passwordHash: await bcrypt.hash('test-password', 4), role: 'CUSTOMER' });
+  const otherLogin = await request('/api/auth/login', { email: otherCustomer.email, password: 'test-password' });
   assert.equal(otherLogin.status, 200);
   const otherToken = otherLogin.data.token;
   assert.equal((await get('/api/payments/config')).data.demoEnabled, true);
@@ -152,10 +152,10 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   assert.equal((await Payment.findById(demoPayment._id)).amount, demoOrder.data.finalAmount);
   assert.equal((await get(`/api/payments/order/${demoOrder.data._id}`, token)).data.payment.status, 'SUCCESS');
 
-  const cashier = await User.create({ fullName: 'UC13 Cashier', phone: '0999000013', passwordHash: await bcrypt.hash('test-password', 4), role: 'STAFF', position: 'CASHIER' });
-  const barista = await User.create({ fullName: 'UC13 Barista', phone: '0999000014', passwordHash: await bcrypt.hash('test-password', 4), role: 'STAFF', position: 'BARISTA' });
-  const cashierToken = (await request('/api/auth/login', { phone: cashier.phone, password: 'test-password' })).data.token;
-  const baristaToken = (await request('/api/auth/login', { phone: barista.phone, password: 'test-password' })).data.token;
+  const cashier = await User.create({ fullName: 'UC13 Cashier', phone: '0999000013', email: 'test-0999000013@example.com', passwordHash: await bcrypt.hash('test-password', 4), role: 'STAFF', position: 'CASHIER' });
+  const barista = await User.create({ fullName: 'UC13 Barista', phone: '0999000014', email: 'test-0999000014@example.com', passwordHash: await bcrypt.hash('test-password', 4), role: 'STAFF', position: 'BARISTA' });
+  const cashierToken = (await request('/api/auth/login', { email: cashier.email, password: 'test-password' })).data.token;
+  const baristaToken = (await request('/api/auth/login', { email: barista.email, password: 'test-password' })).data.token;
   assert.equal((await get('/api/payments', token)).status, 403);
   assert.equal((await get('/api/payments', baristaToken)).status, 403);
   assert.equal((await get('/api/payments', cashierToken)).status, 200);

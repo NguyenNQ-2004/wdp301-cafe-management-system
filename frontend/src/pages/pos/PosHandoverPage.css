@@ -4,7 +4,7 @@
     margin: 2mm;
   }
 
-  body * {
+  body:has(#handover-print) * {
     visibility: hidden !important;
   }
 
