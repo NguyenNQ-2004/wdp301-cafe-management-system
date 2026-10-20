@@ -15,33 +15,32 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     birthday: { type: Date },
     address: { type: String },
-    role: { 
-      type: String, 
-      enum: ['ADMIN', 'STAFF', 'CUSTOMER'], 
-      default: 'CUSTOMER' 
+    role: {
+      type: String,
+      enum: ['ADMIN', 'STAFF', 'CUSTOMER'],
+      default: 'CUSTOMER'
     },
-    status: { 
-      type: String, 
-      enum: ['ACTIVE', 'INACTIVE', 'LOCKED'], 
-      default: 'ACTIVE' 
+    status: {
+      type: String,
+      enum: ['ACTIVE', 'INACTIVE', 'LOCKED'],
+      default: 'ACTIVE'
     },
     // Thuộc tính riêng của Staff / Admin
-    position: { 
-      type: String, 
-      enum: ['MANAGER', 'BARISTA', 'CASHIER', 'SHIPPER'] 
+    position: {
+      type: String,
+      enum: ['MANAGER', 'BARISTA', 'CASHIER', 'SHIPPER']
     },
-    baseSalary: { type: Number, default: 0, min: 0 },
-    hireDate: { type: Date },
+    baseSalary: { type: Number, default: 0 },
     // Thuộc tính riêng của Customer (Membership)
-    tierName: { 
-      type: String, 
-      enum: ['BRONZE', 'SILVER', 'GOLD', 'DIAMOND'], 
-      default: 'BRONZE' 
+    tierName: {
+      type: String,
+      enum: ['BRONZE', 'SILVER', 'GOLD', 'DIAMOND'],
+      default: 'BRONZE'
     },
-    totalPoints: { type: Number, default: 0, min: 0 },
+    totalPoints: { type: Number, default: 0 },
   },
   {
-    timestamps: true,
+    timestamps: true, // Tự động tạo trường createdAt và updatedAt
   }
 );
 
