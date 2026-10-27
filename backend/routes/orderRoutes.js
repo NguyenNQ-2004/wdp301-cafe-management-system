@@ -12,7 +12,7 @@ const { protect } = require('../middlewares/authMiddleware');
 const { normalizeCartItems } = require('../utils/cartItems');
 const { demoPaymentsEnabled } = require('../utils/paymentMode');
 const { withOrderMutation } = require('../utils/orderMutation');
-const { adminOrCashier, authorizePosition } = require('../middlewares/authMiddleware');
+const { adminOrCashier, authorizePosition, authorize } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 router.use(protect);
@@ -48,6 +48,20 @@ router.get('/', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
+});
+
+router.get('/counter', authorize('ADMIN', 'STAFF'), authorizePosition('CASHIER', 'BARISTA', 'MANAGER'), async (req, res) => {
+  try {
+    const filter = { orderType: { $in: ['DINE_IN', 'TAKEAWAY'] } };
+    if (req.query.status) {
+      if (!['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED'].includes(req.query.status)) return res.status(400).json({ message: 'Trạng thái đơn tại quầy không hợp lệ.' });
+      filter.status = req.query.status;
+    }
+    res.json(await Order.find(filter).sort({ createdAt: -1, _id: -1 })
+      .populate('customer', 'fullName phone totalPoints tierName')
+      .populate('cashier', 'fullName phone')
+      .populate('items.product', 'imageUrl name basePrice'));
+  } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
 // 2. GET SINGLE ORDER BY ID

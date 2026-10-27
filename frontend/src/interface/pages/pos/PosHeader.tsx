@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { PageRoute } from '../../types';
 import { useDb } from '../../data/DbContext';
+import useAuthStore from '../../../store/authStore';
 import { POSITION_LABEL, SHIFT_LABEL, initials, shiftTimeRange } from '../../data/dbUtils';
 
 interface PosHeaderProps {
@@ -11,6 +12,8 @@ interface PosHeaderProps {
 
 export const PosHeader: React.FC<PosHeaderProps> = ({ currentRoute, onNavigate }) => {
   const { db, session } = useDb();
+  const account = useAuthStore(state => state.user);
+  const isBarista = account?.role === 'STAFF' && account.position === 'BARISTA';
   const [timeStr, setTimeStr] = useState('');
   const cashier = db.users.find(u => u.id === session.cashierId);
   // Ca đang làm của thu ngân (work_schedules.status = PRESENT)
@@ -33,7 +36,7 @@ export const PosHeader: React.FC<PosHeaderProps> = ({ currentRoute, onNavigate }
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-sm sm:text-base text-stone-900 tracking-tight uppercase">Aura Café</span>
-              <span className="text-[10px] text-primary font-bold tracking-wider uppercase">POS Thu ngân</span>
+              <span className="text-[10px] text-primary font-bold tracking-wider uppercase">{isBarista ? 'Đơn tại quầy · Barista' : 'POS Thu ngân'}</span>
             </div>
           </div>
 
@@ -61,8 +64,9 @@ export const PosHeader: React.FC<PosHeaderProps> = ({ currentRoute, onNavigate }
             { id: 'pos-create', label: 'Tạo đơn tại quầy', icon: 'point_of_sale' },
             { id: 'pos-orders', label: 'Danh sách đơn', icon: 'receipt_long' },
             { id: 'pos-shift', label: 'Chốt ca', icon: 'calculate' },
-            { id: 'pos-handover', label: 'Bàn giao ca', icon: 'assignment_turned_in' }
-          ].map(tab => {
+            { id: 'pos-handover', label: 'Bàn giao ca', icon: 'assignment_turned_in' },
+            ...(isBarista ? [{ id: 'kds-terminal', label: 'Pha chế', icon: 'coffee_maker' }] : [])
+          ].filter(tab => !isBarista || ['pos-orders', 'kds-terminal'].includes(tab.id)).map(tab => {
             const active = currentRoute === tab.id;
             return (
               <button

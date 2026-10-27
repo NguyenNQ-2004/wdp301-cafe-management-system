@@ -31,6 +31,7 @@ interface Value {
   db: DbState; session: Session; loading: boolean; busy: boolean; revision: number;
   error: string; notice: string; unavailable: string[];
   refresh: () => Promise<void>; notify: (message: string) => void;
+  refreshOrders: (scope: 'counter' | 'all', signal?: AbortSignal) => Promise<void>;
   rawId: (id: number) => string; idFor: (table: string, value: unknown) => number;
   setSession: (patch: Partial<Session>) => void;
   transact: <R>(fn: (tx: Tx) => R) => R;
@@ -143,6 +144,40 @@ export function DbProvider({ children }: { children: ReactNode }) {
     dbRef.current = next; setDb(next); setUnavailable(missing); setLoading(false);
   }, [user?.token, user?.role, user?.position, user?._id, normalize, idFor]);
   useEffect(() => { void refresh(); return () => { generation.current++; }; }, [refresh]);
+
+  const refreshOrders = useCallback(async (scope: 'counter' | 'all', signal?: AbortSignal) => {
+    if (!user?.token || inFlight.current) return;
+    const epoch = generation.current;
+    const includePayments = scope === 'counter' && (user.role === 'ADMIN' || (user.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user.position || '')));
+    const [rows, payments] = await Promise.all([
+      shopApi<RecordData[]>(scope === 'counter' ? '/api/orders/counter' : '/api/orders', { token: user.token, signal }),
+      includePayments ? shopApi<RecordData[]>('/api/payments', { token: user.token, signal }) : Promise.resolve(null),
+    ]);
+    if (signal?.aborted || epoch !== generation.current || inFlight.current || user.token !== useAuthStore.getState().user?.token) return;
+    const current = dbRef.current;
+    const replacedIds = new Set(current.orders.filter(order => scope === 'all' || order.order_type !== 'ONLINE').map(order => order.id));
+    const users = new Map(current.users.map(person => [person.id, person]));
+    const lines = current.order_items.filter(item => !replacedIds.has(item.order_id));
+    for (const raw of rows) {
+      for (const key of ['customer', 'cashier', 'shipper']) {
+        if (raw[key] && typeof raw[key] === 'object') {
+          const person = normalize('users', raw[key]) as DbState['users'][number];
+          const existing = users.get(person.id);
+          users.set(person.id, { ...person, ...existing, full_name: person.full_name, phone: person.phone,
+            total_points: raw[key].totalPoints ?? existing?.total_points ?? person.total_points });
+        }
+      }
+      (raw.items || []).forEach((item: RecordData, index: number) => {
+        const id = idFor('order_items', `${raw._id}:${index}`);
+        items.current.set(id, { order: raw._id, index });
+        lines.push({ id, order_id: idFor('orders', raw), product_id: idFor('products', item.product), product_name_at_time: item.productNameAtTime || '', unit_price: item.unitPrice || 0, quantity: item.quantity || 0, subtotal: item.subtotal || 0, customization: item.customization || null, is_prepared: !!item.isPrepared });
+      });
+    }
+    const next = { ...current, users: [...users.values()], orders: [...current.orders.filter(order => !replacedIds.has(order.id)), ...rows.map(row => normalize('orders', row) as Order)], order_items: lines,
+      payments: payments ? payments.map(payment => normalize('payments', payment) as DbState['payments'][number]) : current.payments };
+    dbRef.current = next; setDb(next);
+    setUnavailable(paths => paths.filter(path => path !== '/api/orders' && !(includePayments && path === '/api/payments')));
+  }, [user?.token, user?.role, user?.position, normalize, idFor]);
 
   const notify = (message: string) => { if (inFlight.current) deferredNotice.current = message; else setNotice(message); };
   const perform = (work: () => Promise<unknown>) => {
@@ -269,7 +304,7 @@ export function DbProvider({ children }: { children: ReactNode }) {
   };
   const sessionId = user ? idFor('users', user._id) : 0;
   const session = useMemo(() => ({ customerId: sessionId, cashierId: sessionId, baristaId: sessionId, shipperId: sessionId, adminId: sessionId }), [sessionId]);
-  return <Context.Provider value={{ db, session, loading, busy: pending > 0, revision, error, notice, unavailable, refresh, notify, rawId, idFor, setSession: () => {}, transact, placeOrder,
+  return <Context.Provider value={{ db, session, loading, busy: pending > 0, revision, error, notice, unavailable, refresh, refreshOrders, notify, rawId, idFor, setSession: () => {}, transact, placeOrder,
     setOrderStatus: (id, status, patch = {}) => { transact(tx => tx.update('orders', id, { ...patch, status })); },
     cancelOrder, saveDeliveryOrder, remitCod,
     adjustPoints: (id, delta) => { perform(async () => { await shopApi('/api/loyalty-transactions/adjust', { method: 'POST', token: user?.token, body: { customerId: rawId(id), points: delta, reason: 'Điều chỉnh điểm tại quầy' } }); }); },

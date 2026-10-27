@@ -12,9 +12,10 @@ export class ShopApiError extends Error {
   }
 }
 
-export async function shopApi<T>(path: string, options: { method?: string; token?: string; body?: unknown } = {}): Promise<T> {
+export async function shopApi<T>(path: string, options: { method?: string; token?: string; body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     method: options.method || 'GET',
+    signal: options.signal,
     headers: {
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
       ...(options.token ? { Authorization: `Bearer ${options.token}` } : {})

@@ -60,7 +60,7 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
     return matchStatus && matchType && matchSearch;
   });
 
-  const selected = counterOrders.find(o => o.id === selectedId) ?? filteredOrders[0];
+  const selected = filteredOrders.find(o => o.id === selectedId) ?? filteredOrders[0];
 
   const paidRevenue = counterOrders
     .filter(o => o.status !== 'CANCELLED' && paymentOf(db, o.id)?.status === 'SUCCESS')
@@ -118,8 +118,8 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-stone-100 p-1.5 rounded-2xl">
           <div className="px-3 py-1.5 bg-white rounded-xl shadow-2xs">
-            <span className="text-[10px] text-stone-500 block">Đã thu</span>
-            <span className="text-sm font-bold text-stone-900 font-mono">{fmtMoney(paidRevenue)}</span>
+            <span className="text-[10px] text-stone-500 block">{canEdit ? 'Đã thu' : 'Tổng đơn tại quầy'}</span>
+            <span className="text-sm font-bold text-stone-900 font-mono">{canEdit ? fmtMoney(paidRevenue) : counterOrders.length}</span>
           </div>
           <div className="px-3 py-1.5 bg-white rounded-xl shadow-2xs">
             <span className="text-[10px] text-stone-500 block">Đang pha chế</span>
@@ -136,13 +136,13 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
             <span className="text-sm font-bold text-rose-700 font-mono">{counterOrders.filter(o => o.status === 'CANCELLED').length} đơn</span>
           </div>
         </div>
-        <button
+        {canEdit && <button
           onClick={() => onNavigate('pos-create')}
           className="h-10 px-4 rounded-xl bg-primary hover:bg-primary-container text-white text-xs font-bold flex items-center gap-1.5 shadow-xs"
         >
           <span className="material-symbols-outlined text-[18px]">add_circle</span>
           <span>Tạo đơn mới</span>
-        </button>
+        </button>}
       </div>
 
       {/* Filters */}
@@ -347,7 +347,7 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
                   <span className="material-symbols-outlined text-[18px]">edit</span>Sửa đơn
                 </button>
               )}
-              {paymentOf(db, selected.id)?.status === 'PENDING' && isOpen(selected) && (
+              {canEdit && paymentOf(db, selected.id)?.status === 'PENDING' && isOpen(selected) && (
                 <button
                   onClick={() => handleCollectPayment(selected)}
                   className="py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold flex items-center justify-center gap-1.5 col-span-2"
@@ -356,7 +356,7 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
                   Thu tiền
                 </button>
               )}
-              {selected.status === 'READY' && (
+              {canEdit && selected.status === 'READY' && (
                 <button
                   onClick={() => handleComplete(selected)}
                   className="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center gap-1.5 col-span-2"
@@ -365,14 +365,14 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
                   Trả đồ cho khách
                 </button>
               )}
-              <button
+              {canEdit && <button
                 onClick={() => onOpenBill?.(selected.id)}
                 className="py-2.5 rounded-xl bg-white hover:bg-stone-50 text-stone-800 font-bold flex items-center justify-center gap-1.5 border border-stone-200"
               >
                 <span className="material-symbols-outlined text-[18px]">print</span>
                 Hóa đơn
-              </button>
-              {isOpen(selected) ? (
+              </button>}
+              {canEdit && (isOpen(selected) ? (
                 <button
                   onClick={() => handleCancel(selected)}
                   className="py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-medium flex items-center justify-center gap-1 border border-rose-200"
@@ -382,7 +382,8 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
                 </button>
               ) : (
                 <span className="py-2.5 text-center text-stone-400">Đơn đã đóng</span>
-              )}
+              ))}
+              {!canEdit && <button onClick={() => onNavigate('kds-terminal')} className="col-span-2 rounded-xl bg-primary py-2.5 font-bold text-white">Mở màn hình pha chế</button>}
             </div>
           </div>
         )}

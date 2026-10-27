@@ -8,7 +8,7 @@ import { createServer } from 'vite';
 const memory = new Map([['user', '{invalid json']]);
 globalThis.localStorage = { getItem: key => memory.get(key) ?? null, setItem: (key, value) => memory.set(key, value), removeItem: key => memory.delete(key) };
 globalThis.window = { localStorage: globalThis.localStorage };
-let vite, auth, cart, api, options, credentials, BillPage, InterfaceContext, App, SourceScreen, Header, CounterOrderEditor;
+let vite, auth, cart, api, options, credentials, BillPage, InterfaceContext, App, SourceScreen, Header, CounterOrderEditor, startOrderSync;
 const account = { _id: 'test-customer', fullName: 'Test Customer', phone: '0999999999', role: 'CUSTOMER', token: 'test-token' };
 const tables = ['users', 'work_schedules', 'categories', 'products', 'orders', 'order_items', 'payments', 'loyalty_transactions', 'customer_reviews', 'suppliers', 'ingredients', 'product_ingredients', 'purchase_orders', 'purchase_order_items', 'inventory_transactions', 'shop_settings'];
 const emptyDb = () => Object.fromEntries(tables.map(table => [table, []]));
@@ -26,6 +26,7 @@ before(async () => {
   SourceScreen = (await vite.ssrLoadModule('/src/interface/SourceScreen.tsx')).default;
   ({ Header } = await vite.ssrLoadModule('/src/components/Header.tsx'));
   CounterOrderEditor = (await vite.ssrLoadModule('/src/interface/pages/pos/CounterOrderEditor.tsx')).default;
+  ({ startOrderSync } = await vite.ssrLoadModule('/src/lib/orderSync.ts'));
 });
 after(async () => { await vite?.close(); });
 beforeEach(() => { cart.getState().clear(); });
@@ -194,5 +195,32 @@ test('Counter edit action is available only to eligible staff and unpaid unprepa
     db.order_items[0].is_prepared = false;
     initialState.user = { ...account, role: 'STAFF', position: 'BARISTA' };
     assert.doesNotMatch(screen(), /Sửa đơn/);
+    assert.doesNotMatch(screen(), />Thu tiền<|>Hủy đơn<|>Tạo đơn mới<|>Bàn giao ca</);
+    assert.match(screen(), /Mở màn hình pha chế/);
+    assert.doesNotMatch(renderWithDb(React.createElement(MemoryRouter, null, React.createElement(SourceScreen, { screen: 'pos-orders' })), db, { unavailable: ['/api/payments'] }), /Chưa tải được:/);
   } finally { initialState.user = previous; }
+});
+
+test('Order synchronization pauses, avoids overlapping requests, retries and aborts on cleanup', async () => {
+  let timer, wake, paused = false, unlistened = false, signal;
+  let requests = 0, finish;
+  const errors = [];
+  const stop = startOrderSync(async input => { requests++; signal = input; await new Promise(resolve => { finish = resolve; }); }, error => errors.push(error), {
+    paused: () => paused,
+    schedule: callback => { timer = callback; return 1; }, cancel() {},
+    listen: callback => { wake = callback; return () => { unlistened = true; }; },
+  });
+  paused = true; timer(); assert.equal(requests, 0);
+  paused = false; wake(); assert.equal(requests, 1);
+  wake(); assert.equal(requests, 1);
+  finish(); await new Promise(resolve => setImmediate(resolve)); assert.deepEqual(errors, ['']);
+  timer(); assert.equal(requests, 2); stop(); assert.equal(signal.aborted, true); assert.equal(unlistened, true);
+  finish(); await new Promise(resolve => setImmediate(resolve)); wake(); assert.equal(requests, 2);
+  let retry, count = 0;
+  const failures = [];
+  const stopRetry = startOrderSync(async () => { if (++count === 1) throw new Error('Offline'); }, error => failures.push(error), {
+    paused: () => false, schedule: callback => { retry = callback; return 1; }, cancel() {}, listen: () => () => {},
+  });
+  retry(); await new Promise(resolve => setImmediate(resolve)); assert.deepEqual(failures, ['Offline']);
+  retry(); await new Promise(resolve => setImmediate(resolve)); assert.deepEqual(failures, ['Offline', '']); stopRetry();
 });

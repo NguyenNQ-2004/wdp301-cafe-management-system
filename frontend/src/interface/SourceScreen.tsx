@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { startOrderSync } from '../lib/orderSync';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 import useCartStore from '../store/cartStore';
@@ -44,6 +45,22 @@ export default function SourceScreen({ screen }: { screen: PageRoute }) {
   const { db, rawId, idFor, notify } = store;
   const account = useAuthStore(state => state.user);
   const refresh = store.refresh;
+  const [syncError, setSyncError] = useState('');
+  const pauseSync = useRef(false);
+  pauseSync.current = store.busy || store.loading;
+  const refreshOrders = store.refreshOrders;
+  useEffect(() => {
+    if (!account?.token || !['pos-orders', 'kds-terminal'].includes(screen)) return;
+    setSyncError('');
+    return startOrderSync(signal => refreshOrders(screen === 'pos-orders' ? 'counter' : 'all', signal), setSyncError, {
+      paused: () => pauseSync.current || document.visibilityState === 'hidden' || !!document.querySelector('[role="dialog"]'),
+      schedule: (callback, delay) => setTimeout(callback, delay), cancel: clearTimeout,
+      listen: callback => {
+        document.addEventListener('visibilitychange', callback); window.addEventListener('focus', callback);
+        return () => { document.removeEventListener('visibilitychange', callback); window.removeEventListener('focus', callback); };
+      },
+    });
+  }, [screen, account?.token, refreshOrders]);
   useEffect(() => {
     // Checkout uses the existing API pages; reload their changes when returning.
     if (['orders', 'bill', 'pos-orders', 'kds-terminal', 'delivery-orders', 'delivery-report', 'delivery-cod'].includes(screen)) void refresh();
@@ -91,7 +108,7 @@ export default function SourceScreen({ screen }: { screen: PageRoute }) {
     profile: ['/api/auth/me', '/api/loyalty-transactions'],
     'admin-products': ['/api/products', '/api/categories'],
     'pos-create': ['/api/products', '/api/categories', '/api/users', '/api/users/customers'],
-    'pos-orders': ['/api/orders', '/api/payments'], 'kds-terminal': ['/api/orders'],
+    'pos-orders': account?.position === 'BARISTA' ? ['/api/orders'] : ['/api/orders', '/api/payments'], 'kds-terminal': ['/api/orders'],
     'delivery-orders': ['/api/orders'], 'delivery-report': ['/api/orders'],
     'delivery-cod': ['/api/orders', '/api/payments'], orders: ['/api/orders'],
     bill: ['/api/orders', '/api/payments', '/api/shop-settings'],
@@ -100,6 +117,8 @@ export default function SourceScreen({ screen }: { screen: PageRoute }) {
   if (store.loading) return <div className="grid min-h-[60vh] place-items-center"><p className="animate-pulse text-sm text-stone-500">Đang tải dữ liệu cửa hàng…</p></div>;
 
   return <div>
+    {syncError && ['pos-orders', 'kds-terminal'].includes(screen) && <p role="alert" className="mx-4 my-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Chưa cập nhật được đơn mới: {syncError}. Hệ thống sẽ tự thử lại; danh sách hiện tại có thể đã cũ.</p>}
+    {account?.position === 'BARISTA' && ['pos-orders', 'kds-terminal'].includes(screen) && <nav aria-label="Màn hình Barista" className="flex gap-4 border-b border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-primary"><Link to="/cashier/orders">Danh sách đơn tại quầy</Link><Link to="/barista">Pha chế</Link></nav>}
     {['pos-create', 'pos-orders', 'kds-terminal', 'delivery-orders', 'delivery-report', 'delivery-cod'].includes(screen) && <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-2 text-xs text-stone-600"><Link to="/" className="font-semibold text-primary">← Trang chủ Aura Café</Link><div className="flex items-center gap-4">{(account?.role === 'ADMIN' || ['CASHIER', 'MANAGER'].includes(account?.position || '')) && <Link to="/cashier/payments" className="font-semibold">Thanh toán tại quầy</Link>}{account?.role === 'STAFF' && <Link to="/my-schedule">Lịch làm của tôi</Link>}<span>{account?.fullName}</span><button onClick={() => { useAuthStore.getState().logout(); navigate('/'); }} className="font-semibold text-red-700">Đăng xuất</button></div></div>}
     {missing.length > 0 && <div role="alert" className="mx-4 my-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><span>Chưa tải được: {[...new Set(missing.map(path => DATA_LABELS[path] || 'dữ liệu cửa hàng'))].join(', ')}. Vui lòng thử lại.</span><button onClick={() => void store.refresh()} className="font-bold underline">Thử lại</button></div>}
     {store.error && <p role="alert" className="mx-4 my-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{store.error}</p>}
