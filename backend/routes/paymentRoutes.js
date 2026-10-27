@@ -5,6 +5,7 @@ const Payment = require('../models/Payment');
 const Order = require('../models/Order');
 const { protect } = require('../middlewares/authMiddleware');
 const { demoPaymentsEnabled } = require('../utils/paymentMode');
+const { withOrderMutation } = require('../utils/orderMutation');
 
 const router = express.Router();
 const canManageCounter = (user) => user.role === 'ADMIN' || (user.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user.position));
@@ -76,7 +77,7 @@ router.post('/:id/demo-confirm', async (req, res) => {
 });
 
 // UC13: nhân viên thu ngân xác nhận đã nhận tiền tại quầy.
-router.post('/:id/counter-confirm', async (req, res) => {
+router.post('/:id/counter-confirm', withOrderMutation(async (req, res) => {
   try {
     if (!canManageCounter(req.user)) return res.status(403).json({ message: 'Chỉ thu ngân hoặc quản lý được xác nhận thanh toán tại quầy.' });
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã giao dịch không hợp lệ.' });
@@ -107,6 +108,11 @@ router.post('/:id/counter-confirm', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-});
+}, async (req) => {
+  if (!mongoose.isValidObjectId(req.params.id)) throw Object.assign(new Error('Mã giao dịch không hợp lệ.'), { status: 400 });
+  const payment = await Payment.findById(req.params.id).select('order');
+  if (!payment) throw Object.assign(new Error('Không tìm thấy giao dịch.'), { status: 404 });
+  return payment.order;
+}));
 
 module.exports = router;

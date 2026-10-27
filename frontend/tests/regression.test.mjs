@@ -8,7 +8,7 @@ import { createServer } from 'vite';
 const memory = new Map([['user', '{invalid json']]);
 globalThis.localStorage = { getItem: key => memory.get(key) ?? null, setItem: (key, value) => memory.set(key, value), removeItem: key => memory.delete(key) };
 globalThis.window = { localStorage: globalThis.localStorage };
-let vite, auth, cart, api, options, credentials, BillPage, InterfaceContext, App, SourceScreen, Header;
+let vite, auth, cart, api, options, credentials, BillPage, InterfaceContext, App, SourceScreen, Header, CounterOrderEditor;
 const account = { _id: 'test-customer', fullName: 'Test Customer', phone: '0999999999', role: 'CUSTOMER', token: 'test-token' };
 const tables = ['users', 'work_schedules', 'categories', 'products', 'orders', 'order_items', 'payments', 'loyalty_transactions', 'customer_reviews', 'suppliers', 'ingredients', 'product_ingredients', 'purchase_orders', 'purchase_order_items', 'inventory_transactions', 'shop_settings'];
 const emptyDb = () => Object.fromEntries(tables.map(table => [table, []]));
@@ -25,6 +25,7 @@ before(async () => {
   App = (await vite.ssrLoadModule('/src/ConnectedApp.tsx')).default;
   SourceScreen = (await vite.ssrLoadModule('/src/interface/SourceScreen.tsx')).default;
   ({ Header } = await vite.ssrLoadModule('/src/components/Header.tsx'));
+  CounterOrderEditor = (await vite.ssrLoadModule('/src/interface/pages/pos/CounterOrderEditor.tsx')).default;
 });
 after(async () => { await vite?.close(); });
 beforeEach(() => { cart.getState().clear(); });
@@ -161,4 +162,37 @@ test('Unrelated endpoint failures do not show an error on the menu', () => {
 test('Successful data loads do not show a warning', () => {
   const screen = React.createElement(MemoryRouter, null, React.createElement(SourceScreen, { screen: 'home' }));
   assert.doesNotMatch(renderWithDb(screen, emptyDb()), /Chưa tải được:/);
+});
+
+test('Counter editor renders persisted items, table and note in an accessible dialog', () => {
+  const db = emptyDb();
+  const order = { ...sampleOrder, order_type: 'DINE_IN', table_number: 'T07', order_note: 'Keep this note', update_token: '2026-10-27T03:00:00.123Z' };
+  db.orders = [order];
+  db.products = [{ id: 5, name: 'Test Coffee', base_price: 30000, is_available: true, variants_config: { sizes: { M: 0, L: 10000 } } }];
+  db.order_items = [{ id: 8, order_id: 1, product_id: 5, product_name_at_time: 'Test Coffee', quantity: 2, customization: { size: 'L' } }];
+  const html = renderWithDb(React.createElement(CounterOrderEditor, { order, onClose() {} }), db);
+  assert.match(html, /role="dialog"/); assert.match(html, /aria-modal="true"/);
+  assert.match(html, /value="T07"/); assert.match(html, /Keep this note/);
+  assert.match(html, /<option selected="">L<\/option>/); assert.match(html, /value="2"/);
+  assert.match(html, /Lưu thay đổi/);
+});
+
+test('Counter edit action is available only to eligible staff and unpaid unprepared orders', () => {
+  const db = emptyDb(); db.orders = [{ ...sampleOrder, status: 'PREPARING' }];
+  db.payments = [{ id: 2, order_id: 1, status: 'PENDING', payment_method: 'CASH', amount: 30000 }];
+  db.order_items = [{ id: 3, order_id: 1, product_id: 5, product_name_at_time: 'Coffee', quantity: 1, is_prepared: false }];
+  const screen = () => renderWithDb(React.createElement(MemoryRouter, null, React.createElement(SourceScreen, { screen: 'pos-orders' })), db);
+  const initialState = auth.getInitialState();
+  const previous = initialState.user;
+  // SSR normally reads Zustand's startup snapshot rather than browser login state.
+  try {
+    initialState.user = { ...account, role: 'STAFF', position: 'CASHIER' };
+    assert.match(screen(), /Sửa đơn/);
+    db.payments[0].status = 'SUCCESS'; assert.doesNotMatch(screen(), /Sửa đơn/);
+    db.payments[0].status = 'PENDING'; db.order_items[0].is_prepared = true;
+    assert.doesNotMatch(screen(), /Sửa đơn/);
+    db.order_items[0].is_prepared = false;
+    initialState.user = { ...account, role: 'STAFF', position: 'BARISTA' };
+    assert.doesNotMatch(screen(), /Sửa đơn/);
+  } finally { initialState.user = previous; }
 });

@@ -81,6 +81,7 @@ export function DbProvider({ children }: { children: ReactNode }) {
   const normalize = useCallback((table: string, raw: RecordData): RecordData => {
     const row: RecordData = Object.fromEntries(Object.entries(raw).map(([key, value]) => [snake(key), value]));
     row.id = idFor(table, raw);
+    if (table === 'orders') row.update_token = raw.updatedAt;
     for (const key of ['created_at', 'updated_at', 'paid_at', 'check_in_time', 'check_out_time']) row[key] = sqlDate(row[key]);
     if (table === 'users') Object.assign(row, { full_name: raw.fullName || raw.full_name || '', phone: raw.phone || '', email: raw.email || null, birthday: raw.birthday?.slice(0, 10) || null, address: raw.address || null, password_hash: '', role: raw.role || 'CUSTOMER', status: raw.status || 'ACTIVE', position: raw.position || null, base_salary: raw.baseSalary || 0, hire_date: raw.hireDate?.slice(0, 10) || null, total_points: raw.totalPoints || 0 });
     if (table === 'categories') Object.assign(row, { status: raw.status || 'ACTIVE', image_url: raw.image_url || raw.imageUrl || null, description: raw.description || null, icon: raw.icon || null });

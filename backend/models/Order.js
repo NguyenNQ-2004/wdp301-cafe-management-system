@@ -10,6 +10,7 @@ const orderItemSchema = new mongoose.Schema({
 }, { _id: false });
 
 const orderSchema = new mongoose.Schema({
+  mutationLock: { type: String, select: false },
   orderCode: { type: String, required: true, unique: true },
   customer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   cashier: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
