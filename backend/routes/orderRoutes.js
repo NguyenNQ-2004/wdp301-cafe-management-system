@@ -484,7 +484,7 @@ router.put('/:id/counter', adminOrCashier, withOrderMutation(async (req, res) =>
   try {
     const body = req.body;
     if (!body || Array.isArray(body) || typeof body !== 'object'
-      || Object.keys(body).some(key => !['items', 'tableNumber', 'orderNote', 'expectedUpdatedAt'].includes(key))) {
+      || Object.keys(body).some(key => !['items', 'tableNumber', 'orderNote', 'expectedUpdatedAt', 'expectedTotal'].includes(key))) {
       throw orderError('Dữ liệu cập nhật đơn không hợp lệ.');
     }
     const order = await Order.findById(req.params.id);
@@ -504,18 +504,22 @@ router.put('/:id/counter', adminOrCashier, withOrderMutation(async (req, res) =>
       || (order.orderType === 'DINE_IN' && !body.tableNumber.trim())) throw orderError('Số bàn phải có từ 1 đến 20 ký tự cho đơn tại quán.');
     if (typeof body.orderNote !== 'string' || body.orderNote.trim().length > 500) throw orderError('Ghi chú phải có tối đa 500 ký tự.');
     let normalized;
-    try { normalized = await normalizeCartItems(body.items); }
+    // Legacy callers must not accidentally erase item options they did not send.
+    if (order.items.some(item => Object.keys(item.customization || {}).some(key => key !== 'size'))
+      && Array.isArray(body.items) && body.items.some(item => !item?.customization)) {
+      throw orderError('Vui lòng tải lại màn hình và gửi đầy đủ tùy chọn từng món khi sửa đơn.');
+    }
+    try { normalized = await normalizeCounterItems(body.items); }
     catch (error) { throw orderError(error.message); }
     if (!normalized.length) throw orderError('Đơn phải có ít nhất một món.');
-    if (order.items.some(item => item.customization?.topping?.length)) throw orderError('Chưa hỗ trợ sửa đơn có topping.', 409);
-    const items = normalized.map(({ product, quantity, size, unitPrice }) => {
-      const candidates = order.items.filter(item => String(item.product) === String(product._id));
-      const previous = candidates.find(item => (item.customization?.size || 'M') === size) || (candidates.length === 1 ? candidates[0] : undefined);
+    const items = normalized.map(({ product, quantity, customization, unitPrice }) => {
       return { product: product._id, productNameAtTime: product.name, quantity, unitPrice,
-        subtotal: quantity * unitPrice, customization: { ...(previous?.customization || {}), size }, isPrepared: false };
+        subtotal: quantity * unitPrice, customization, isPrepared: false };
     });
     const totalAmount = items.reduce((sum, item) => sum + item.subtotal, 0);
     if (totalAmount < order.discountAmount) throw orderError('Tổng tiền món không được nhỏ hơn số tiền giảm giá.');
+    const finalAmount = totalAmount + order.deliveryFee - order.discountAmount;
+    if (body.expectedTotal !== undefined && (!Number.isSafeInteger(body.expectedTotal) || body.expectedTotal !== finalAmount)) throw orderError('Giá món hoặc topping đã thay đổi. Vui lòng tải lại thực đơn trước khi lưu.', 409);
     original = order.toObject();
     originalItems = await OrderItem.find({ order: order._id }).lean();
     payment = payments[0];

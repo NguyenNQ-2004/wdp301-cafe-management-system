@@ -7,9 +7,9 @@ The team's existing `src/pages/pos/PosOrdersPage.tsx` is already integrated unde
 
 ## User flow
 
-Open `/cashier/orders`, select an eligible order, choose **Sửa đơn**, change products/sizes/quantities, table and note, then **Lưu thay đổi**. The order, item snapshots and pending payment are updated using server catalog prices. Existing item options are retained when matching product/size (also when a product has a single original line and its size changes).
+Open `/cashier/orders`, select an eligible order, choose **Sửa đơn**, change products/sizes/quantities, table and note, then **Lưu thay đổi**. The `feature/counter-order-customization` extension also edits sugar, ice, toppings and item notes while preserving independent lines of the same product/size. The order, item snapshots and pending payment use server catalog prices.
 
-The action is available to ADMIN and STAFF with CASHIER or MANAGER position. Only DINE_IN/TAKEAWAY orders in PENDING/CONFIRMED/PREPARING with no item marked prepared and one matching PENDING payment can be edited. This permits existing DINE_IN creation, which starts in PREPARING before any item is marked prepared. READY, completed, cancelled and paid orders are rejected. Orders using reward/voucher redemption or toppings require separate business support and are rejected.
+The action is available to ADMIN and STAFF with CASHIER or MANAGER position. Only DINE_IN/TAKEAWAY orders in PENDING/CONFIRMED/PREPARING with no item marked prepared and one matching PENDING payment can be edited. This permits existing DINE_IN creation, which starts in PREPARING before any item is marked prepared. READY, completed, cancelled and paid orders are rejected. Orders using reward/voucher redemption still require separate business support. Topped orders are supported by the customization extension.
 
 ## Endpoint
 
@@ -24,7 +24,7 @@ The action is available to ADMIN and STAFF with CASHIER or MANAGER position. Onl
 }
 ```
 
-Use the exact `updatedAt` from GET `/api/orders` as `expectedUpdatedAt`. The client adapter preserves this as `update_token`, independently of formatted dates. Successful response is `{ message, order }`. Reload order data after success. Empty/duplicate lines, invalid quantities/sizes and client-supplied totals are rejected. A stale version returns 409; reload the list and reopen the editor.
+Use the exact `updatedAt` from GET `/api/orders` as `expectedUpdatedAt`. The client adapter preserves this as `update_token`, independently of formatted dates. Successful response is `{ message, order }`. Reload order data after success. Empty lines and invalid quantities/sizes/options are rejected. Duplicate product/size lines are preserved independently. The editor sends full `customization` per line and `expectedTotal` to detect price changes. Legacy callers cannot omit customization when existing options would be lost. Stale order versions or price quotes return 409.
 
 ## Consistency and recovery
 

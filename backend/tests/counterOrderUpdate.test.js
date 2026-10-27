@@ -57,7 +57,7 @@ test('Counter order editing persists totals and rejects unsafe or stale mutation
     assert.equal((await request('PUT', '/api/orders/invalid/counter', update)).status, 400);
   });
   await t.test('Invalid lines, empty tables and forged totals leave the order unchanged', async () => {
-    for (const patch of [{ items: [] }, { tableNumber: ' ' }, { finalAmount: 1 }, { items: [{ productId: String(coffee._id), quantity: 0 }] }, { items: [update.items[0], update.items[0]] }]) {
+    for (const patch of [{ items: [] }, { tableNumber: ' ' }, { finalAmount: 1 }, { items: [{ productId: String(coffee._id), quantity: 0 }] }, { items: [{ ...update.items[0], customization: { sugar: 'invalid' } }] }]) {
       assert.equal((await request('PUT', path, { ...update, ...patch })).status, 400);
     }
     assert.equal((await Order.findById(order._id)).finalAmount, 30000);

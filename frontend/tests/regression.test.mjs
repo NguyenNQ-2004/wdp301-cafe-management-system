@@ -171,13 +171,16 @@ test('Counter editor renders persisted items, table and note in an accessible di
   const db = emptyDb();
   const order = { ...sampleOrder, order_type: 'DINE_IN', table_number: 'T07', order_note: 'Keep this note', update_token: '2026-10-27T03:00:00.123Z' };
   db.orders = [order];
-  db.products = [{ id: 5, name: 'Test Coffee', base_price: 30000, is_available: true, variants_config: { sizes: { M: 0, L: 10000 } } }];
-  db.order_items = [{ id: 8, order_id: 1, product_id: 5, product_name_at_time: 'Test Coffee', quantity: 2, customization: { size: 'L' } }];
+  db.products = [{ id: 5, name: 'Test Coffee', base_price: 30000, is_available: true, variants_config: { sizes: { M: 0, L: 10000 }, toppings: [{ name: 'Pearl', price: 5000 }] } }];
+  db.order_items = [{ id: 8, order_id: 1, product_id: 5, product_name_at_time: 'Test Coffee', quantity: 2, customization: { size: 'L', sugar: '30%', ice: 'Ít đá', topping: ['Pearl'], note: 'Keep item note' } }];
   const html = renderWithDb(React.createElement(CounterOrderEditor, { order, onClose() {} }), db);
   assert.match(html, /role="dialog"/); assert.match(html, /aria-modal="true"/);
   assert.match(html, /value="T07"/); assert.match(html, /Keep this note/);
   assert.match(html, /<option selected="">L<\/option>/); assert.match(html, /value="2"/);
   assert.match(html, /Lưu thay đổi/);
+  assert.match(html, /<option selected="">30%<\/option>/); assert.match(html, /<option selected="">Ít đá<\/option>/);
+  assert.match(html, /type="checkbox" checked=""/); assert.match(html, /value="Keep item note"/);
+  assert.match(html, /90\.000/);
 });
 
 test('Counter edit action is available only to eligible staff and unpaid unprepared orders', () => {

@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "test:counter-customization": "node --test tests/counterCustomization.test.js",
     "test:counter-creation": "node --test tests/counterCreation.test.js",
     "test:counter-processing": "node --test tests/counterProcessing.test.js",
     "test:counter-cancellation": "node --test tests/counterCancellation.test.js",
