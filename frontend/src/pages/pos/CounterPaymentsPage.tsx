@@ -84,6 +84,7 @@ export default function CounterPaymentsPage() {
   return <div className="min-h-[calc(100vh-5rem)] bg-[#fafafa] px-5 py-10">
     <div className="mx-auto max-w-5xl">
       <button onClick={() => navigate('/cashier')} className="text-sm font-semibold text-primary">← Về trang thu ngân</button>
+      <button onClick={() => navigate('/cashier/orders')} className="ml-5 text-sm font-semibold text-primary">Danh sách đơn tại quầy</button>
       <h1 className="mt-4 text-3xl font-bold text-slate-950">Thanh toán tại quầy</h1>
       <p className="mt-2 text-slate-600">Chỉ xác nhận sau khi đã nhận tiền mặt hoặc kiểm tra giao dịch trong tài khoản/ứng dụng nhận tiền. Chuyển khoản, MoMo và VNPay tại đây do thu ngân đối soát thủ công.</p>
       {error && <p role="alert" className="mt-5 rounded-lg bg-red-50 p-4 text-red-700">{error}</p>}

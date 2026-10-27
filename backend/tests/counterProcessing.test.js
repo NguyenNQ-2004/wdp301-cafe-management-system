@@ -1,0 +1,61 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { randomBytes } = require('crypto');
+const express = require('express');
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+require('dotenv').config({ quiet: true });
+process.env.JWT_SECRET = 'counter-processing-test';
+const User = require('../models/User');
+const Category = require('../models/Category');
+const Product = require('../models/Product');
+const Order = require('../models/Order');
+const OrderItem = require('../models/OrderItem');
+const Payment = require('../models/Payment');
+const LoyaltyTransaction = require('../models/LoyaltyTransaction');
+
+test('Real counter flow: email login, creation, confirmation, preparation, payment and handoff', async t => {
+  await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/aura_cafe_erp', { dbName: `cafe_counter_processing_test_${randomBytes(6).toString('hex')}`, serverSelectionTimeoutMS: 5000 });
+  const app = express(); app.use(express.json());
+  app.use('/api/auth', require('../routes/authRoutes')); app.use('/api/orders', require('../routes/orderRoutes')); app.use('/api/payments', require('../routes/paymentRoutes'));
+  const server = await new Promise(resolve => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
+  t.after(async () => {
+    server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
+    assert.match(mongoose.connection.db.databaseName, /^cafe_counter_processing_test_[a-f0-9]{12}$/);
+    await mongoose.connection.dropDatabase(); await mongoose.disconnect();
+  });
+  const request = async (method, path, body, token) => {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}${path}`, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    return { status: response.status, data: await response.json() };
+  };
+  const password = 'counter-test-password';
+  const passwordHash = await bcrypt.hash(password, 4);
+  const cashier = await User.create({ fullName: 'Cashier', email: 'cashier@test.invalid', phone: '0999666001', passwordHash, role: 'STAFF', position: 'CASHIER' });
+  const barista = await User.create({ fullName: 'Barista', email: 'barista@test.invalid', phone: '0999666002', passwordHash, role: 'STAFF', position: 'BARISTA' });
+  const customer = await User.create({ fullName: 'Customer', email: 'customer@test.invalid', phone: '0999666003', passwordHash, role: 'CUSTOMER' });
+  const cashierLogin = await request('POST', '/api/auth/login', { email: cashier.email, password });
+  const baristaLogin = await request('POST', '/api/auth/login', { email: barista.email, password });
+  assert.equal(cashierLogin.status, 200); assert.equal(baristaLogin.status, 200);
+  const cashierToken = cashierLogin.data.token, baristaToken = baristaLogin.data.token;
+  const category = await Category.create({ name: 'Coffee' });
+  const product = await Product.create({ name: 'Coffee', category: category._id, basePrice: 30000, isAvailable: true });
+  const created = await request('POST', '/api/orders', { orderType: 'TAKEAWAY', customerId: String(customer._id), finalAmount: 1,
+    items: [{ productId: String(product._id), size: 'M', quantity: 2 }] }, cashierToken);
+  assert.equal(created.status, 201); assert.equal(created.data.finalAmount, 60000); assert.equal(created.data.status, 'PENDING');
+  const id = created.data._id;
+  assert.equal(await OrderItem.countDocuments({ order: id }), 1);
+  assert.ok((await request('GET', '/api/orders/counter', null, baristaToken)).data.some(order => order._id === id));
+  assert.equal((await request('PUT', `/api/orders/${id}/status`, { status: 'CONFIRMED' }, cashierToken)).status, 200);
+  assert.equal((await request('PUT', `/api/orders/${id}/status`, { status: 'PREPARING' }, baristaToken)).status, 200);
+  assert.equal((await request('PUT', `/api/orders/${id}/items/0/prepared`, { isPrepared: true }, baristaToken)).status, 200);
+  assert.equal((await Order.findById(id)).status, 'READY');
+  assert.equal((await request('PUT', `/api/orders/${id}/status`, { status: 'COMPLETED' }, cashierToken)).status, 409);
+  const payment = await Payment.findOne({ order: id });
+  assert.equal((await request('POST', `/api/payments/${payment._id}/counter-confirm`, { paymentMethod: 'CASH' }, baristaToken)).status, 403);
+  assert.equal((await request('POST', `/api/payments/${payment._id}/counter-confirm`, { paymentMethod: 'CASH' }, cashierToken)).status, 200);
+  assert.equal((await request('PUT', `/api/orders/${id}/status`, { status: 'COMPLETED' }, cashierToken)).status, 200);
+  assert.equal((await request('PUT', `/api/orders/${id}/status`, { status: 'COMPLETED' }, cashierToken)).status, 200);
+  assert.equal((await Order.findById(id)).status, 'COMPLETED');
+  assert.equal((await User.findById(customer._id)).totalPoints, 60);
+  assert.equal(await LoyaltyTransaction.countDocuments({ order: id, transactionType: 'EARN' }), 1);
+});

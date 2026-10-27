@@ -379,6 +379,12 @@ router.put('/:id/status', withOrderMutation(async (req, res) => {
       }
     }
 
+    if (status === 'COMPLETED' && ['DINE_IN', 'TAKEAWAY'].includes(order.orderType)) {
+      const payments = await Payment.find({ order: order._id });
+      if (payments.length !== 1 || payments[0].status !== 'SUCCESS' || payments[0].amount !== order.finalAmount) {
+        return res.status(409).json({ message: 'Cần xác nhận đã nhận đủ tiền trước khi trả đồ cho khách.' });
+      }
+    }
     if (status === 'CANCELLED' && ['DINE_IN', 'TAKEAWAY'].includes(order.orderType)) {
       await cancelCounterOrder(order, cancelReason, res);
       return res.json({ message: 'Đã hủy đơn tại quầy.', order });

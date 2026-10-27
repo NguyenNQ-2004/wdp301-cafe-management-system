@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { PageRoute, Order, OrderStatus } from '../../types';
 import { PosHeader } from './PosHeader';
 import CounterOrderEditor from './CounterOrderEditor';
@@ -16,7 +17,6 @@ import {
   fmtDateTime,
   fmtMoney,
   fmtTime,
-  nowSql,
   orderCustomerName,
   orderItemsOf,
   paymentOf,
@@ -32,7 +32,8 @@ interface PosOrdersPageProps {
 type StatusFilter = 'all' | OrderStatus;
 
 export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShowToast, onOpenBill }) => {
-  const { db, transact, setOrderStatus } = useDb();
+  const { db, processCounterOrder, rawId } = useDb();
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'DINE_IN' | 'TAKEAWAY'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,21 +69,19 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
     .filter(o => o.status !== 'CANCELLED' && paymentOf(db, o.id)?.status === 'SUCCESS')
     .reduce((s, o) => s + o.final_amount, 0);
 
-  const handleComplete = (o: Order) => {
+  const handleComplete = async (o: Order) => {
     const pay = paymentOf(db, o.id);
-    if (pay && pay.status !== 'SUCCESS') {
+    if (!pay || pay.status !== 'SUCCESS') {
       onShowToast?.(`Đơn ${o.order_code} chưa thanh toán. Hãy thu tiền trước khi trả đồ.`);
       return;
     }
-    setOrderStatus(o.id, 'COMPLETED');
-    onShowToast?.(`Đã trả đồ cho đơn ${o.order_code}.`);
+    if (await processCounterOrder(o.id, 'COMPLETED')) onShowToast?.(`Đã trả đồ cho đơn ${o.order_code}.`);
   };
 
   const handleCollectPayment = (o: Order) => {
     const pay = paymentOf(db, o.id);
     if (!pay) return;
-    transact(tx => tx.update('payments', pay.id, { status: 'SUCCESS', paid_at: nowSql() }));
-    onShowToast?.(`Đã thu ${fmtMoney(pay.amount)} cho đơn ${o.order_code}.`);
+    navigate(`/cashier/payments?orderId=${encodeURIComponent(rawId(o.id))}&method=${encodeURIComponent(pay.payment_method)}`);
   };
 
   const statusTabs: { id: StatusFilter; label: string }[] = [
@@ -337,6 +336,9 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
             })()}
 
             <div className="p-4 bg-stone-100 border-t border-stone-200 grid grid-cols-2 gap-2 text-xs">
+              {canEdit && selected.status === 'PENDING' && <button onClick={async () => {
+                if (await processCounterOrder(selected.id, 'CONFIRMED')) onShowToast?.(`Đã xác nhận đơn ${selected.order_code}.`);
+              }} className="col-span-2 rounded-xl bg-primary py-2.5 font-bold text-white">Xác nhận đơn</button>}
               {canEdit && ['PENDING', 'CONFIRMED', 'PREPARING'].includes(selected.status) && paymentOf(db, selected.id)?.status === 'PENDING' && !orderItemsOf(db, selected.id).some(item => item.is_prepared) && (
                 <button onClick={() => setEditingId(selected.id)} className="col-span-2 flex items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-white py-2.5 font-bold text-primary hover:bg-stone-50">
                   <span className="material-symbols-outlined text-[18px]">edit</span>Sửa đơn
