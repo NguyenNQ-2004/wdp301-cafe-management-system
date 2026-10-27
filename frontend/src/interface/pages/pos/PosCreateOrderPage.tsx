@@ -14,7 +14,6 @@ import {
   getSettingNumber,
   initials,
   maxRedeemPoints,
-  nowSql,
   pointsToMoney,
   productSizes,
   productToppings
@@ -39,7 +38,8 @@ const METHODS: PaymentMethod[] = ['CASH', 'BANK_TRANSFER', 'VNPAY', 'MOMO'];
 
 export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNavigate, onShowToast }) => {
   const navigate = useNavigate();
-  const { db, session, placeOrder, transact, rawId } = useDb();
+  const { db, session, placeOrder, createCounterCustomer, rawId } = useDb();
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [activeCategory, setActiveCategory] = useState<number | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -98,6 +98,7 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
 
   const handleConfirmAddToCart = () => {
     if (!selectedProduct) return;
+    if (cartItems.length >= 50) { onShowToast?.('Mỗi đơn có tối đa 50 dòng món.'); return; }
     const bakery = isBakery(selectedProduct);
     const customization: OrderCustomization = {
       size: modalSize,
@@ -120,7 +121,7 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
   };
 
   const handleUpdateQty = (id: string, delta: number) =>
-    setCartItems(prev => prev.map(i => (i.id === id ? { ...i, quantity: i.quantity + delta } : i)).filter(i => i.quantity > 0));
+    setCartItems(prev => prev.map(i => (i.id === id ? { ...i, quantity: Math.min(99, i.quantity + delta) } : i)).filter(i => i.quantity > 0));
 
   const handleLookup = () => {
     const phone = phoneQuery.replace(/\s/g, '');
@@ -135,32 +136,22 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
     }
   };
 
-  const handleRegisterNewCust = (e: React.FormEvent) => {
+  const handleRegisterNewCust = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (creatingCustomer) return;
     if (db.users.some(u => u.phone === newCustForm.phone.trim())) {
       onShowToast?.('Số điện thoại đã tồn tại trong hệ thống.');
       return;
     }
-    const created = transact(tx =>
-      tx.insert('users', {
-        full_name: newCustForm.full_name.trim(),
-        phone: newCustForm.phone.trim(),
-        email: null,
-        password_hash: 'pos_created',
-        birthday: newCustForm.birthday || null,
-        address: null,
-        role: 'CUSTOMER',
-        status: 'ACTIVE',
-        position: null,
-        base_salary: 0,
-        hire_date: null,
-        total_points: 0,
-        created_at: nowSql()
-      })
-    );
-    setCustomerId(created.id);
-    setIsNewCustModalOpen(false);
-    onShowToast?.(`Đã tạo tài khoản khách hàng cho ${created.full_name}.`);
+    const phone = newCustForm.phone.replace(/\s+/g, '');
+    if (!newCustForm.full_name.trim() || !/^\+?[0-9]{9,15}$/.test(phone)) { onShowToast?.('Nhập họ tên và số điện thoại liên hệ hợp lệ.'); return; }
+    setCreatingCustomer(true);
+    try {
+      const created = await createCounterCustomer({ fullName: newCustForm.full_name.trim(), phone, birthday: newCustForm.birthday || undefined });
+      setCustomerId(created.id); setIsNewCustModalOpen(false);
+      onShowToast?.(`Đã tạo khách hàng ${created.full_name} và gắn vào đơn.`);
+    } catch (error) { onShowToast?.((error as Error).message); }
+    finally { setCreatingCustomer(false); }
   };
 
   const handleCheckout = async () => {
@@ -318,10 +309,11 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
                   </button>
                 </div>
                 <div className="pt-2 border-t border-stone-200/60 flex items-center justify-between gap-2 text-xs">
-                  <span className="text-stone-600">Đổi điểm (tối đa {maxPoints}):</span>
+                  <span className="text-stone-600">Đổi điểm tại quầy chưa khả dụng</span>
                   <div className="flex items-center gap-1.5">
                     <input
                       type="number"
+                      disabled
                       min={0}
                       max={maxPoints}
                       step={getSettingNumber(db, 'points_step', 10)}
@@ -433,6 +425,7 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
 
             <textarea
               rows={2}
+              maxLength={500}
               value={orderNote}
               onChange={e => setOrderNote(e.target.value)}
               placeholder="Ghi chú đơn hàng (orders.order_note)..."
@@ -607,6 +600,7 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
 
             <input
               value={modalNote}
+              maxLength={300}
               onChange={e => setModalNote(e.target.value)}
               placeholder="Ghi chú cho barista..."
               className="w-full h-10 px-3 rounded-xl border border-stone-300 text-xs"
@@ -616,7 +610,7 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
               <div className="flex items-center gap-2 bg-stone-100 rounded-xl p-1 border border-stone-200">
                 <button type="button" onClick={() => setModalQty(Math.max(1, modalQty - 1))} className="w-8 h-8 rounded-lg bg-white font-bold text-stone-800">-</button>
                 <span className="w-8 text-center font-mono font-bold text-sm">{modalQty}</span>
-                <button type="button" onClick={() => setModalQty(modalQty + 1)} className="w-8 h-8 rounded-lg bg-white font-bold text-stone-800">+</button>
+                <button type="button" onClick={() => setModalQty(Math.min(99, modalQty + 1))} className="w-8 h-8 rounded-lg bg-white font-bold text-stone-800">+</button>
               </div>
               <button
                 type="button"
@@ -678,8 +672,8 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
                 <button type="button" onClick={() => setIsNewCustModalOpen(false)} className="px-4 py-2 rounded-xl text-stone-600 font-semibold">
                   Bỏ qua
                 </button>
-                <button type="submit" className="px-5 py-2 rounded-xl bg-primary text-white font-bold shadow-xs hover:bg-primary-container">
-                  Lưu & Gắn vào đơn
+                <button type="submit" disabled={creatingCustomer} className="px-5 py-2 rounded-xl bg-primary text-white font-bold shadow-xs hover:bg-primary-container disabled:opacity-50">
+                  {creatingCustomer ? 'Đang lưu…' : 'Lưu & Gắn vào đơn'}
                 </button>
               </div>
             </form>

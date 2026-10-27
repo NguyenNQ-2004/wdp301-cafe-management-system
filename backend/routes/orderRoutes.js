@@ -10,6 +10,7 @@ const Cart = require('../models/Cart');
 const RewardItem = require('../models/RewardItem');
 const { protect } = require('../middlewares/authMiddleware');
 const { normalizeCartItems } = require('../utils/cartItems');
+const { normalizeCounterItems } = require('../utils/counterItems');
 const { demoPaymentsEnabled } = require('../utils/paymentMode');
 const { withOrderMutation } = require('../utils/orderMutation');
 const { cancelCounterOrder } = require('../utils/cancelCounterOrder');
@@ -110,8 +111,10 @@ router.post('/', async (req, res) => {
     const isStaffOrAdmin = ['ADMIN', 'STAFF'].includes(req.user.role);
 
     // Chuẩn hóa danh sách món
+    const counterStaff = isStaffOrAdmin && ['DINE_IN', 'TAKEAWAY'].includes(orderType);
+    if (counterStaff && req.user.role !== 'ADMIN' && !['CASHIER', 'MANAGER'].includes(req.user.position)) throw orderError('Chỉ thu ngân hoặc quản lý được tạo đơn tại quầy.', 403);
     let items;
-    try { items = await normalizeCartItems(rawItems); }
+    try { items = await (counterStaff ? normalizeCounterItems(rawItems) : normalizeCartItems(rawItems)); }
     catch (error) { throw orderError(error.message); }
     if (!items.length) throw orderError('Vui lòng chọn ít nhất một món.');
     if (!['DINE_IN', 'TAKEAWAY', 'ONLINE'].includes(orderType)) {
@@ -128,6 +131,10 @@ router.post('/', async (req, res) => {
     if (orderType === 'ONLINE' && (finalDeliveryAddress.length < 5 || finalDeliveryAddress.length > 300)) throw orderError('Địa chỉ giao hàng phải từ 5 đến 300 ký tự.');
     if (orderNote != null && (typeof orderNote !== 'string' || orderNote.length > 500)) throw orderError('Ghi chú không hợp lệ.');
     if (tableNumber != null && (typeof tableNumber !== 'string' || tableNumber.length > 20)) throw orderError('Số bàn không hợp lệ.');
+    if (orderType === 'DINE_IN' && (typeof tableNumber !== 'string' || !tableNumber.trim())) throw orderError('Vui lòng nhập số bàn cho đơn tại quán.');
+    if (counterStaff && req.body.customerId != null) {
+      if (!mongoose.isValidObjectId(req.body.customerId) || !await User.exists({ _id: req.body.customerId, role: 'CUSTOMER', status: 'ACTIVE' })) throw orderError('Khách hàng không tồn tại hoặc không hoạt động.');
+    }
     const finalPaymentMethod = isStaffOrAdmin
       ? (paymentMethod || (orderType === 'ONLINE' ? 'COD' : 'CASH'))
       : (orderType === 'ONLINE' ? (paymentMethod === 'DEMO_ONLINE' ? 'DEMO_ONLINE' : 'COD') : 'PAY_AT_COUNTER');
@@ -154,6 +161,7 @@ router.post('/', async (req, res) => {
     }
     const deliveryFee = orderType === 'ONLINE' && totalAmount < 150000 ? 18000 : 0;
     const finalAmount = totalAmount + deliveryFee - discountAmount;
+    if (counterStaff && req.body.expectedTotal !== undefined && (!Number.isInteger(req.body.expectedTotal) || req.body.expectedTotal !== finalAmount)) throw orderError('Giá món đã thay đổi. Vui lòng kiểm tra lại đơn trước khi tạo.', 409);
     if (req.user.role === 'CUSTOMER' && (!Number.isInteger(req.body.expectedTotal) || req.body.expectedTotal !== finalAmount)) return res.status(409).json({ message: 'Giá món, ưu đãi điểm hoặc phí giao hàng đã thay đổi. Vui lòng kiểm tra lại giỏ hàng trước khi đặt.', finalAmount });
     if (reward) {
       const customer = await User.findOneAndUpdate({ _id: req.user._id, role: 'CUSTOMER', totalPoints: { $gte: reward.pointsCost } }, { $inc: { totalPoints: -reward.pointsCost } }, { returnDocument: 'after' });
@@ -175,11 +183,11 @@ router.post('/', async (req, res) => {
       cashier: isStaffOrAdmin ? req.user._id : undefined,
       orderType,
       status: orderType === 'DINE_IN' && isStaffOrAdmin ? 'PREPARING' : 'PENDING',
-      items: items.map(({ product, quantity, size, unitPrice }) => ({
+      items: items.map(({ product, quantity, size, unitPrice, customization }) => ({
         product: product._id,
         productNameAtTime: product.name,
         unitPrice,
-        customization: { size },
+        customization: customization || { size },
         quantity,
         subtotal: unitPrice * quantity,
         isPrepared: false

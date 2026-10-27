@@ -8,7 +8,7 @@ import { createServer } from 'vite';
 const memory = new Map([['user', '{invalid json']]);
 globalThis.localStorage = { getItem: key => memory.get(key) ?? null, setItem: (key, value) => memory.set(key, value), removeItem: key => memory.delete(key) };
 globalThis.window = { localStorage: globalThis.localStorage };
-let vite, auth, cart, api, options, credentials, BillPage, InterfaceContext, App, SourceScreen, Header, CounterOrderEditor, startOrderSync, CounterCancellationDialog;
+let vite, auth, cart, api, options, credentials, BillPage, InterfaceContext, App, SourceScreen, Header, CounterOrderEditor, startOrderSync, CounterCancellationDialog, counterOrderPayload;
 const account = { _id: 'test-customer', fullName: 'Test Customer', phone: '0999999999', role: 'CUSTOMER', token: 'test-token' };
 const tables = ['users', 'work_schedules', 'categories', 'products', 'orders', 'order_items', 'payments', 'loyalty_transactions', 'customer_reviews', 'suppliers', 'ingredients', 'product_ingredients', 'purchase_orders', 'purchase_order_items', 'inventory_transactions', 'shop_settings'];
 const emptyDb = () => Object.fromEntries(tables.map(table => [table, []]));
@@ -28,6 +28,7 @@ before(async () => {
   CounterOrderEditor = (await vite.ssrLoadModule('/src/interface/pages/pos/CounterOrderEditor.tsx')).default;
   ({ startOrderSync } = await vite.ssrLoadModule('/src/lib/orderSync.ts'));
   CounterCancellationDialog = (await vite.ssrLoadModule('/src/interface/pages/pos/CounterCancellationDialog.tsx')).default;
+  ({ counterOrderPayload } = await vite.ssrLoadModule('/src/lib/counterOrderPayload.ts'));
 });
 after(async () => { await vite?.close(); });
 beforeEach(() => { cart.getState().clear(); });
@@ -233,4 +234,13 @@ test('Counter cancellation dialog identifies the order and requires a reason bef
   assert.match(html, /textarea required="" maxLength="500"/);
   assert.match(html, /type="submit" disabled=""/);
   assert.doesNotMatch(html, /Đã hủy đơn/);
+});
+
+test('Counter payload preserves independent cups of the same product and size', () => {
+  const lines = [{ productId: 'coffee', quantity: 1, customization: { size: 'M', sugar: '0%', ice: 'Ít đá', topping: ['Pearl'] } },
+    { productId: 'coffee', quantity: 2, customization: { size: 'M', sugar: '100%', note: 'second cup' } }];
+  const payload = counterOrderPayload(lines);
+  assert.equal(payload.length, 2); assert.equal(payload[0].customization.sugar, '0%'); assert.equal(payload[1].customization.sugar, '100%');
+  assert.deepEqual(payload[0].customization.topping, ['Pearl']);
+  for (const quantity of [0, 100, 1.5]) assert.throws(() => counterOrderPayload([{ ...lines[0], quantity }]));
 });

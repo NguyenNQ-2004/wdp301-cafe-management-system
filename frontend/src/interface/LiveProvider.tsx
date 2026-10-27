@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 import useAuthStore from '../store/authStore';
 import { shopApi, ShopApiError } from '../lib/shopApi';
-import { groupOrderItems } from '../lib/cartOptions';
+import { counterOrderPayload } from '../lib/counterOrderPayload';
 import type { DbState, IdTable, Row, Order, OrderStatus, OrderType, OrderCustomization } from './types';
 
 type RecordData = Record<string, any>;
@@ -36,6 +36,7 @@ interface Value {
   setSession: (patch: Partial<Session>) => void;
   transact: <R>(fn: (tx: Tx) => R) => R;
   placeOrder: (input: PlaceOrderInput) => Promise<Order>;
+  createCounterCustomer: (input: { fullName: string; phone: string; birthday?: string }) => Promise<DbState['users'][number]>;
   setOrderStatus: (id: number, status: OrderStatus, patch?: Partial<Order>) => void;
   cancelOrder: (id: number, reason: string) => Promise<boolean>;
   processCounterOrder: (id: number, status: 'CONFIRMED' | 'COMPLETED') => Promise<boolean>;
@@ -239,19 +240,29 @@ export function DbProvider({ children }: { children: ReactNode }) {
     if (commands.length) perform(async () => { for (const command of commands) await send(command); });
     return result;
   };
+  const createCounterCustomer = async (input: { fullName: string; phone: string; birthday?: string }) => {
+    if (!user?.token || inFlight.current) throw new Error('Vui lòng chờ thao tác hiện tại hoàn tất.');
+    inFlight.current++; setPending(inFlight.current); setError('');
+    try {
+      const result = await shopApi<{ customer: RecordData }>('/api/users/customers', { method: 'POST', token: user.token, body: input });
+      const customer = normalize('users', result.customer) as DbState['users'][number];
+      const next = { ...dbRef.current, users: [...dbRef.current.users.filter(person => person.id !== customer.id), customer] };
+      dbRef.current = next; setDb(next); return customer;
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Không tạo được khách hàng.'); throw failure; }
+    finally { inFlight.current--; setPending(inFlight.current); }
+  };
   const placeOrder = async (input: PlaceOrderInput): Promise<Order> => {
     if (!user?.token) throw new Error('Vui lòng đăng nhập để tạo đơn.');
     if (inFlight.current) throw new Error('Vui lòng chờ thao tác hiện tại hoàn tất.');
     if (input.points_to_redeem) throw new Error('Đổi điểm tại quầy hiện chưa khả dụng.');
-    if (input.items.some(item => item.customization?.topping?.length)) throw new Error('Đặt thêm topping hiện chưa khả dụng. Vui lòng bỏ topping để tiếp tục.');
-    const orderItems = groupOrderItems(input.items.map(item => ({ productId: rawId(item.product_id), quantity: item.quantity, size: item.customization?.size || 'M' })));
+    const orderItems = counterOrderPayload(input.items.map(item => ({ productId: rawId(item.product_id), quantity: item.quantity, customization: item.customization })));
     inFlight.current++; setPending(inFlight.current); setError('');
     try {
     const result = await shopApi<RecordData>('/api/orders', { method: 'POST', token: user.token, body: {
       items: orderItems,
       orderType: input.order_type, customerId: input.customer_id ? rawId(input.customer_id) : undefined,
       recipientName: input.recipient_name, recipientPhone: input.recipient_phone, deliveryAddress: input.delivery_address,
-      tableNumber: input.table_number, orderNote: [input.order_note, ...input.items.filter(item => item.customization).map(item => `${item.quantity} x ${dbRef.current.products.find(product => product.id === item.product_id)?.name || ''} (${item.customization?.size || 'M'}): ${[item.customization?.sugar && `đường ${item.customization.sugar}`, item.customization?.ice, item.customization?.note].filter(Boolean).join(', ')}`)].filter(Boolean).join('; '), paymentMethod: input.order_type === 'ONLINE' ? 'COD' : 'PAY_AT_COUNTER',
+      tableNumber: input.table_number, orderNote: input.order_note || '', expectedTotal: input.items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0), paymentMethod: input.order_type === 'ONLINE' ? 'COD' : 'PAY_AT_COUNTER',
     } });
     await refresh(); return normalize('orders', result) as Order;
     } catch (failure) {
@@ -320,7 +331,7 @@ export function DbProvider({ children }: { children: ReactNode }) {
   };
   const sessionId = user ? idFor('users', user._id) : 0;
   const session = useMemo(() => ({ customerId: sessionId, cashierId: sessionId, baristaId: sessionId, shipperId: sessionId, adminId: sessionId }), [sessionId]);
-  return <Context.Provider value={{ db, session, loading, busy: pending > 0, revision, error, notice, unavailable, refresh, refreshOrders, notify, rawId, idFor, setSession: () => {}, transact, placeOrder,
+  return <Context.Provider value={{ db, session, loading, busy: pending > 0, revision, error, notice, unavailable, refresh, refreshOrders, notify, rawId, idFor, setSession: () => {}, transact, placeOrder, createCounterCustomer,
     setOrderStatus: (id, status, patch = {}) => { transact(tx => tx.update('orders', id, { ...patch, status })); },
     cancelOrder, processCounterOrder, saveDeliveryOrder, remitCod,
     adjustPoints: (id, delta) => { perform(async () => { await shopApi('/api/loyalty-transactions/adjust', { method: 'POST', token: user?.token, body: { customerId: rawId(id), points: delta, reason: 'Điều chỉnh điểm tại quầy' } }); }); },
