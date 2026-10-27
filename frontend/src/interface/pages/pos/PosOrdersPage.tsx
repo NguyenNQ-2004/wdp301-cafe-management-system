@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { PageRoute, Order, OrderStatus } from '../../types';
 import { PosHeader } from './PosHeader';
 import CounterOrderEditor from './CounterOrderEditor';
+import CounterCancellationDialog from './CounterCancellationDialog';
 import useAuthStore from '../../../store/authStore';
 import { useDb } from '../../data/DbContext';
 import {
@@ -31,12 +32,13 @@ interface PosOrdersPageProps {
 type StatusFilter = 'all' | OrderStatus;
 
 export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShowToast, onOpenBill }) => {
-  const { db, transact, setOrderStatus, cancelOrder } = useDb();
+  const { db, transact, setOrderStatus } = useDb();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'DINE_IN' | 'TAKEAWAY'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
   const account = useAuthStore(state => state.user);
   const canEdit = account?.role === 'ADMIN' || (account?.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(account.position || ''));
 
@@ -83,14 +85,6 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
     onShowToast?.(`Đã thu ${fmtMoney(pay.amount)} cho đơn ${o.order_code}.`);
   };
 
-  const handleCancel = (o: Order) => {
-    const reason = prompt(`Nhập lý do hủy đơn ${o.order_code}:`);
-    if (reason && reason.trim()) {
-      cancelOrder(o.id, reason.trim());
-      onShowToast?.(`Đã hủy đơn ${o.order_code}.`);
-    }
-  };
-
   const statusTabs: { id: StatusFilter; label: string }[] = [
     { id: 'all', label: 'Tất cả' },
     { id: 'CONFIRMED', label: ORDER_STATUS_LABEL.CONFIRMED },
@@ -105,6 +99,7 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
   return (
     <div className="min-h-screen bg-stone-50 pb-16 flex flex-col">
       {editingId !== null && db.orders.find(order => order.id === editingId) && <CounterOrderEditor order={db.orders.find(order => order.id === editingId)!} onClose={() => setEditingId(null)} />}
+      {cancellingId !== null && db.orders.find(order => order.id === cancellingId) && <CounterCancellationDialog order={db.orders.find(order => order.id === cancellingId)!} onClose={() => setCancellingId(null)} />}
       <PosHeader currentRoute="pos-orders" onNavigate={onNavigate} onShowToast={onShowToast} />
 
       {/* Metrics */}
@@ -372,16 +367,16 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
                 <span className="material-symbols-outlined text-[18px]">print</span>
                 Hóa đơn
               </button>}
-              {canEdit && (isOpen(selected) ? (
+              {canEdit && (isOpen(selected) && paymentOf(db, selected.id)?.status !== 'SUCCESS' ? (
                 <button
-                  onClick={() => handleCancel(selected)}
+                  onClick={() => setCancellingId(selected.id)}
                   className="py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-medium flex items-center justify-center gap-1 border border-rose-200"
                 >
                   <span className="material-symbols-outlined text-[16px]">cancel</span>
                   Hủy đơn
                 </button>
               ) : (
-                <span className="py-2.5 text-center text-stone-400">Đơn đã đóng</span>
+                <span className="py-2.5 text-center text-stone-500">{isOpen(selected) ? 'Đã thanh toán; cần xử lý hoàn tiền trước khi hủy' : 'Đơn đã đóng'}</span>
               ))}
               {!canEdit && <button onClick={() => onNavigate('kds-terminal')} className="col-span-2 rounded-xl bg-primary py-2.5 font-bold text-white">Mở màn hình pha chế</button>}
             </div>

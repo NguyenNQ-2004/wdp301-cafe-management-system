@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "test:counter-cancellation": "node --test tests/counterCancellation.test.js",
     "test:counter-order-list": "node --test tests/counterOrderList.test.js",
     "test:counter-order-update": "node --test tests/counterOrderUpdate.test.js",
     "start": "node server.js",

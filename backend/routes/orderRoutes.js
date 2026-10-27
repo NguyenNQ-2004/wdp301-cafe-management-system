@@ -12,6 +12,7 @@ const { protect } = require('../middlewares/authMiddleware');
 const { normalizeCartItems } = require('../utils/cartItems');
 const { demoPaymentsEnabled } = require('../utils/paymentMode');
 const { withOrderMutation } = require('../utils/orderMutation');
+const { cancelCounterOrder } = require('../utils/cancelCounterOrder');
 const { adminOrCashier, authorizePosition, authorize } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
@@ -378,6 +379,10 @@ router.put('/:id/status', withOrderMutation(async (req, res) => {
       }
     }
 
+    if (status === 'CANCELLED' && ['DINE_IN', 'TAKEAWAY'].includes(order.orderType)) {
+      await cancelCounterOrder(order, cancelReason, res);
+      return res.json({ message: 'Đã hủy đơn tại quầy.', order });
+    }
     order.status = status;
     if (cancelReason !== undefined) order.cancelReason = cancelReason.trim();
     if (req.body.orderNote !== undefined) order.orderNote = req.body.orderNote.trim();
@@ -525,6 +530,15 @@ router.put('/:id/counter', adminOrCashier, withOrderMutation(async (req, res) =>
     }
     res.status(error.status || 500).json({ message: error.message });
   }
+}));
+
+router.put('/:id/counter-cancel', adminOrCashier, withOrderMutation(async (req, res) => {
+  try {
+    if (!req.body || Array.isArray(req.body) || Object.keys(req.body).some(key => key !== 'cancelReason')) throw orderError('Dữ liệu hủy đơn không hợp lệ.');
+    const order = await Order.findById(req.params.id);
+    await cancelCounterOrder(order, req.body.cancelReason, res);
+    res.json({ message: 'Đã hủy đơn tại quầy.', order });
+  } catch (error) { res.status(error.status || 500).json({ message: error.message }); }
 }));
 
 module.exports = router;

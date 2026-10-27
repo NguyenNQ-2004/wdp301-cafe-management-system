@@ -8,7 +8,7 @@ import { createServer } from 'vite';
 const memory = new Map([['user', '{invalid json']]);
 globalThis.localStorage = { getItem: key => memory.get(key) ?? null, setItem: (key, value) => memory.set(key, value), removeItem: key => memory.delete(key) };
 globalThis.window = { localStorage: globalThis.localStorage };
-let vite, auth, cart, api, options, credentials, BillPage, InterfaceContext, App, SourceScreen, Header, CounterOrderEditor, startOrderSync;
+let vite, auth, cart, api, options, credentials, BillPage, InterfaceContext, App, SourceScreen, Header, CounterOrderEditor, startOrderSync, CounterCancellationDialog;
 const account = { _id: 'test-customer', fullName: 'Test Customer', phone: '0999999999', role: 'CUSTOMER', token: 'test-token' };
 const tables = ['users', 'work_schedules', 'categories', 'products', 'orders', 'order_items', 'payments', 'loyalty_transactions', 'customer_reviews', 'suppliers', 'ingredients', 'product_ingredients', 'purchase_orders', 'purchase_order_items', 'inventory_transactions', 'shop_settings'];
 const emptyDb = () => Object.fromEntries(tables.map(table => [table, []]));
@@ -27,6 +27,7 @@ before(async () => {
   ({ Header } = await vite.ssrLoadModule('/src/components/Header.tsx'));
   CounterOrderEditor = (await vite.ssrLoadModule('/src/interface/pages/pos/CounterOrderEditor.tsx')).default;
   ({ startOrderSync } = await vite.ssrLoadModule('/src/lib/orderSync.ts'));
+  CounterCancellationDialog = (await vite.ssrLoadModule('/src/interface/pages/pos/CounterCancellationDialog.tsx')).default;
 });
 after(async () => { await vite?.close(); });
 beforeEach(() => { cart.getState().clear(); });
@@ -223,4 +224,13 @@ test('Order synchronization pauses, avoids overlapping requests, retries and abo
   });
   retry(); await new Promise(resolve => setImmediate(resolve)); assert.deepEqual(failures, ['Offline']);
   retry(); await new Promise(resolve => setImmediate(resolve)); assert.deepEqual(failures, ['Offline', '']); stopRetry();
+});
+
+test('Counter cancellation dialog identifies the order and requires a reason before submitting', () => {
+  const db = emptyDb(); db.orders = [sampleOrder];
+  const html = renderWithDb(React.createElement(CounterCancellationDialog, { order: sampleOrder, onClose() {} }), db);
+  assert.match(html, /role="dialog"/); assert.match(html, /ONLY-ORDER-001/);
+  assert.match(html, /textarea required="" maxLength="500"/);
+  assert.match(html, /type="submit" disabled=""/);
+  assert.doesNotMatch(html, /Đã hủy đơn/);
 });

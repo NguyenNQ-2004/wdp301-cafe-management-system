@@ -260,6 +260,7 @@ export function DbProvider({ children }: { children: ReactNode }) {
   };
   const cancelOrder = async (id: number, reason: string): Promise<boolean> => {
     if (!user?.token) return false;
+    if (inFlight.current) { setError('Vui lòng chờ thao tác hiện tại hoàn tất.'); return false; }
     if (typeof reason !== 'string' || !reason.trim() || reason.trim().length > 500) {
       setError('Vui lòng chọn lý do hủy đơn hợp lệ.');
       return false;
@@ -268,7 +269,9 @@ export function DbProvider({ children }: { children: ReactNode }) {
     if (!order) { setError('Không tìm thấy đơn hàng cần hủy.'); return false; }
     inFlight.current++; setPending(inFlight.current); setError(''); setNotice('');
     try {
-      await shopApi(`/api/orders/${rawId(id)}/status`, { method: 'PUT', token: user.token, body: { status: 'CANCELLED', cancelReason: reason.trim() } });
+      const staffCounter = user.role !== 'CUSTOMER' && order.order_type !== 'ONLINE';
+      await shopApi(`/api/orders/${rawId(id)}/${staffCounter ? 'counter-cancel' : 'status'}`, { method: 'PUT', token: user.token,
+        body: staffCounter ? { cancelReason: reason.trim() } : { status: 'CANCELLED', cancelReason: reason.trim() } });
       await refresh();
       return true;
     } catch (failure) {
