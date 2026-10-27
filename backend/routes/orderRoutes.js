@@ -11,6 +11,8 @@ const RewardItem = require('../models/RewardItem');
 const { protect } = require('../middlewares/authMiddleware');
 const { normalizeCartItems } = require('../utils/cartItems');
 const { demoPaymentsEnabled } = require('../utils/paymentMode');
+const { withOrderMutation } = require('../utils/orderMutation');
+const { adminOrCashier, authorizePosition } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 router.use(protect);
@@ -251,7 +253,7 @@ router.post('/', async (req, res) => {
 });
 
 // 4. UPDATE ORDER STATUS (Dành cho Thu ngân, Pha chế, Shipper, Quản lý)
-router.put('/:id/status', async (req, res) => {
+router.put('/:id/status', withOrderMutation(async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã đơn hàng không hợp lệ.' });
     if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
@@ -401,10 +403,10 @@ router.put('/:id/status', async (req, res) => {
   } catch (error) {
     res.status(error.status || (error.name === 'ValidationError' ? 400 : 500)).json({ message: error.message });
   }
-});
+}));
 
 // 5. BARISTA KDS: TOGGLE ITEM PREPARED (Tích từng món đã pha xong)
-router.put('/:id/items/:itemIndex/prepared', async (req, res) => {
+router.put('/:id/items/:itemIndex/prepared', authorizePosition('BARISTA', 'MANAGER'), withOrderMutation(async (req, res) => {
   try {
     const { itemIndex } = req.params;
     const { isPrepared } = req.body;
@@ -438,6 +440,77 @@ router.put('/:id/items/:itemIndex/prepared', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-});
+}));
+
+// Edit counter orders before payment or the first item is marked prepared.
+router.put('/:id/counter', adminOrCashier, withOrderMutation(async (req, res) => {
+  let original;
+  let originalItems;
+  let payment;
+  let changed = false;
+  try {
+    const body = req.body;
+    if (!body || Array.isArray(body) || typeof body !== 'object'
+      || Object.keys(body).some(key => !['items', 'tableNumber', 'orderNote', 'expectedUpdatedAt'].includes(key))) {
+      throw orderError('Dữ liệu cập nhật đơn không hợp lệ.');
+    }
+    const order = await Order.findById(req.params.id);
+    if (!['DINE_IN', 'TAKEAWAY'].includes(order.orderType)) throw orderError('Chỉ được sửa đơn tại quầy.', 409);
+    if (!['PENDING', 'CONFIRMED', 'PREPARING'].includes(order.status) || order.items.some(item => item.isPrepared)) {
+      throw orderError('Không thể sửa đơn đã có món được pha hoặc đã kết thúc.', 409);
+    }
+    if (typeof body.expectedUpdatedAt !== 'string' || body.expectedUpdatedAt !== order.updatedAt.toISOString()) {
+      throw orderError('Đơn đã thay đổi. Vui lòng tải lại trước khi sửa.', 409);
+    }
+    const payments = await Payment.find({ order: order._id });
+    if (payments.length !== 1 || payments[0].status !== 'PENDING' || payments[0].amount !== order.finalAmount) {
+      throw orderError('Chỉ được sửa đơn có một khoản thanh toán đang chờ thu và khớp số tiền.', 409);
+    }
+    if (order.pointsRedeemed || order.reward || order.voucher) throw orderError('Đơn có ưu đãi cần được xử lý riêng trước khi sửa.', 409);
+    if (typeof body.tableNumber !== 'string' || body.tableNumber.trim().length > 20
+      || (order.orderType === 'DINE_IN' && !body.tableNumber.trim())) throw orderError('Số bàn phải có từ 1 đến 20 ký tự cho đơn tại quán.');
+    if (typeof body.orderNote !== 'string' || body.orderNote.trim().length > 500) throw orderError('Ghi chú phải có tối đa 500 ký tự.');
+    let normalized;
+    try { normalized = await normalizeCartItems(body.items); }
+    catch (error) { throw orderError(error.message); }
+    if (!normalized.length) throw orderError('Đơn phải có ít nhất một món.');
+    if (order.items.some(item => item.customization?.topping?.length)) throw orderError('Chưa hỗ trợ sửa đơn có topping.', 409);
+    const items = normalized.map(({ product, quantity, size, unitPrice }) => {
+      const candidates = order.items.filter(item => String(item.product) === String(product._id));
+      const previous = candidates.find(item => (item.customization?.size || 'M') === size) || (candidates.length === 1 ? candidates[0] : undefined);
+      return { product: product._id, productNameAtTime: product.name, quantity, unitPrice,
+        subtotal: quantity * unitPrice, customization: { ...(previous?.customization || {}), size }, isPrepared: false };
+    });
+    const totalAmount = items.reduce((sum, item) => sum + item.subtotal, 0);
+    if (totalAmount < order.discountAmount) throw orderError('Tổng tiền món không được nhỏ hơn số tiền giảm giá.');
+    original = order.toObject();
+    originalItems = await OrderItem.find({ order: order._id }).lean();
+    payment = payments[0];
+    Object.assign(order, { items, totalAmount, finalAmount: totalAmount + order.deliveryFee - order.discountAmount,
+      tableNumber: order.orderType === 'DINE_IN' ? body.tableNumber.trim() : undefined, orderNote: body.orderNote.trim() });
+    changed = true;
+    await order.save();
+    await OrderItem.deleteMany({ order: order._id });
+    await OrderItem.insertMany(items.map(item => ({ ...item, order: order._id })));
+    const result = await Payment.updateOne({ _id: payment._id, status: 'PENDING', amount: payment.amount }, { $set: { amount: order.finalAmount } });
+    if (result.matchedCount !== 1) throw orderError('Khoản thanh toán đã thay đổi.', 409);
+    res.json({ message: 'Đã cập nhật đơn tại quầy.', order });
+  } catch (error) {
+    if (changed) {
+      try {
+        const { _id, __v, ...snapshot } = original;
+        await Order.updateOne({ _id }, { $set: { ...snapshot, tableNumber: original.tableNumber || null, orderNote: original.orderNote || null } }, { timestamps: false });
+        await OrderItem.deleteMany({ order: _id });
+        if (originalItems.length) await OrderItem.insertMany(originalItems);
+        await Payment.updateOne({ _id: payment._id }, { $set: { amount: payment.amount, updatedAt: payment.updatedAt } }, { timestamps: false });
+      } catch (rollbackError) {
+        res.locals.retainMutationLock = true;
+        console.error('Counter order rollback failed:', String(original._id), rollbackError.message);
+        return res.status(500).json({ message: 'Đơn đang tạm khóa để kiểm tra đồng bộ dữ liệu. Vui lòng liên hệ quản lý.' });
+      }
+    }
+    res.status(error.status || 500).json({ message: error.message });
+  }
+}));
 
 module.exports = router;

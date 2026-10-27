@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import type { PageRoute, Order, OrderStatus } from '../../types';
 import { PosHeader } from './PosHeader';
+import CounterOrderEditor from './CounterOrderEditor';
+import useAuthStore from '../../../store/authStore';
 import { useDb } from '../../data/DbContext';
 import {
   ORDER_STATUS_LABEL,
@@ -34,6 +36,9 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
   const [typeFilter, setTypeFilter] = useState<'all' | 'DINE_IN' | 'TAKEAWAY'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const account = useAuthStore(state => state.user);
+  const canEdit = account?.role === 'ADMIN' || (account?.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(account.position || ''));
 
   // Đơn phục vụ tại quầy: tại quán + mang đi (kể cả khách đặt online rồi đến lấy)
   const counterOrders = db.orders
@@ -99,6 +104,7 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
 
   return (
     <div className="min-h-screen bg-stone-50 pb-16 flex flex-col">
+      {editingId !== null && db.orders.find(order => order.id === editingId) && <CounterOrderEditor order={db.orders.find(order => order.id === editingId)!} onClose={() => setEditingId(null)} />}
       <PosHeader currentRoute="pos-orders" onNavigate={onNavigate} onShowToast={onShowToast} />
 
       {/* Metrics */}
@@ -336,6 +342,11 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
             })()}
 
             <div className="p-4 bg-stone-100 border-t border-stone-200 grid grid-cols-2 gap-2 text-xs">
+              {canEdit && ['PENDING', 'CONFIRMED', 'PREPARING'].includes(selected.status) && paymentOf(db, selected.id)?.status === 'PENDING' && !orderItemsOf(db, selected.id).some(item => item.is_prepared) && (
+                <button onClick={() => setEditingId(selected.id)} className="col-span-2 flex items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-white py-2.5 font-bold text-primary hover:bg-stone-50">
+                  <span className="material-symbols-outlined text-[18px]">edit</span>Sửa đơn
+                </button>
+              )}
               {paymentOf(db, selected.id)?.status === 'PENDING' && isOpen(selected) && (
                 <button
                   onClick={() => handleCollectPayment(selected)}

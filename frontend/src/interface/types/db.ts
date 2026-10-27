@@ -88,6 +88,7 @@ export type OrderStatus =
 
 // 5. orders
 export interface Order {
+  update_token?: string;
   id: number;
   order_code: string;
   customer_id: number | null;
