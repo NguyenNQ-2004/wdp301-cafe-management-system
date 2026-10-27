@@ -86,6 +86,7 @@ router.post('/', async (req, res) => {
       orderNote,
       tableNumber,
       paymentMethod,
+      demoProvider,
       rewardId
     } = req.body;
 
@@ -115,6 +116,7 @@ router.post('/', async (req, res) => {
       : (orderType === 'ONLINE' ? (paymentMethod === 'DEMO_ONLINE' ? 'DEMO_ONLINE' : 'COD') : 'PAY_AT_COUNTER');
     if (!['COD', 'PAY_AT_COUNTER', 'CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER', 'DEMO_ONLINE'].includes(finalPaymentMethod)) throw orderError('Phương thức thanh toán không hợp lệ.');
     if (finalPaymentMethod === 'DEMO_ONLINE' && (orderType !== 'ONLINE' || req.user.role !== 'CUSTOMER' || !demoPaymentsEnabled())) throw orderError('Thanh toán mô phỏng hiện không khả dụng.', 403);
+    if (demoProvider != null && (finalPaymentMethod !== 'DEMO_ONLINE' || !['MOMO', 'VNPAY', 'BANK_TRANSFER'].includes(demoProvider))) throw orderError('Kênh thanh toán mô phỏng không hợp lệ.');
 
     const totalAmount = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
     let reward = null;
@@ -176,7 +178,8 @@ router.post('/', async (req, res) => {
       deliveryAddress: orderType === 'ONLINE' ? finalDeliveryAddress : undefined,
       tableNumber: orderType === 'DINE_IN' ? tableNumber?.trim() : undefined,
       orderNote: orderNote?.trim() || undefined,
-      paymentMethod: finalPaymentMethod
+      paymentMethod: finalPaymentMethod,
+      ...(finalPaymentMethod === 'DEMO_ONLINE' && demoProvider ? { demoProvider } : {})
     };
 
     const order = await Order.create(orderData);
@@ -200,6 +203,7 @@ router.post('/', async (req, res) => {
     await Payment.create({
       order: order._id,
       paymentMethod: finalPaymentMethod === 'DEMO_ONLINE' ? 'DEMO_ONLINE' : ['CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER'].includes(finalPaymentMethod) ? finalPaymentMethod : 'CASH',
+      ...(finalPaymentMethod === 'DEMO_ONLINE' && demoProvider ? { demoProvider } : {}),
       amount: finalAmount,
       status: 'PENDING',
       paymentNote: finalPaymentMethod === 'DEMO_ONLINE' ? 'Giao dịch mô phỏng, không thu tiền thật' : orderType === 'ONLINE' ? 'Đơn đặt online' : 'Thanh toán tại quầy'
@@ -249,20 +253,118 @@ router.post('/', async (req, res) => {
 // 4. UPDATE ORDER STATUS (Dành cho Thu ngân, Pha chế, Shipper, Quản lý)
 router.put('/:id/status', async (req, res) => {
   try {
-    if (!['ADMIN', 'STAFF'].includes(req.user.role)) return res.status(403).json({ message: 'Chỉ nhân viên được cập nhật trạng thái đơn hàng.' });
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã đơn hàng không hợp lệ.' });
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+      return res.status(400).json({ message: 'Dữ liệu cập nhật đơn hàng không hợp lệ.' });
+    }
     const { status, cancelReason, shipperId } = req.body;
     const validStatuses = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'DELIVERING', 'COMPLETED', 'CANCELLED'];
-    
+    if (Object.keys(req.body || {}).some((key) => !['status', 'cancelReason', 'shipperId', 'orderNote'].includes(key))) {
+      return res.status(400).json({ message: 'Dữ liệu cập nhật đơn hàng không hợp lệ.' });
+    }
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: 'Trạng thái đơn hàng không hợp lệ.' });
+    }
+    if (cancelReason !== undefined && (typeof cancelReason !== 'string' || cancelReason.trim().length > 500)) {
+      return res.status(400).json({ message: 'Lý do hủy phải có tối đa 500 ký tự.' });
+    }
+    if (req.body.orderNote !== undefined && (typeof req.body.orderNote !== 'string' || req.body.orderNote.trim().length > 500)) {
+      return res.status(400).json({ message: 'Ghi chú đơn hàng phải có tối đa 500 ký tự.' });
+    }
+    if (shipperId !== undefined && shipperId !== null && !mongoose.isValidObjectId(shipperId)) {
+      return res.status(400).json({ message: 'Mã nhân viên giao hàng không hợp lệ.' });
     }
 
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Không tìm thấy đơn hàng.' });
 
+    const isAdmin = req.user.role === 'ADMIN';
+    const isStaff = req.user.role === 'STAFF';
+    const position = req.user.position;
+    const isShipper = isStaff && position === 'SHIPPER';
+    if (!isAdmin && !isStaff && req.user.role !== 'CUSTOMER') {
+      return res.status(403).json({ message: 'Bạn không có quyền cập nhật đơn hàng.' });
+    }
+
+    if (req.user.role === 'CUSTOMER') {
+      if (String(order.customer) !== String(req.user._id)) return res.status(403).json({ message: 'Bạn không có quyền cập nhật đơn hàng này.' });
+      if (status !== 'CANCELLED' || !['PENDING', 'CONFIRMED'].includes(order.status)) {
+        return res.status(409).json({ message: 'Khách hàng chỉ có thể hủy đơn trước khi quán bắt đầu pha chế.' });
+      }
+      if (shipperId !== undefined) return res.status(403).json({ message: 'Khách hàng không được thay đổi nhân viên giao hàng.' });
+    }
+    if (req.body.orderNote !== undefined && !(isAdmin || (isStaff && position === 'MANAGER') || (isShipper && String(order.shipper || '') === String(req.user._id) && status === 'READY' && shipperId === null))) {
+      return res.status(403).json({ message: 'Bạn không có quyền ghi chú sự cố cho đơn hàng này.' });
+    }
+
+    const allowedNext = {
+      PENDING: ['CONFIRMED', 'PREPARING', 'CANCELLED'],
+      CONFIRMED: ['PREPARING', 'CANCELLED'],
+      PREPARING: ['READY', 'CANCELLED'],
+      READY: ['PREPARING', 'DELIVERING', 'COMPLETED', 'CANCELLED'],
+      DELIVERING: ['READY', 'COMPLETED', 'CANCELLED'],
+      COMPLETED: [],
+      CANCELLED: []
+    };
+    if (status !== order.status && !allowedNext[order.status]?.includes(status)) {
+      return res.status(409).json({ message: `Không thể chuyển đơn từ ${order.status} sang ${status}.` });
+    }
+    if (status === 'DELIVERING' && order.orderType !== 'ONLINE') {
+      return res.status(409).json({ message: 'Chỉ đơn giao hàng mới được chuyển sang trạng thái đang giao.' });
+    }
+    if (status === 'COMPLETED' && order.orderType === 'ONLINE' && order.status !== 'DELIVERING') {
+      return res.status(409).json({ message: 'Đơn giao hàng phải ở trạng thái đang giao trước khi hoàn tất.' });
+    }
+    if (status === 'CANCELLED' && (!cancelReason || !cancelReason.trim())) {
+      return res.status(400).json({ message: 'Vui lòng nhập lý do hủy đơn.' });
+    }
+    if (status !== 'CANCELLED' && cancelReason !== undefined) {
+      return res.status(400).json({ message: 'Chỉ được gửi lý do khi hủy đơn.' });
+    }
+
+    if (isShipper) {
+      const assigningSelf = shipperId != null && String(shipperId) === String(req.user._id);
+      const unassigningSelf = shipperId === null && String(order.shipper || '') === String(req.user._id) && status === 'READY';
+      const ownsOrder = String(order.shipper || '') === String(req.user._id);
+      const canClaim = status === 'READY' && order.status === 'READY' && order.orderType === 'ONLINE' && !order.shipper && assigningSelf;
+      const canDeliver = ownsOrder && order.orderType === 'ONLINE' && ['DELIVERING', 'COMPLETED', 'CANCELLED'].includes(status);
+      const canReturn = ownsOrder && order.orderType === 'ONLINE' && status === 'READY' && unassigningSelf;
+      if ((!canClaim && !canDeliver && !canReturn) || (shipperId !== undefined && !assigningSelf && !unassigningSelf)) {
+        return res.status(403).json({ message: 'Shipper chỉ được nhận đơn sẵn sàng hoặc cập nhật đơn đang giao của mình.' });
+      }
+    } else if (isStaff && position === 'BARISTA' && !['PREPARING', 'READY', 'CANCELLED'].includes(status)) {
+      return res.status(403).json({ message: 'Barista chỉ được cập nhật trạng thái chuẩn bị món.' });
+    } else if (isStaff && position === 'CASHIER' && !['CONFIRMED', 'COMPLETED', 'CANCELLED'].includes(status)) {
+      return res.status(403).json({ message: 'Thu ngân chỉ được xác nhận, hoàn tất đơn tại quầy hoặc hủy đơn.' });
+    } else if (isStaff && position === 'CASHIER' && status === 'COMPLETED' && order.orderType === 'ONLINE') {
+      return res.status(403).json({ message: 'Thu ngân không được xác nhận hoàn tất đơn giao hàng.' });
+    } else if (isStaff && !['MANAGER', 'CASHIER', 'BARISTA', 'SHIPPER'].includes(position)) {
+      return res.status(403).json({ message: 'Chức vụ hiện tại không được cập nhật đơn hàng.' });
+    }
+
+    if (shipperId !== undefined) {
+      if (shipperId === null) {
+        const managerMayRelease = isAdmin || (isStaff && position === 'MANAGER');
+        const shipperMayRelease = isShipper && status === 'READY' && String(order.shipper || '') === String(req.user._id);
+        if (order.orderType !== 'ONLINE' || ['COMPLETED', 'CANCELLED'].includes(order.status) || (!managerMayRelease && !shipperMayRelease)) {
+          return res.status(403).json({ message: 'Bạn không có quyền bỏ gán shipper khỏi đơn hàng này.' });
+        }
+        order.shipper = undefined;
+      }
+      else {
+        const shipper = await User.findOne({ _id: shipperId, role: 'STAFF', position: 'SHIPPER', status: 'ACTIVE' }).select('_id');
+        if (!shipper) return res.status(400).json({ message: 'Nhân viên giao hàng không tồn tại hoặc không hoạt động.' });
+        if (order.orderType !== 'ONLINE' || !['PENDING', 'CONFIRMED', 'PREPARING', 'READY'].includes(order.status)) return res.status(409).json({ message: 'Chỉ có thể gán shipper cho đơn giao hàng chưa kết thúc.' });
+        if (!isAdmin && !(isStaff && ['MANAGER', 'SHIPPER'].includes(position))) return res.status(403).json({ message: 'Bạn không có quyền gán nhân viên giao hàng.' });
+        if (isShipper && String(shipperId) !== String(req.user._id)) return res.status(403).json({ message: 'Shipper chỉ được nhận đơn cho chính mình.' });
+        if (order.shipper && String(order.shipper) !== String(shipperId)) return res.status(409).json({ message: 'Đơn hàng đã được gán cho shipper khác.' });
+        order.shipper = shipper._id;
+      }
+    }
+
     order.status = status;
-    if (cancelReason !== undefined) order.cancelReason = cancelReason;
-    if (shipperId) order.shipper = shipperId;
+    if (cancelReason !== undefined) order.cancelReason = cancelReason.trim();
+    if (req.body.orderNote !== undefined) order.orderNote = req.body.orderNote.trim();
 
     // COD được thu khi giao xong; đơn tại quầy và demo có bước xác nhận riêng.
     if (status === 'COMPLETED') {
@@ -297,7 +399,7 @@ router.put('/:id/status', async (req, res) => {
     await order.save();
     res.json({ message: 'Cập nhật trạng thái thành công!', order });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(error.status || (error.name === 'ValidationError' ? 400 : 500)).json({ message: error.message });
   }
 });
 

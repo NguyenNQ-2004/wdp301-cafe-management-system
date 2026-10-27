@@ -44,14 +44,16 @@ test('UC26 records own attendance once and lets admin review and mark absence', 
   };
 
   const hash = await bcrypt.hash('test-password', 4);
-  const admin = await User.create({ fullName: 'Admin', phone: '0999000051', passwordHash: hash, role: 'ADMIN' });
-  const staffA = await User.create({ fullName: 'Staff A', phone: '0999000052', passwordHash: hash, role: 'STAFF', position: 'CASHIER' });
-  const staffB = await User.create({ fullName: 'Staff B', phone: '0999000053', passwordHash: hash, role: 'STAFF', position: 'BARISTA' });
-  const customer = await User.create({ fullName: 'Customer', phone: '0999000054', passwordHash: hash, role: 'CUSTOMER' });
-  const tokenFor = async (user) => (await request('POST', '/api/auth/login', { phone: user.phone, password: 'test-password' })).data.token;
+  const admin = await User.create({ fullName: 'Admin', phone: '0999000051', email: 'test-0999000051@example.com', passwordHash: hash, role: 'ADMIN' });
+  const staffA = await User.create({ fullName: 'Staff A', phone: '0999000052', email: 'test-0999000052@example.com', passwordHash: hash, role: 'STAFF', position: 'CASHIER' });
+  const staffB = await User.create({ fullName: 'Staff B', phone: '0999000053', email: 'test-0999000053@example.com', passwordHash: hash, role: 'STAFF', position: 'BARISTA' });
+  const shipper = await User.create({ fullName: 'Shipper', phone: '0999000055', email: 'test-0999000055@example.com', passwordHash: hash, role: 'STAFF', position: 'SHIPPER' });
+  const customer = await User.create({ fullName: 'Customer', phone: '0999000054', email: 'test-0999000054@example.com', passwordHash: hash, role: 'CUSTOMER' });
+  const tokenFor = async (user) => (await request('POST', '/api/auth/login', { email: user.email, password: 'test-password' })).data.token;
   const adminToken = await tokenFor(admin);
   const aToken = await tokenFor(staffA);
   const bToken = await tokenFor(staffB);
+  const shipperToken = await tokenFor(shipper);
   const customerToken = await tokenFor(customer);
   const vnNow = new Date(Date.now() + 7 * 3600000);
   const today = vnNow.toISOString().slice(0, 10);
@@ -76,6 +78,14 @@ test('UC26 records own attendance once and lets admin review and mark absence', 
   assert.equal((await request('GET', `/api/work-schedules/attendance${query}`, null, adminToken)).data.length, 4);
   assert.equal((await request('GET', `/api/work-schedules/attendance${query}&userId=${staffB._id}`, null, aToken)).data.length, 3);
   assert.equal((await request('PUT', `/api/work-schedules/${own._id}/shift-action`, { action: 'CHECK_OUT' }, aToken)).status, 409);
+  const shipperSchedule = await WorkSchedule.create({ user: shipper._id, workDate: new Date(today), shiftName: 'MORNING', status: 'PRESENT', checkInTime: new Date() });
+  assert.equal((await request('PUT', `/api/work-schedules/${shipperSchedule._id}/shift-action`, { action: 'REMIT_COD', cash: 100 }, aToken)).status, 403);
+  assert.equal((await request('PUT', `/api/work-schedules/${shipperSchedule._id}/shift-action`, { action: 'REMIT_COD', cash: 100.5 }, shipperToken)).status, 400);
+  const remitted = await request('PUT', `/api/work-schedules/${shipperSchedule._id}/shift-action`, { action: 'REMIT_COD', cash: 100000, note: 'Đã nộp quỹ' }, shipperToken);
+  assert.equal(remitted.status, 200);
+  assert.equal(remitted.data.expectedCash, 0);
+  assert.equal(remitted.data.schedule.endingCashActual, 100000);
+  assert.equal((await request('PUT', `/api/work-schedules/${shipperSchedule._id}/shift-action`, { action: 'REMIT_COD', cash: 100000 }, shipperToken)).status, 409);
   assert.equal((await request('PUT', `/api/work-schedules/${own._id}/shift-action`, { action: 'CHECK_IN' }, bToken)).status, 403);
   assert.equal((await request('PUT', `/api/work-schedules/${own._id}/shift-action`, { action: 'CHECK_IN' }, adminToken)).status, 403);
   assert.equal((await request('PUT', `/api/work-schedules/${future._id}/shift-action`, { action: 'CHECK_IN' }, aToken)).status, 409);

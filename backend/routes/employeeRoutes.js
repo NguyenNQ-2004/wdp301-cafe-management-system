@@ -3,13 +3,14 @@ const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const { protect, adminOnly } = require('../middlewares/authMiddleware');
+const { normalizeEmail, validEmail } = require('../utils/accountEmail');
 
 const router = express.Router();
 router.use(protect, adminOnly);
 
 const positions = ['MANAGER', 'BARISTA', 'CASHIER', 'SHIPPER'];
 const statuses = ['ACTIVE', 'INACTIVE', 'LOCKED'];
-const allowedFields = ['fullName', 'phone', 'position', 'baseSalary', 'hireDate', 'status', 'password'];
+const allowedFields = ['fullName', 'phone', 'email', 'position', 'baseSalary', 'hireDate', 'status', 'password'];
 const badRequest = (message) => Object.assign(new Error(message), { status: 400 });
 const publicEmployee = (employee) => {
   const result = employee.toObject();
@@ -21,7 +22,7 @@ function parseEmployee(body, creating) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw badRequest('Dữ liệu nhân viên không hợp lệ.');
   if (Object.keys(body).some((key) => !allowedFields.includes(key))) throw badRequest('Thông tin nhân viên không hợp lệ.');
   const data = {};
-  for (const field of ['fullName', 'phone', 'position']) {
+  for (const field of ['fullName', 'phone', 'email', 'position']) {
     if (creating && body[field] === undefined) throw badRequest(`Thiếu thông tin ${field}.`);
   }
   if (body.fullName !== undefined) {
@@ -31,6 +32,11 @@ function parseEmployee(body, creating) {
   if (body.phone !== undefined) {
     if (typeof body.phone !== 'string' || !/^[0-9]{9,15}$/.test(body.phone.trim())) throw badRequest('Số điện thoại phải có từ 9 đến 15 chữ số.');
     data.phone = body.phone.trim();
+  }
+  if (body.email !== undefined) {
+    const email = normalizeEmail(body.email);
+    if (!validEmail(email)) throw badRequest('Cần nhập Gmail/email hợp lệ cho tài khoản nhân viên.');
+    data.email = email;
   }
   if (body.position !== undefined) {
     if (!positions.includes(body.position)) throw badRequest('Vị trí nhân viên không hợp lệ.');
@@ -62,7 +68,7 @@ function parseEmployee(body, creating) {
 }
 
 const handleError = (error, res) => {
-  if (error.code === 11000) return res.status(409).json({ message: 'Số điện thoại này đã được sử dụng.' });
+  if (error.code === 11000) return res.status(409).json({ message: error.keyPattern?.phone ? 'Số điện thoại này đã được sử dụng.' : 'Email này đã được sử dụng.' });
   return res.status(error.status || (error.name === 'ValidationError' ? 400 : 500)).json({ message: error.message });
 };
 

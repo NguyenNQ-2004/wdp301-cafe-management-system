@@ -45,12 +45,12 @@ test('UC27 reconciles only cashier cash payments and saves one printable snapsho
     return { status: response.status, data: await response.json() };
   };
   const hash = await bcrypt.hash('test-password', 4);
-  const admin = await User.create({ fullName: 'Admin', phone: '0999000061', passwordHash: hash, role: 'ADMIN' });
-  const cashierA = await User.create({ fullName: 'Cashier A', phone: '0999000062', passwordHash: hash, role: 'STAFF', position: 'CASHIER' });
-  const cashierB = await User.create({ fullName: 'Cashier B', phone: '0999000063', passwordHash: hash, role: 'STAFF', position: 'CASHIER' });
-  const barista = await User.create({ fullName: 'Barista', phone: '0999000064', passwordHash: hash, role: 'STAFF', position: 'BARISTA' });
-  const customer = await User.create({ fullName: 'Customer', phone: '0999000065', passwordHash: hash, role: 'CUSTOMER' });
-  const tokenFor = async (user) => (await request('POST', '/api/auth/login', { phone: user.phone, password: 'test-password' })).data.token;
+  const admin = await User.create({ fullName: 'Admin', phone: '0999000061', email: 'test-0999000061@example.com', passwordHash: hash, role: 'ADMIN' });
+  const cashierA = await User.create({ fullName: 'Cashier A', phone: '0999000062', email: 'test-0999000062@example.com', passwordHash: hash, role: 'STAFF', position: 'CASHIER' });
+  const cashierB = await User.create({ fullName: 'Cashier B', phone: '0999000063', email: 'test-0999000063@example.com', passwordHash: hash, role: 'STAFF', position: 'CASHIER' });
+  const barista = await User.create({ fullName: 'Barista', phone: '0999000064', email: 'test-0999000064@example.com', passwordHash: hash, role: 'STAFF', position: 'BARISTA' });
+  const customer = await User.create({ fullName: 'Customer', phone: '0999000065', email: 'test-0999000065@example.com', passwordHash: hash, role: 'CUSTOMER' });
+  const tokenFor = async (user) => (await request('POST', '/api/auth/login', { email: user.email, password: 'test-password' })).data.token;
   const adminToken = await tokenFor(admin);
   const aToken = await tokenFor(cashierA);
   const bToken = await tokenFor(cashierB);

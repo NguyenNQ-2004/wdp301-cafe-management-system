@@ -21,6 +21,7 @@ export interface CartItem {
   unitPrice: number;
   quantity: number;
   checked: boolean;
+  customization?: { size?: string; sugar?: string; ice?: string; note?: string; topping?: string[] };
 }
 
 export interface RewardOffer {
@@ -64,6 +65,7 @@ export interface OrderRecord {
   deliveryAddress?: string;
   orderNote?: string;
   paymentMethod?: 'COD' | 'PAY_AT_COUNTER' | 'DEMO_ONLINE' | 'CASH' | 'VNPAY' | 'MOMO' | 'BANK_TRANSFER';
+  demoProvider?: 'MOMO' | 'VNPAY' | 'BANK_TRANSFER';
   createdAt: string;
 }
 
@@ -71,6 +73,7 @@ export interface PaymentRecord {
   _id: string;
   order: string;
   paymentMethod: 'CASH' | 'VNPAY' | 'MOMO' | 'BANK_TRANSFER' | 'DEMO_ONLINE';
+  demoProvider?: 'MOMO' | 'VNPAY' | 'BANK_TRANSFER';
   amount: number;
   status: 'PENDING' | 'SUCCESS' | 'FAILED';
   transactionCode?: string;

@@ -2,10 +2,6 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const getJwtSecret = require('../config/jwtSecret');
 
-/**
- * Middleware xác thực JWT token
- * Gán req.user từ token hợp lệ
- */
 const protect = async (req, res, next) => {
   let token;
 
@@ -14,13 +10,13 @@ const protect = async (req, res, next) => {
     req.headers.authorization.startsWith('Bearer')
   ) {
     try {
-      // Lấy token từ header
+      // Get token from header
       token = req.headers.authorization.split(' ')[1];
 
-      // Xác thực token
+      // Verify token
       const decoded = jwt.verify(token, getJwtSecret());
 
-      // Gán user vào request (bỏ passwordHash)
+      // Get user from the token
       req.user = await User.findById(decoded.id).select('-passwordHash');
 
       if (!req.user) {

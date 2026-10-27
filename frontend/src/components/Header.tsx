@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { PageRoute } from '../types';
-import useAuthStore from '../store/authStore';
 
 interface HeaderProps {
   currentRoute: PageRoute;
@@ -8,30 +8,26 @@ interface HeaderProps {
   cartCount: number;
   onOpenAuth: () => void;
   onSearch?: (query: string) => void;
+  user?: { fullName: string } | null;
+  onLogout?: () => void;
 }
+
+const AuthLinks = () => <>
+  <Link to="/login" className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-primary px-4 text-sm font-semibold text-primary hover:bg-primary/5">Đăng nhập</Link>
+  <Link to="/register" className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-container">Đăng ký</Link>
+</>;
 
 export const Header: React.FC<HeaderProps> = ({
   currentRoute,
   onNavigate,
   cartCount,
   onOpenAuth,
-  onSearch
+  onSearch,
+  user = null,
+  onLogout
 }) => {
-  const { user, logout } = useAuthStore();
   const [searchValue, setSearchValue] = useState('');
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // Đóng dropdown khi click ra ngoài
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setIsUserMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,50 +47,19 @@ export const Header: React.FC<HeaderProps> = ({
     { route: 'feedback', label: 'Phản ánh & Khiếu nại' }
   ];
 
-  // Helper hiển thị badge vai trò
-  const getRoleBadge = () => {
-    if (!user) return null;
-    if (user.role === 'ADMIN') {
-      return (
-        <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 border border-red-200">
-          Admin
-        </span>
-      );
-    }
-    if (user.position === 'CASHIER' || user.position === 'MANAGER') {
-      return (
-        <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 border border-blue-200">
-          Thu ngân
-        </span>
-      );
-    }
-    if (user.position === 'BARISTA') {
-      return (
-        <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-          Pha chế
-        </span>
-      );
-    }
-    return (
-      <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
-        Hội viên
-      </span>
-    );
-  };
-
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-surface-container-lowest border-b border-surface-container-highest shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
-      <div className="h-20 w-full px-margin-lg flex items-center justify-between gap-space-lg">
+      <div className="h-20 w-full px-4 md:px-margin-lg flex items-center justify-between gap-3 md:gap-space-lg">
         {/* Brand Logo & Main Nav */}
         <div className="flex items-center gap-space-xl">
           <button
             onClick={() => onNavigate('home')}
-            className="flex items-center gap-space-sm text-left group cursor-pointer"
+            className="flex items-center gap-space-sm text-left group"
           >
             <span className="w-9 h-9 rounded-lg bg-primary-container flex items-center justify-center text-white shadow-sm group-hover:bg-primary transition-colors">
               <span className="material-symbols-outlined text-[20px]">local_cafe</span>
             </span>
-            <div className="flex flex-col">
+            <div className={user ? 'hidden flex-col sm:flex' : 'flex flex-col'}>
               <span className="font-headline-sm text-headline-sm text-primary tracking-tight font-bold">
                 Aura Café
               </span>
@@ -104,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </button>
 
-          <nav className="hidden xl:flex items-center gap-space-lg h-20">
+          <nav className="hidden 2xl:flex items-center gap-space-lg h-20">
             {navItems.map((item) => {
               const isActive = currentRoute === item.route;
               return (
@@ -127,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Global Search Input */}
         <form
           onSubmit={handleSearchSubmit}
-          className="hidden md:flex items-center gap-space-md flex-1 max-w-md mx-space-md"
+          className="min-w-0 flex items-center gap-space-md flex-1 max-w-md mx-space-md hidden md:flex"
         >
           <div className="relative w-full">
             <span className="material-symbols-outlined absolute left-space-md top-1/2 -translate-y-1/2 text-secondary text-[20px]">
@@ -146,59 +111,18 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </form>
 
-        {/* Action Controls: Role Quick Links, Cart & Profile */}
-        <div className="flex items-center gap-space-md">
-          {/* Quick link tới Portal dành cho Admin / Staff */}
-          {user?.role === 'ADMIN' && (
-            <button
-              onClick={() => onNavigate('admin')}
-              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                currentRoute === 'admin'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[16px]">shield_person</span>
-              <span>Quản trị Admin</span>
-            </button>
-          )}
-
-          {(user?.position === 'CASHIER' || (user?.role === 'ADMIN' && currentRoute !== 'cashier')) && (
-            <button
-              onClick={() => onNavigate('cashier')}
-              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                currentRoute === 'cashier'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[16px]">point_of_sale</span>
-              <span>POS Thu ngân</span>
-            </button>
-          )}
-
-          {(user?.position === 'BARISTA' || (user?.role === 'ADMIN' && currentRoute !== 'barista')) && (
-            <button
-              onClick={() => onNavigate('barista')}
-              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                currentRoute === 'barista'
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[16px]">coffee</span>
-              <span>KDS Pha chế</span>
-            </button>
-          )}
-
+        {/* Action Controls: Cart & Profile */}
+        <div className="flex shrink-0 items-center gap-2 sm:gap-space-md">
           {/* Mobile Menu Dropdown toggle (for smaller screens) */}
-          <div className="flex xl:hidden">
+          <div className="flex 2xl:hidden">
             <button
-              onClick={() => onNavigate('menu')}
-              className="h-10 px-2 flex items-center justify-center rounded-lg border border-surface-container-highest text-on-surface hover:bg-surface-container cursor-pointer"
-              title="Menu"
+              onClick={() => setMobileOpen(open => !open)}
+              className="h-10 px-2 flex items-center justify-center rounded-lg border border-surface-container-highest text-on-surface hover:bg-surface-container"
+              title="Mở điều hướng"
+              aria-label="Mở điều hướng"
+              aria-expanded={mobileOpen}
             >
-              <span className="material-symbols-outlined text-[20px]">menu_book</span>
+              <span className="material-symbols-outlined text-[20px]">{mobileOpen ? 'close' : 'menu'}</span>
             </button>
           </div>
 
@@ -223,172 +147,21 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </button>
 
-          {/* User Profile / Auth Area with Dropdown */}
-          <div className="relative" ref={menuRef}>
-            {user ? (
-              <button
-                type="button"
-                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-full sm:rounded-lg border border-surface-container-highest hover:bg-surface-container transition-all cursor-pointer"
-              >
-                <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm shadow-sm">
-                  {user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}
-                </div>
-                <div className="hidden sm:flex flex-col text-left">
-                  <span className="text-xs font-semibold text-on-surface leading-tight max-w-[120px] truncate">
-                    {user.fullName}
-                  </span>
-                  <div className="flex items-center mt-0.5">
-                    {getRoleBadge()}
-                  </div>
-                </div>
-                <span className="material-symbols-outlined text-secondary text-[18px] hidden sm:block">
-                  {isUserMenuOpen ? 'expand_less' : 'expand_more'}
-                </span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={onOpenAuth}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary-container text-white font-label-md text-sm font-semibold shadow-sm cursor-pointer transition-all active:scale-95"
-              >
-                <span className="material-symbols-outlined text-[18px]">person</span>
-                <span className="hidden sm:inline">Đăng nhập</span>
-              </button>
-            )}
-
-            {/* Dropdown Menu khi đã đăng nhập */}
-            {user && isUserMenuOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-surface-container-lowest rounded-xl shadow-xl border border-surface-container-high py-2 z-50 animate-fadeIn">
-                {/* Header info trong Dropdown */}
-                <div className="px-4 py-3 border-b border-surface-container-highest">
-                  <div className="font-semibold text-sm text-on-surface">{user.fullName}</div>
-                  <div className="text-xs text-secondary mt-0.5">{user.phone}</div>
-                  <div className="mt-1.5">{getRoleBadge()}</div>
-                </div>
-
-                {/* Các liên kết điều hướng */}
-                <div className="py-1">
-                  <button
-                    onClick={() => {
-                      onNavigate('home');
-                      setIsUserMenuOpen(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-xs sm:text-sm text-on-surface hover:bg-surface-container flex items-center gap-2.5 transition-colors cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[18px] text-secondary">home</span>
-                    <span>Về Trang chủ Aura</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      onNavigate('menu');
-                      setIsUserMenuOpen(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-xs sm:text-sm text-on-surface hover:bg-surface-container flex items-center gap-2.5 transition-colors cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[18px] text-secondary">restaurant_menu</span>
-                    <span>Khám phá Menu đồ uống</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      onNavigate('profile');
-                      setIsUserMenuOpen(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-xs sm:text-sm text-on-surface hover:bg-surface-container flex items-center gap-2.5 transition-colors cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[18px] text-secondary">account_circle</span>
-                    <span>Hồ sơ & Đổi mật khẩu</span>
-                  </button>
-
-                  {user.role === 'STAFF' && (
-                    <button
-                      onClick={() => {
-                        onNavigate('my-schedule');
-                        setIsUserMenuOpen(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-xs sm:text-sm text-on-surface hover:bg-surface-container flex items-center gap-2.5 transition-colors cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[18px] text-secondary">calendar_month</span>
-                      <span>Lịch làm việc của tôi</span>
-                    </button>
-                  )}
-                  {user.role === 'STAFF' && (
-                    <button
-                      onClick={() => {
-                        onNavigate('my-attendance');
-                        setIsUserMenuOpen(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-xs sm:text-sm text-on-surface hover:bg-surface-container flex items-center gap-2.5 transition-colors cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[18px] text-secondary">how_to_reg</span>
-                      <span>Chấm công của tôi</span>
-                    </button>
-                  )}
-
-                  {/* Quyền quản trị cho Admin */}
-                  {user.role === 'ADMIN' && (
-                    <button
-                      onClick={() => {
-                        onNavigate('admin');
-                        setIsUserMenuOpen(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-xs sm:text-sm text-red-700 hover:bg-red-50 flex items-center gap-2.5 transition-colors cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[18px] text-red-600">shield_person</span>
-                      <span>Bảng Quản trị Admin</span>
-                    </button>
-                  )}
-
-                  {/* Quyền POS cho Cashier hoặc Admin */}
-                  {(user.position === 'CASHIER' || user.role === 'ADMIN') && (
-                    <button
-                      onClick={() => {
-                        onNavigate('cashier');
-                        setIsUserMenuOpen(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-xs sm:text-sm text-blue-700 hover:bg-blue-50 flex items-center gap-2.5 transition-colors cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[18px] text-blue-600">point_of_sale</span>
-                      <span>Màn hình Thu ngân POS</span>
-                    </button>
-                  )}
-
-                  {/* Quyền KDS cho Barista hoặc Admin */}
-                  {(user.position === 'BARISTA' || user.role === 'ADMIN') && (
-                    <button
-                      onClick={() => {
-                        onNavigate('barista');
-                        setIsUserMenuOpen(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-xs sm:text-sm text-amber-700 hover:bg-amber-50 flex items-center gap-2.5 transition-colors cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[18px] text-amber-600">coffee</span>
-                      <span>Màn hình Pha chế KDS</span>
-                    </button>
-                  )}
-                </div>
-
-                {/* Nút Đăng xuất */}
-                <div className="border-t border-surface-container-highest pt-1 mt-1">
-                  <button
-                    onClick={() => {
-                      logout();
-                      setIsUserMenuOpen(false);
-                      onNavigate('home');
-                    }}
-                    className="w-full px-4 py-2 text-left text-xs sm:text-sm text-red-600 hover:bg-red-50 flex items-center gap-2.5 transition-colors cursor-pointer font-medium"
-                  >
-                    <span className="material-symbols-outlined text-[18px] text-red-600">logout</span>
-                    <span>Đăng xuất tài khoản</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          {user ? <>
+            <button type="button" onClick={onOpenAuth} aria-label={`Tài khoản ${user.fullName}`} className="flex h-10 items-center gap-2 rounded-lg bg-primary px-2 sm:px-3 text-white hover:bg-primary-container">
+              <span className="material-symbols-outlined text-[20px]">person</span>
+              <span className="hidden max-w-28 truncate text-sm font-semibold lg:inline">{user.fullName}</span>
+            </button>
+            <button type="button" onClick={onLogout} aria-label="Đăng xuất" title="Đăng xuất" className="flex h-10 items-center gap-2 rounded-lg border border-surface-container-highest px-2 sm:px-3 text-sm font-semibold text-on-surface hover:bg-surface-container">
+              <span className="material-symbols-outlined text-[20px]">logout</span><span className="hidden sm:inline">Đăng xuất</span>
+            </button>
+          </> : <div className="hidden items-center gap-2 sm:flex"><AuthLinks /></div>}
         </div>
       </div>
+      {!user && <div aria-label="Tài khoản khách hàng" className="flex h-12 items-center justify-center gap-3 border-t border-surface-container-highest px-4 sm:hidden"><AuthLinks /></div>}
+      {mobileOpen && <nav aria-label="Điều hướng trên điện thoại" className="absolute inset-x-3 top-full mt-2 grid gap-1 rounded-2xl border border-stone-200 bg-white p-3 shadow-xl 2xl:hidden">
+        {navItems.map(item => <button key={item.route} onClick={() => { onNavigate(item.route); setMobileOpen(false); }} className={`rounded-xl px-4 py-3 text-left text-sm font-semibold ${currentRoute === item.route ? 'bg-primary/10 text-primary' : 'text-stone-700 hover:bg-stone-50'}`}>{item.label}</button>)}
+      </nav>}
     </header>
   );
 };

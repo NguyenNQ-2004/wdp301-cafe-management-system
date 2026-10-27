@@ -1,0 +1,87 @@
+◇ injected env (2) from .env
+✔ UC26 records own attendance once and lets admin review and mark absence (1258.9183ms)
+◇ injected env (2) from .env
+✔ Screen 28: Customer CRM management flow and access control (1105.5984ms)
+◇ injected env (2) from .env
+▶ email registration and login keep phone as contact information
+  ✔ registration normalizes email and stores contact phone without escalating roles (246.6731ms)
+  ✔ email login is case insensitive and retains the contact information (125.3865ms)
+  ✔ phone login and malformed credentials are rejected (171.7429ms)
+  ✔ duplicate email and invalid registrations do not create accounts (43.6342ms)
+  ✔ profile email cannot be removed and the new email becomes the login (179.1381ms)
+  ✔ normalized identity index prevents concurrent duplicate registrations (291.0272ms)
+  ✔ duplicate legacy emails are rejected without changing the existing records (24.2823ms)
+  ✔ profile cannot take another account email and locked users cannot log in (165.1058ms)
+✔ email registration and login keep phone as contact information (2794.598ms)
+◇ injected env (2) from .env
+✖ UC23 allows admin to manage staff without exposing credentials or affecting customers (811.4035ms)
+◇ injected env (2) from .env
+✔ UC25 assigns weekly shifts and keeps staff schedules private (712.7178ms)
+◇ injected env (2) from .env
+✔ Screen 30: Feedback & complaints submission, filtering, and admin response flow (584.2634ms)
+◇ injected env (2) from .env
+✔ inventory overview, filters and stock adjustments (536.9624ms)
+◇ injected env (2) from .env
+✔ Screen 29: Loyalty rules, phone lookup, point adjust, and tier upgrade flow (528.514ms)
+◇ injected env (2) from .env
+✖ UC11 order creation, UC12 demo payment and UC13 counter payment (818.5842ms)
+◇ injected env (2) from .env
+✔ purchase order creation, ordering and receiving update real stock once (576.0272ms)
+◇ injected env (2) from .env
+✔ restock overview and proposal approval flow (509.1023ms)
+◇ injected env (2) from .env
+✔ actual server mounts existing API routers and protects customer orders (1061.2256ms)
+◇ injected env (2) from .env
+✔ UC27 reconciles only cashier cash payments and saves one printable snapshot (822.9364ms)
+◇ injected env (2) from .env
+✔ supplier overview and protected CRUD flow (451.3331ms)
+◇ injected env (2) from .env
+✔ UC24 configures three non-overlapping shifts in shop settings (517.0512ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 21
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 27465.4022
+
+✖ failing tests:
+
+test at tests\employeeManagement.test.js:13:1
+✖ UC23 allows admin to manage staff without exposing credentials or affecting customers (811.4035ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + undefined
+  - null
+
+      at TestContext.<anonymous> (C:\Users\nguye\Desktop\wdp301-cafe-management-system\backend\tests\employeeManagement.test.js:81:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\onlineOrdering.test.js:22:1
+✖ UC11 order creation, UC12 demo payment and UC13 counter payment (818.5842ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  400 !== 201
+
+      at TestContext.<anonymous> (C:\Users\nguye\Desktop\wdp301-cafe-management-system\backend\tests\onlineOrdering.test.js:139:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 400,
+    expected: 201,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

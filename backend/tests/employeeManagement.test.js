@@ -44,15 +44,15 @@ test('UC23 allows admin to manage staff without exposing credentials or affectin
   };
 
   const passwordHash = await bcrypt.hash('admin-password', 4);
-  const admin = await User.create({ fullName: 'UC23 Admin', phone: '0999000021', passwordHash, role: 'ADMIN' });
-  const customer = await User.create({ fullName: 'UC23 Customer', phone: '0999000022', passwordHash, role: 'CUSTOMER' });
-  const adminToken = (await request('POST', '/api/auth/login', { phone: admin.phone, password: 'admin-password' })).data.token;
-  const customerToken = (await request('POST', '/api/auth/login', { phone: customer.phone, password: 'admin-password' })).data.token;
+  const admin = await User.create({ fullName: 'UC23 Admin', phone: '0999000021', email: 'test-0999000021@example.com', passwordHash, role: 'ADMIN' });
+  const customer = await User.create({ fullName: 'UC23 Customer', phone: '0999000022', email: 'test-0999000022@example.com', passwordHash, role: 'CUSTOMER' });
+  const adminToken = (await request('POST', '/api/auth/login', { email: admin.email, password: 'admin-password' })).data.token;
+  const customerToken = (await request('POST', '/api/auth/login', { email: customer.email, password: 'admin-password' })).data.token;
   assert.equal((await request('GET', '/api/employees')).status, 401);
   assert.equal((await request('GET', '/api/employees', null, customerToken)).status, 403);
   assert.equal((await request('POST', '/api/employees', { fullName: 'Blocked' }, customerToken)).status, 403);
 
-  const employeeData = { fullName: '  Thu ngân A  ', phone: '0999000023', password: 'employee-password', position: 'CASHIER', baseSalary: 6500000, hireDate: '2026-10-01' };
+  const employeeData = { fullName: '  Thu ngân A  ', phone: '0999000023', email: 'test-0999000023@example.com', password: 'employee-password', position: 'CASHIER', baseSalary: 6500000, hireDate: '2026-10-01' };
   assert.equal((await request('POST', '/api/employees', { ...employeeData, password: undefined }, adminToken)).status, 400);
   assert.equal((await request('POST', '/api/employees', { ...employeeData, role: 'ADMIN' }, adminToken)).status, 400);
   assert.equal((await request('POST', '/api/employees', { ...employeeData, baseSalary: -1 }, adminToken)).status, 400);
@@ -64,7 +64,7 @@ test('UC23 allows admin to manage staff without exposing credentials or affectin
   assert.equal(created.data.baseSalary, 6500000);
   assert.equal(created.data.passwordHash, undefined);
   assert.equal((await request('POST', '/api/employees', employeeData, adminToken)).status, 409);
-  const staffToken = (await request('POST', '/api/auth/login', { phone: employeeData.phone, password: employeeData.password })).data.token;
+  const staffToken = (await request('POST', '/api/auth/login', { email: employeeData.email, password: employeeData.password })).data.token;
   assert.equal((await request('GET', '/api/employees', null, staffToken)).status, 403);
 
   const list = await request('GET', '/api/employees', null, adminToken);
@@ -79,9 +79,9 @@ test('UC23 allows admin to manage staff without exposing credentials or affectin
   assert.equal(updated.data.baseSalary, 7000000);
   assert.equal(updated.data.status, 'INACTIVE');
   assert.equal(updated.data.hireDate, null);
-  assert.equal((await request('POST', '/api/auth/login', { phone: employeeData.phone, password: employeeData.password })).status, 403);
+  assert.equal((await request('POST', '/api/auth/login', { email: employeeData.email, password: employeeData.password })).status, 403);
   assert.equal((await request('GET', '/api/employees', null, staffToken)).status, 403);
   assert.equal((await request('PUT', `/api/employees/${created.data._id}`, { status: 'ACTIVE', password: 'new-employee-password' }, adminToken)).status, 200);
-  assert.equal((await request('POST', '/api/auth/login', { phone: employeeData.phone, password: 'new-employee-password' })).status, 200);
+  assert.equal((await request('POST', '/api/auth/login', { email: employeeData.email, password: 'new-employee-password' })).status, 200);
   assert.equal((await User.findById(customer._id)).role, 'CUSTOMER');
 });

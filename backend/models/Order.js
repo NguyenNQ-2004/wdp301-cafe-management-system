@@ -28,6 +28,7 @@ const orderSchema = new mongoose.Schema({
   deliveryFee: { type: Number, default: 0 },
   finalAmount: { type: Number, required: true },
   paymentMethod: { type: String, enum: ['COD', 'PAY_AT_COUNTER', 'CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER', 'DEMO_ONLINE'], default: 'CASH' },
+  demoProvider: { type: String, enum: ['MOMO', 'VNPAY', 'BANK_TRANSFER'] },
   recipientName: { type: String },
   recipientPhone: { type: String },
   deliveryAddress: { type: String },
