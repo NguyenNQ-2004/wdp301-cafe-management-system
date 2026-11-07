@@ -41,8 +41,10 @@ test('email registration and login keep phone as contact information', async t =
     assert.equal(result.data.passwordHash, undefined); assert.equal(result.data.emailKey, undefined);
     assert.equal((await request('GET', '/api/auth/me', null, token)).data.email, 'coffee.user@gmail.com');
   });
-  await t.test('phone login and malformed credentials are rejected', async () => {
-    for (const body of [{ phone: '0901234567', password: input.password }, {}, { email: input.email }, { email: { $ne: null }, password: input.password }, { email: 'bad', password: input.password }]) {
+  await t.test('phone and email local-part login work while malformed credentials are rejected', async () => {
+    for (const identifier of ['0901234567', 'coffee.user']) assert.equal((await request('POST', '/api/auth/login', { identifier, password: input.password })).status, 200);
+    assert.equal((await request('POST', '/api/auth/login', { identifier: 'unknown', password: input.password })).status, 401);
+    for (const body of [{}, { email: input.email }, { email: { $ne: null }, password: input.password }, { email: 'bad@', password: input.password }]) {
       assert.equal((await request('POST', '/api/auth/login', body)).status, 400);
     }
     assert.equal((await request('POST', '/api/auth/login', { email: input.email, password: 'wrong-password' })).status, 401);
@@ -64,6 +66,16 @@ test('email registration and login keep phone as contact information', async t =
   await t.test('normalized identity index prevents concurrent duplicate registrations', async () => {
     const results = await Promise.all([1, 2].map(n => request('POST', '/api/auth/register', { ...input, email: 'parallel@gmail.com', phone: `090123457${n}` })));
     assert.deepEqual(results.map(result => result.status).sort(), [201, 409]);
+  });
+  await t.test('password changes validate length, current password and confirmation before saving', async () => {
+    for (const patch of [{ newPassword: 'short' }, { oldPassword: { $ne: null } }, { confirmPassword: 'different' }]) assert.equal((await request('PUT', '/api/auth/change-password', { oldPassword: input.password, newPassword: '123456', ...patch }, token)).status, 400);
+    assert.equal((await request('PUT', '/api/auth/change-password', { oldPassword: 'wrong', newPassword: '123456' }, token)).status, 401);
+    assert.equal((await request('PUT', '/api/auth/change-password', { oldPassword: input.password, newPassword: '123456', confirmPassword: '123456' }, token)).status, 200);
+    assert.equal((await request('POST', '/api/auth/login', { identifier: 'new.identity', password: '123456' })).status, 200);
+    assert.equal((await request('GET', '/api/auth/me', undefined, token)).status, 401);
+    token = (await request('POST', '/api/auth/login', { identifier: 'new.identity', password: '123456' })).data.token;
+    assert.equal((await request('PUT', '/api/auth/change-password', { oldPassword: '123456', newPassword: input.password }, token)).status, 200);
+    token = (await request('POST', '/api/auth/login', { identifier: 'new.identity', password: input.password })).data.token;
   });
   await t.test('duplicate legacy emails are rejected without changing the existing records', async () => {
     const passwordHash = await bcrypt.hash('legacy-password', 4);

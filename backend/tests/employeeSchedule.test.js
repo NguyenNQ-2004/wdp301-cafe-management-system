@@ -53,6 +53,7 @@ test('UC25 assigns weekly shifts and keeps staff schedules private', async (t) =
   const staffToken = await tokenFor(staffA);
   const otherToken = await tokenFor(staffB);
   const customerToken = await tokenFor(customer);
+  await require('../models/WorkShift').create(['MORNING', 'EVENING'].map((shiftName, i) => ({ weekStart: new Date('2026-10-12'), shiftName, startTime: i ? '17:00' : '07:00', endTime: i ? '22:00' : '12:00' })));
   const week = '?weekStart=2026-10-12';
   const payload = { userId: String(staffA._id), workDate: '2026-10-12', shiftName: 'MORNING', note: 'Quầy sáng' };
 

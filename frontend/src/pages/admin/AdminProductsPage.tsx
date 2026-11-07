@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import ImageInput from '../../components/ImageInput';
 import type { PageRoute, Product } from '../../types';
 import { useDb } from '../../data/DbContext';
-import { fmtMoney, productCost, productSizes, productToppings } from '../../data/dbUtils';
+import { fmtMoney, productCost, productCostDetails, productSizes, productToppings } from '../../data/dbUtils';
 import { AdminLayout, Badge, Field, FormActions, Modal, PrimaryButton, StatCard, inputCls } from './AdminUi';
 
 interface AdminProductsPageProps {
@@ -176,7 +177,7 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
             </thead>
             <tbody className="divide-y divide-stone-100">
               {filtered.map(p => {
-                const cost = productCost(db, p.id);
+                const { cost, estimated } = productCostDetails(db, p.id);
                 const basePrice = p.base_price ?? p.basePrice ?? 0;
                 const margin =
                   cost !== null && basePrice > 0
@@ -216,7 +217,7 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
                       )}
                     </td>
                     <td className="py-3 px-4 text-right font-mono text-stone-500">
-                      {cost === null ? '—' : fmtMoney(cost)}
+                      {cost === null ? '—' : <>{fmtMoney(cost)}{estimated && <span className="block text-[10px] font-sans text-amber-700">Dự kiến · chưa nhập kho</span>}</>}
                     </td>
                     <td className="py-3 px-4 text-right font-mono font-bold text-stone-900">
                       {fmtMoney(basePrice)}
@@ -316,13 +317,8 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
                   className={inputCls}
                 />
               </Field>
-              <Field label="Ảnh (URL)" column="image_url">
-                <input
-                  maxLength={500}
-                  value={editing.form.image_url}
-                  onChange={e => setForm({ image_url: e.target.value })}
-                  className={inputCls}
-                />
+              <Field label="Ảnh sản phẩm" column="image_url">
+                <ImageInput value={editing.form.image_url} onChange={image_url => setForm({ image_url })} className={inputCls} />
               </Field>
             </div>
             <Field label="Mô tả" column="description">

@@ -97,8 +97,8 @@ const CustomerDashboard: React.FC = () => {
               <span className="material-symbols-outlined text-[24px]">stars</span>
             </div>
             <div>
-              <div className="text-xs text-white/80">Hạng Hội Viên</div>
-              <div className="text-lg font-bold text-amber-300">SILVER MEMBER</div>
+              <div className="text-xs text-white/80">Điểm khách hàng</div>
+              <div className="text-lg font-bold text-amber-300">Tích điểm theo số điện thoại</div>
               <div className="text-xs text-white/90">120 Điểm tích lũy</div>
             </div>
           </div>

@@ -61,7 +61,8 @@ export default function AdminStockPage() {
 
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!token || !form.ingredientId || form.quantity <= 0) return showToast('Số lượng phải lớn hơn 0.');
+    if (saving) return;
+    if (!token || !form.ingredientId || !Number.isFinite(form.quantity) || form.quantity <= 0) return showToast('Số lượng phải lớn hơn 0.');
     setSaving(true);
     try {
       await shopApi('/api/inventory-transactions', {
@@ -148,7 +149,7 @@ export default function AdminStockPage() {
               Nhập số lượng theo đơn vị của nguyên liệu đã chọn.
             </p>
           </Field>
-          <FormActions onCancel={() => setIsModalOpen(false)} submitLabel={saving ? 'Đang ghi...' : 'Ghi phiếu'} />
+          <FormActions loading={saving} onCancel={() => setIsModalOpen(false)} submitLabel={saving ? 'Đang ghi...' : 'Ghi phiếu'} />
         </form>
       </Modal>
     ) : null}

@@ -2,10 +2,13 @@ const express = require('express');
 const mongoose = require('mongoose');
 const InventoryTransaction = require('../models/InventoryTransaction');
 const Ingredient = require('../models/Ingredient');
-const PurchaseOrderItem = require('../models/PurchaseOrderItem');
+const { latestPurchasePrices } = require('../utils/purchasePrices');
 const { protect, adminOnly } = require('../middlewares/authMiddleware');
+const { lockIngredients, moveStock, undoStockMove } = require('../utils/stockLots');
+const { invalid } = require('../utils/adminValidation');
 
-const router = express.Router();
+const { atomicRouter } = require('../utils/atomicRoute');
+const router = atomicRouter(express.Router());
 const TRANSACTION_TYPES = ['IN_PURCHASE', 'OUT_ORDER', 'ADJUSTMENT', 'SPOILAGE'];
 
 router.use(protect);
@@ -29,23 +32,15 @@ router.get('/overview', adminOnly, async (req, res) => {
       .populate('supplier', 'name phone')
       .sort({ name: 1 })
       .lean();
-    const ingredientIds = ingredients.map((ingredient) => ingredient._id);
-    const purchaseItems = await PurchaseOrderItem.find({ ingredient: { $in: ingredientIds } })
-      .select('ingredient unitPrice createdAt')
-      .sort({ createdAt: -1, _id: -1 })
-      .lean();
-
-    const latestPrice = new Map();
-    for (const item of purchaseItems) {
-      const key = String(item.ingredient);
-      if (!latestPrice.has(key)) latestPrice.set(key, item.unitPrice);
-    }
+    const latestPrice = await latestPurchasePrices();
 
     let estimatedValue = 0;
     let lowStockCount = 0;
     const stock = ingredients.map((ingredient) => {
       const latestUnitPrice = latestPrice.get(String(ingredient._id)) ?? null;
-      const itemValue = latestUnitPrice === null ? null : ingredient.currentStock * latestUnitPrice;
+      const itemValue = ingredient.stockLots
+        ? ingredient.stockLots.some(lot => lot.remainingQuantity > 0 && lot.unitCost == null) ? null : ingredient.stockLots.reduce((sum, lot) => sum + lot.remainingQuantity * (lot.unitCost ?? 0), 0)
+        : latestUnitPrice === null ? null : ingredient.currentStock * latestUnitPrice;
       const isLowStock = ingredient.currentStock <= ingredient.minStockLevel;
       if (itemValue !== null) estimatedValue += itemValue;
       if (isLowStock) lowStockCount += 1;
@@ -90,8 +85,10 @@ router.get('/', adminOnly, async (req, res) => {
 
 // Record a movement and update stock in one guarded database operation.
 router.post('/', adminOnly, async (req, res) => {
+  let release;
   try {
     const { ingredient, transactionType, referenceId, note } = req.body;
+    if (!['ADJUSTMENT', 'SPOILAGE'].includes(transactionType)) return res.status(400).json({ message: 'Nhập hàng và xuất pha chế phải được tạo qua luồng phiếu nhập hoặc đơn hàng.' });
     const quantity = Number(req.body.quantity);
     if (!mongoose.isValidObjectId(ingredient) || !TRANSACTION_TYPES.includes(transactionType) || !Number.isFinite(quantity) || quantity <= 0) {
       return res.status(400).json({ message: 'Thông tin biến động kho không hợp lệ.' });
@@ -106,33 +103,26 @@ router.post('/', adminOnly, async (req, res) => {
     const referenceType = transactionType === 'IN_PURCHASE'
       ? 'PURCHASE_ORDER'
       : transactionType === 'OUT_ORDER' ? 'ORDER' : 'ADJUSTMENT';
-    const stockFilter = { _id: ingredient };
-    if (stockDelta < 0) stockFilter.currentStock = { $gte: Math.abs(stockDelta) };
+    const totalCost = req.body.totalCost;
+    if (totalCost !== undefined && (!Number.isSafeInteger(totalCost) || totalCost < 0 || stockDelta < 0)) throw invalid('Tổng tiền chỉ áp dụng cho lượng nhập và phải là số nguyên không âm.');
+    release = lockIngredients([ingredient]);
+    const movement = await moveStock(ingredient, stockDelta, { unitCost: totalCost === undefined ? null : totalCost / quantity, sourceType: transactionType === 'IN_PURCHASE' ? 'PURCHASE' : 'ADJUSTMENT', sourceId: referenceId });
 
-    const updatedIngredient = await Ingredient.findOneAndUpdate(
-      stockFilter,
-      { $inc: { currentStock: stockDelta } },
-      { returnDocument: 'after', runValidators: true }
-    );
-    if (!updatedIngredient) {
-      const exists = await Ingredient.exists({ _id: ingredient });
-      return res.status(exists ? 409 : 404).json({ message: exists ? 'Số lượng xuất vượt quá tồn kho hiện tại.' : 'Không tìm thấy nguyên liệu.' });
-    }
-
+    let transaction;
     try {
-      const transaction = await InventoryTransaction.create({
+      transaction = await InventoryTransaction.create({
         ingredient, transactionType, quantity, stockDelta, referenceType,
-        referenceId, note, createdBy: req.user._id
+        referenceId, note, createdBy: req.user._id, costTotal: movement.cost, lotAllocations: movement.allocations
       });
-      await transaction.populate([{ path: 'ingredient', select: 'name unit currentStock' }, { path: 'createdBy', select: 'fullName' }]);
-      return res.status(201).json({ message: 'Ghi nhận biến động kho thành công!', transaction: transactionJson(transaction), updatedStock: updatedIngredient.currentStock });
     } catch (error) {
-      await Ingredient.updateOne({ _id: ingredient }, { $inc: { currentStock: -stockDelta } });
+      await undoStockMove(movement);
       throw error;
     }
+    await transaction.populate([{ path: 'ingredient', select: 'name unit currentStock' }, { path: 'createdBy', select: 'fullName' }]);
+    return res.status(201).json({ message: 'Ghi nhận biến động kho thành công!', transaction: transactionJson(transaction), updatedStock: movement.currentStock });
   } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    res.status(error.status || 500).json({ message: error.message });
+  } finally { release?.(); }
 });
 
 module.exports = router;

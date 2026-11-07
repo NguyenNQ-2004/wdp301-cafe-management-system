@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { loginCredentials, registrationPayload } from '../lib/authCredentials';
+import PasswordRecoveryForm from './PasswordRecoveryForm';
 
 interface AuthModalProps {
   isOpen: boolean;
-  initialTab?: 'login' | 'register';
+  initialTab?: 'login' | 'register' | 'forgot';
   onClose: () => void;
   onLoginSuccess?: (user: any) => void;
 }
@@ -29,7 +30,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [regPhone, setRegPhone] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
-  const [forgotInput, setForgotInput] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   if (!isOpen) return null;
 
@@ -57,7 +58,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       if (!response.ok) {
         setLoginError(response.status === 401
-          ? 'Gmail/email hoặc mật khẩu không đúng. Mật khẩu phân biệt chữ hoa và chữ thường.'
+          ? 'Tên đăng nhập hoặc mật khẩu không đúng. Mật khẩu phân biệt chữ hoa và chữ thường.'
           : data.message || 'Không thể đăng nhập. Vui lòng thử lại.');
         return;
       }
@@ -75,6 +76,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     e.preventDefault();
     if (isRegistering) return;
     setRegisterError('');
+    if (regPassword !== confirmPassword) { setRegisterError('Mật khẩu xác nhận không khớp.'); return; }
     let payload;
     try { payload = registrationPayload({ fullName: regName, phone: regPhone, email: regEmail, password: regPassword }); }
     catch (error) { setRegisterError((error as Error).message); return; }
@@ -83,7 +85,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const response = await fetch(`${(import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '')}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, confirmPassword }),
       });
 
       const data = await response.json();
@@ -97,6 +99,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setLoginIdentifier(payload.email);
       setLoginPassword('');
       setRegPassword('');
+      setConfirmPassword('');
       setLoginError('');
       setActiveTab('login');
     } catch {
@@ -104,10 +107,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     } finally { setIsRegistering(false); }
   };
 
-  const handleForgotSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    triggerToast('Khôi phục mật khẩu qua email chưa được hỗ trợ. Vui lòng liên hệ quản trị viên để được trợ giúp.');
-  };
 
   return (
     <div role="dialog" aria-modal="true" aria-label={activeTab === 'register' ? 'Đăng ký tài khoản' : activeTab === 'login' ? 'Đăng nhập tài khoản' : 'Khôi phục mật khẩu'} className="fixed inset-0 z-[100] flex items-center justify-center p-gutter md:p-gutter-lg bg-black/60 backdrop-blur-sm animate-fadeIn">
@@ -233,7 +232,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   Chào mừng trở lại
                 </h2>
                 <p className="font-body-sm text-body-sm text-secondary">
-                  Nhập Gmail và mật khẩu tài khoản Aura Café để tiếp tục
+                  Nhập số điện thoại, email hoặc tên email để đăng nhập
                 </p>
               </div>
 
@@ -241,17 +240,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div className="space-y-space-xs mt-space-xs">
                 <label className="font-label-md text-label-md text-on-surface font-medium block">
-                  Gmail / Email đăng nhập
+                  Số điện thoại / Email / Tên đăng nhập
                 </label>
                 <div className="relative flex items-center">
                   <span className="material-symbols-outlined absolute left-space-md text-secondary pointer-events-none text-[20px]">
                     alternate_email
                   </span>
                   <input
-                    type="email"
+                    type="text"
                     name="email"
                     autoComplete="username"
-                    inputMode="email"
+                    inputMode="text"
                     autoCapitalize="none"
                     spellCheck={false}
                     value={loginIdentifier}
@@ -412,8 +411,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     autoComplete="new-password"
                     value={regPassword}
                     onChange={(e) => setRegPassword(e.target.value)}
-                    minLength={8}
-                    placeholder="Mật khẩu tài khoản Aura Café, tối thiểu 8 ký tự"
+                    minLength={6}
+                    placeholder="Mật khẩu tài khoản Aura Café, tối thiểu 6 ký tự"
                     className="w-full h-11 pl-11 pr-11 bg-surface-container-low rounded text-on-surface placeholder:text-secondary/60 font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary-container/20 border-0"
                   />
                   <button
@@ -428,6 +427,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
+              <label className="block text-sm font-medium">Xác nhận mật khẩu<input type="password" name="confirmPassword" autoComplete="new-password" required minLength={6} value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} className="mt-2 w-full h-11 rounded bg-surface-container-low px-3" /></label>
               <div className="flex items-center gap-space-sm pt-space-xs">
                 <input
                   type="checkbox"
@@ -465,61 +465,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           {/* TAB 3: FORGOT PASSWORD FORM */}
           {activeTab === 'forgot' && (
-            <form className="flex flex-col gap-space-md" onSubmit={handleForgotSubmit}>
-              <div className="space-y-1">
-                <h2 className="font-headline-md text-headline-md text-on-surface font-semibold tracking-tight">
-                  Khôi phục quyền truy cập
-                </h2>
-                <p className="font-body-sm text-body-sm text-secondary">
-                  Hệ thống sẽ gửi liên kết khôi phục mật khẩu vào hòm thư Gmail của bạn
-                </p>
-              </div>
-
-              <div className="space-y-space-xs mt-space-xs">
-                <label className="font-label-md text-label-md text-on-surface font-medium block">
-                  Địa chỉ Email (Gmail)
-                </label>
-                <div className="relative flex items-center">
-                  <span className="material-symbols-outlined absolute left-space-md text-secondary text-[20px]">
-                    mail
-                  </span>
-                  <input
-                    type="email"
-                    required
-                    value={forgotInput}
-                    onChange={(e) => setForgotInput(e.target.value)}
-                    placeholder="khachhang@gmail.com"
-                    className="w-full h-11 pl-11 pr-space-md bg-surface-container-low rounded text-on-surface placeholder:text-secondary/60 font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary-container/20 border-0"
-                  />
-                </div>
-              </div>
-
-              <div className="p-space-md bg-surface-container-low rounded-lg flex items-start gap-space-sm text-secondary font-body-sm text-body-sm">
-                <span className="material-symbols-outlined text-[20px] text-primary shrink-0">
-                  info
-                </span>
-                <span>
-                  Đối với tài khoản Quản trị cấp cao (Admin), liên hệ bộ phận IT chi nhánh qua hotline 1900 6868 nếu không nhận được OTP.
-                </span>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full h-12 bg-primary-container hover:bg-primary text-white rounded font-label-lg text-label-lg font-semibold flex items-center justify-center gap-space-sm shadow-md transition-all cursor-pointer"
-              >
-                <span>Gửi mã khôi phục</span>
-                <span className="material-symbols-outlined text-[18px]">send</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('login')}
-                className="w-full h-11 bg-surface-container-low hover:bg-surface-container rounded font-label-md text-label-md text-on-surface flex items-center justify-center gap-space-sm transition-all cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-                <span>Quay lại Đăng nhập</span>
-              </button>
-            </form>
+            <PasswordRecoveryForm onLogin={() => setActiveTab('login')} />
           )}
 
           {/* Operational Security Badge Footer */}

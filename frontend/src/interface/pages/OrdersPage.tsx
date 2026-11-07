@@ -77,7 +77,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ onNavigate, onReorder, o
     { id: 'CANCELLED', label: 'Đã hủy' }
   ];
 
-  const canCancel = (o: Order) => o.status === 'PENDING' || o.status === 'CONFIRMED';
+  const canCancel = (o: Order) => o.status === 'PENDING' && o.payment_status !== 'SUCCESS';
 
   const renderItems = (o: Order) =>
     orderItemsOf(db, o.id).map(it => {
@@ -310,7 +310,7 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ onNavigate, onReorder, o
                     <span className="font-headline-md text-headline-md font-tabular-data font-bold text-primary">{fmtMoney(o.final_amount)}</span>
                   </div>
                   <div className="flex items-center gap-space-xs flex-wrap justify-end">
-                    {o.payment_method === 'DEMO_ONLINE' && o.status !== 'CANCELLED' && <button type="button" onClick={() => onOpenPayment(o.id)} className="h-9 px-space-md rounded-lg bg-primary text-white font-label-md flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">qr_code_2</span>Xem thanh toán</button>}
+                    {['DEMO_ONLINE', 'BANK_TRANSFER'].includes(o.payment_method || '') && o.status !== 'CANCELLED' && <button type="button" onClick={() => onOpenPayment(o.id)} className="h-9 px-space-md rounded-lg bg-primary text-white font-label-md flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">qr_code_2</span>Xem thanh toán</button>}
                     <button
                       type="button"
                       onClick={() => onOpenBill(o.id)}

@@ -43,6 +43,7 @@ if (accounts.customer) {
   const account = accounts.customer;
   await check('Customer cart', '/api/cart', 200, account.token);
   await check('Customer loyalty', '/api/loyalty-transactions', 200, account.token);
+  await check('Customer points and redeemable rewards', '/api/rewards', 200, account.token);
   await check('Customer cannot read employees', '/api/employees', 403, account.token);
   const result = await check('Customer orders', '/api/orders', 200, account.token);
   if (Array.isArray(result.data)) checks.push({ name: 'Customer orders contain only own records', pass: result.data.every(order => String(order.customer?._id || order.customer) === account._id) });

@@ -1,3 +1,4 @@
+import { productCost as calculateProductCost, productCostDetails as calculateProductCostDetails } from '../../data/dbUtils';
 import type {
   DbState,
   InventoryRefType,
@@ -263,8 +264,7 @@ export const customizationTags = (c: OrderCustomization | null | undefined) => {
 
 export const calcEarnPoints = (db: DbState, amount: number) => {
   const unit = getSettingNumber(db, 'points_earn_unit', 1000) || 1000;
-  const step = getSettingNumber(db, 'points_step', 10) || 1;
-  return Math.floor(Math.floor(amount / unit) / step) * step;
+  return Math.floor(Math.max(0, amount) / unit);
 };
 
 export const pointsToMoney = (db: DbState, points: number) => {
@@ -322,23 +322,17 @@ export const lastPurchasePrice = (db: DbState, ingredientId: number): number | n
   const items = db.purchase_order_items
     .filter(i => i.ingredient_id === ingredientId)
     .map(i => ({ item: i, po: db.purchase_orders.find(p => p.id === i.po_id) }))
-    .filter(x => x.po && x.po.status !== 'CANCELLED')
+    .filter(x => x.po && x.po.status === 'RECEIVED')
     .sort((a, b) => (a.po!.created_at < b.po!.created_at ? 1 : -1));
   return items[0]?.item.unit_price ?? null;
 };
 
 // Giá vốn 1 phần sản phẩm. Trả về null nếu chưa có định mức hoặc nguyên liệu chưa có giá nhập.
 export const productCost = (db: DbState, productId: number): number | null => {
-  const bom = db.product_ingredients.filter(b => b.product_id === productId);
-  if (bom.length === 0) return null;
-  let total = 0;
-  for (const b of bom) {
-    const price = lastPurchasePrice(db, b.ingredient_id);
-    if (price === null) return null;
-    total += price * b.quantity_required;
-  }
-  return total;
+  return calculateProductCost(db, productId);
 };
+
+export const productCostDetails = (db: DbState, productId: number) => calculateProductCostDetails(db, productId);
 
 export const isLowStock = (i: { current_stock: number; min_stock_level: number }) => i.current_stock <= i.min_stock_level;
 

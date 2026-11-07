@@ -22,6 +22,9 @@ const protect = async (req, res, next) => {
       if (!req.user) {
         return res.status(401).json({ message: 'Tài khoản không tồn tại.' });
       }
+      if ((decoded.passwordVersion || 0) !== (req.user.passwordChangedAt?.getTime() || 0)) {
+        return res.status(401).json({ message: 'Mật khẩu đã được thay đổi. Vui lòng đăng nhập lại.' });
+      }
 
       if (req.user.status !== 'ACTIVE') {
         return res.status(403).json({ message: 'Tài khoản đã bị vô hiệu hóa hoặc khóa.' });

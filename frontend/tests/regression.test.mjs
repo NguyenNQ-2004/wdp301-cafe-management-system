@@ -8,7 +8,7 @@ import { createServer } from 'vite';
 const memory = new Map([['user', '{invalid json']]);
 globalThis.localStorage = { getItem: key => memory.get(key) ?? null, setItem: (key, value) => memory.set(key, value), removeItem: key => memory.delete(key) };
 globalThis.window = { localStorage: globalThis.localStorage };
-let vite, auth, cart, api, options, credentials, BillPage, InterfaceContext, App, SourceScreen, Header, CounterOrderEditor;
+let vite, auth, cart, api, options, credentials, productBadge, BillPage, InterfaceContext, App, SourceScreen, Header, CounterOrderEditor;
 const account = { _id: 'test-customer', fullName: 'Test Customer', phone: '0999999999', role: 'CUSTOMER', token: 'test-token' };
 const tables = ['users', 'work_schedules', 'categories', 'products', 'orders', 'order_items', 'payments', 'loyalty_transactions', 'customer_reviews', 'suppliers', 'ingredients', 'product_ingredients', 'purchase_orders', 'purchase_order_items', 'inventory_transactions', 'shop_settings'];
 const emptyDb = () => Object.fromEntries(tables.map(table => [table, []]));
@@ -20,6 +20,7 @@ before(async () => {
   api = await vite.ssrLoadModule('/src/lib/shopApi.ts');
   options = await vite.ssrLoadModule('/src/lib/cartOptions.ts');
   credentials = await vite.ssrLoadModule('/src/lib/authCredentials.ts');
+  productBadge = await vite.ssrLoadModule('/src/lib/productBadge.ts');
   ({ BillPage } = await vite.ssrLoadModule('/src/interface/pages/BillPage.tsx'));
   ({ InterfaceContext } = await vite.ssrLoadModule('/src/interface/LiveProvider.tsx'));
   App = (await vite.ssrLoadModule('/src/ConnectedApp.tsx')).default;
@@ -31,6 +32,11 @@ after(async () => { await vite?.close(); });
 beforeEach(() => { cart.getState().clear(); });
 
 test('Corrupt stored authentication does not crash startup', () => assert.equal(auth.getState().user, null));
+test('Legacy mojibake product badges are normalized for home-page filters', () => {
+  assert.equal(productBadge.normalizeProductBadge('B├üN CHß║áY'), 'BÁN CHẠY');
+  assert.equal(productBadge.normalizeProductBadge('M├ôN Mß╗ÜI'), 'MÓN MỚI');
+  assert.equal(productBadge.normalizeProductBadge('  BÁN CHẠY  '), 'BÁN CHẠY');
+});
 test('Login and logout tolerate browser storage being blocked', () => {
   const original = globalThis.localStorage;
   globalThis.localStorage = { ...original, setItem: () => { throw new Error('Blocked'); }, removeItem: () => { throw new Error('Blocked'); } };
@@ -76,7 +82,25 @@ test('POS rejects excess and invalid quantities before sending a request', () =>
 });
 test('Cart API payload contains the supported fields only', () => {
   const result = api.cartPayload([{ ...api.productToCartItem(product), customization: { sugar: '0%' } }]);
-  assert.deepEqual(result, [{ productId: 'coffee', quantity: 1, size: 'M', checked: true }]);
+  assert.deepEqual(result, [{ productId: 'coffee', quantity: 1, size: 'M', checked: true, customization: { sugar: '0%' } }]);
+});
+
+test('Topping price and customization survive cart serialization', () => {
+  const line = api.productToCartItem({ ...product, variantsConfig: { ...product.variantsConfig, toppings: [{ name: 'Pearls', price: 5000 }] } }, 'L', { topping: ['Pearls'], sugar: '50%' });
+  assert.equal(line.unitPrice, 45000);
+  assert.deepEqual(api.cartPayload([line])[0].customization, { topping: ['Pearls'], sugar: '50%' });
+});
+
+test('POS groups equal customizations and preserves different drink options', () => {
+  const base = { productId: 'coffee', size: 'M', quantity: 1 };
+  const lines = options.groupOrderItems([{ ...base, customization: { sugar: '50%' } }, { ...base, customization: { sugar: '50%' } }, { ...base, customization: { sugar: '0%' } }]);
+  assert.equal(lines.length, 2); assert.equal(lines[0].quantity, 2); assert.equal(lines[1].quantity, 1);
+});
+
+test('RedirectUtil permits local routes and rejects external or encoded redirects', async () => {
+  const { isSafeLocalPath } = await vite.ssrLoadModule('/src/lib/RedirectUtil.ts');
+  assert.equal(isSafeLocalPath('/orders?tab=all'), true);
+  for (const path of ['https://example.com', '//example.com', '/%2fexample.com', '/%5cexample.com', '/%0aexample.com', '/%zz']) assert.equal(isSafeLocalPath(path), false);
 });
 test('Missing API routes produce an actionable error for an HTML 404 response', async () => {
   const original = globalThis.fetch;
@@ -102,16 +126,17 @@ test('Login route renders the password form', () => {
   auth.getState().logout();
   const html = renderToString(React.createElement(MemoryRouter, { initialEntries: ['/login'] }, React.createElement(App)));
   assert.match(html, /type="password"/); assert.match(html, /autoComplete="current-password"/i);
-  assert.match(html, /type="email"/);
+  assert.match(html, /type="text"/);
   assert.match(html, /name="email"/);
-  assert.match(html, /Gmail \/ Email đăng nhập/);
+  assert.match(html, /Số điện thoại \/ Email \/ Tên đăng nhập/);
   assert.doesNotMatch(html, /name="phone"/);
 });
 test('Email login payload normalizes email and preserves the account password', () => {
   assert.deepEqual(credentials.loginCredentials(' My.Email@Gmail.com ', ' Case-Sensitive Password '), { email: 'my.email@gmail.com', password: ' Case-Sensitive Password ' });
 });
-test('Phone numbers and malformed emails cannot be used as login identifiers', () => {
-  for (const identifier of ['0901234567', 'bad-email', 'user@', 'a b@gmail.com']) assert.throws(() => credentials.loginCredentials(identifier, 'password'));
+test('Phone and local-part identifiers work and malformed identifiers are rejected', () => {
+  for (const identifier of ['0901234567', 'coffee.user']) assert.equal(credentials.loginCredentials(identifier, 'password').email, identifier);
+  for (const identifier of ['user@', 'a b@gmail.com']) assert.throws(() => credentials.loginCredentials(identifier, 'password'));
   assert.throws(() => credentials.loginCredentials('valid@gmail.com', ''));
 });
 test('Registration sends email credentials and a separate normalized contact phone', () => {
@@ -162,6 +187,25 @@ test('Unrelated endpoint failures do not show an error on the menu', () => {
 test('Successful data loads do not show a warning', () => {
   const screen = React.createElement(MemoryRouter, null, React.createElement(SourceScreen, { screen: 'home' }));
   assert.doesNotMatch(renderWithDb(screen, emptyDb()), /Chưa tải được:/);
+});
+test('Forgot password route renders the email recovery form', () => {
+  auth.getState().logout();
+  const html = renderToString(React.createElement(MemoryRouter, { initialEntries: ['/forgot-password'] }, React.createElement(App)));
+  assert.match(html, /autoComplete="email"/);
+  assert.match(html, /Gửi mã khôi phục/);
+  assert.doesNotMatch(html, /chưa được hỗ trợ/);
+});
+test('Home best sellers rank global sales even when no badge or private orders exist', () => {
+  const db = emptyDb();
+  db.categories = [{ id: 1, name: 'Coffee', status: 'ACTIVE' }];
+  db.products = [
+    { id: 2, name: 'LOWER-SALES', category_id: 1, is_available: true, total_sold: 3, badge: 'BÁN CHẠY' },
+    { id: 3, name: 'TOP-GLOBAL-SELLER', category_id: 1, is_available: true, total_sold: 21 }
+  ];
+  const html = renderWithDb(React.createElement(MemoryRouter, null, React.createElement(SourceScreen, { screen: 'home' })), db);
+  const cards = html.slice(html.indexOf('aria-label="Sản phẩm được yêu thích"'));
+  assert.ok(cards.indexOf('TOP-GLOBAL-SELLER') < cards.indexOf('LOWER-SALES'));
+  assert.match(cards, /Tùy chọn và thêm TOP-GLOBAL-SELLER/);
 });
 
 test('Counter editor renders persisted items, table and note in an accessible dialog', () => {

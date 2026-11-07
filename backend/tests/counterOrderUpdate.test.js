@@ -42,7 +42,7 @@ test('Counter order editing persists totals and rejects unsafe or stale mutation
     return { status: response.status, body: await response.json() };
   };
   const create = async () => {
-    const result = await request('POST', '/api/orders', { orderType: 'DINE_IN', tableNumber: 'T01', items: [{ productId: String(coffee._id), size: 'M', quantity: 1 }] });
+    const result = await request('POST', '/api/orders', { orderType: 'DINE_IN', tableNumber: 'T01', items: [{ productId: String(coffee._id), size: 'M', quantity: 1, customization: { sugar: '50%', ice: 'Ít đá' } }] });
     assert.equal(result.status, 201); return result.body;
   };
   const order = await create();
@@ -66,6 +66,9 @@ test('Counter order editing persists totals and rejects unsafe or stale mutation
     const result = await request('PUT', path, update); assert.equal(result.status, 200, JSON.stringify(result.body));
     assert.equal(result.body.order.finalAmount, 100000); assert.equal(result.body.order.tableNumber, 'T02');
     assert.equal(result.body.order.orderNote, 'No ice');
+    assert.equal(result.body.order.items[0].customization.size, 'L');
+    assert.equal(result.body.order.items[0].customization.sugar, '50%');
+    assert.equal(result.body.order.items[0].customization.ice, 'Ít đá');
     const lines = await OrderItem.find({ order: order._id }); assert.equal(lines.length, 2);
     assert.equal(lines.reduce((sum, item) => sum + item.subtotal, 0), 100000);
     assert.equal((await Payment.findOne({ order: order._id })).amount, 100000);
@@ -104,6 +107,51 @@ test('Counter order editing persists totals and rejects unsafe or stale mutation
     assert.equal((await request('PUT', path, payload)).status, 409);
     await Order.updateOne({ _id: order._id }, { $set: { status: 'CANCELLED' } });
     assert.equal((await request('PUT', path, payload)).status, 409);
+    assert.equal(await Order.countDocuments({ mutationLock: { $exists: true } }), 0);
+  });
+  await t.test('Payment-write failure aborts order, item snapshots and mutation lock together', async () => {
+    const candidate = await create();
+    const originalUpdate = Payment.updateOne;
+    Payment.updateOne = async () => { throw new Error('Simulated payment amount failure'); };
+    try {
+      const result = await request('PUT', `/api/orders/${candidate._id}/counter`, { ...update, expectedUpdatedAt: candidate.updatedAt });
+      assert.equal(result.status, 500);
+    } finally { Payment.updateOne = originalUpdate; }
+    const saved = await Order.findById(candidate._id);
+    assert.equal(saved.finalAmount, 30000);
+    assert.equal(saved.updatedAt.toISOString(), candidate.updatedAt);
+    assert.equal((await Payment.findOne({ order: candidate._id })).amount, 30000);
+    assert.equal(await OrderItem.countDocuments({ order: candidate._id }), 1);
+    assert.equal(await Order.countDocuments({ mutationLock: { $exists: true } }), 0);
+  });
+  await t.test('Orders with captured inventory cannot be repriced or have their items replaced', async () => {
+    const candidate = await create();
+    await Order.updateOne({ _id: candidate._id }, { $set: { inventoryDeductedAt: new Date() } }, { timestamps: false });
+    const result = await request('PUT', `/api/orders/${candidate._id}/counter`, { ...update, expectedUpdatedAt: candidate.updatedAt });
+    assert.equal(result.status, 409);
+    assert.equal((await Order.findById(candidate._id)).finalAmount, 30000);
+    assert.equal((await Payment.findOne({ order: candidate._id })).amount, 30000);
+  });
+  await t.test('Concurrent edits accept one version; edit versus payment stays consistent', async () => {
+    const candidate = await create();
+    const candidatePath = `/api/orders/${candidate._id}/counter`;
+    const payload = { ...update, expectedUpdatedAt: candidate.updatedAt };
+    const edits = await Promise.all([
+      request('PUT', candidatePath, payload),
+      request('PUT', candidatePath, { ...payload, items: [update.items[1]] }),
+    ]);
+    assert.deepEqual(edits.map(result => result.status).sort(), [200, 409]);
+    const before = await Order.findById(candidate._id);
+    const payment = await Payment.findOne({ order: candidate._id });
+    const results = await Promise.all([
+      request('PUT', candidatePath, { ...payload, expectedUpdatedAt: before.updatedAt.toISOString(), items: [update.items[0]] }),
+      request('POST', `/api/payments/${payment._id}/counter-confirm`, { paymentMethod: 'CASH' }),
+    ]);
+    assert.ok(results.every(result => [200, 409].includes(result.status)), JSON.stringify(results));
+    const after = await Order.findById(candidate._id);
+    const settled = await Payment.findById(payment._id);
+    assert.equal(settled.amount, after.finalAmount);
+    assert.equal((await OrderItem.find({ order: candidate._id })).reduce((sum, item) => sum + item.subtotal, 0), after.totalAmount);
     assert.equal(await Order.countDocuments({ mutationLock: { $exists: true } }), 0);
   });
 });

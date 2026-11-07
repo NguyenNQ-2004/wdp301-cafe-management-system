@@ -1,0 +1,54 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { randomBytes } = require('crypto');
+const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
+require('dotenv').config();
+const User = require('../models/User');
+const Product = require('../models/Product');
+const Category = require('../models/Category');
+const Order = require('../models/Order');
+const ShopSetting = require('../models/ShopSetting');
+const { normalizeCartItems } = require('../utils/cartItems');
+
+test('legacy topping names round trip through cart and checkout without dropping price or points', async t => {
+  const dbName = `aura_legacy_topping_test_${randomBytes(5).toString('hex')}`;
+  await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/aura_cafe_erp', { dbName, serverSelectionTimeoutMS: 5000 });
+  const app = require('../server');
+  const server = await new Promise(resolve => { const instance = app.listen(0, '127.0.0.1', () => resolve(instance)); });
+  t.after(async () => {
+    server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
+    assert.match(mongoose.connection.db.databaseName, /^aura_legacy_topping_test_[a-f0-9]+$/);
+    await mongoose.connection.dropDatabase(); await mongoose.disconnect();
+  });
+  const customer = await User.create({ fullName: 'Topping Customer', phone: '0900000771', passwordHash: 'test-only', role: 'CUSTOMER', totalPoints: 120 });
+  const category = await Category.create({ name: 'Coffee' });
+  const product = await Product.create({ category: category._id, name: 'Cà Phê Muối', basePrice: 45000, variantsConfig: { sizes: { M: 0 }, toppings: [{ name: 'Extra kem muß╗æi', price: 8000 }] } });
+  await ShopSetting.create([{ settingKey: 'points_step', settingValue: '10' }, { settingKey: 'points_step_value', settingValue: '2000' }]);
+  const token = jwt.sign({ id: customer._id }, require('../config/jwtSecret')());
+  const call = async (method, path, body) => {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}${path}`, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    return { status: response.status, data: await response.json() };
+  };
+  const item = { productId: String(product._id), quantity: 1, size: 'M', customization: { topping: ['Extra kem muối'] } };
+  const [normalized] = await normalizeCartItems([item]);
+  assert.equal(normalized.unitPrice, 53000);
+  assert.deepEqual(normalized.customization.topping, ['Extra kem muß╗æi']);
+  await assert.rejects(normalizeCartItems([{ ...item, customization: { topping: ['Extra kem muối', 'Extra kem muß╗æi'] } }]), /trùng lặp/);
+  await assert.rejects(normalizeCartItems([{ ...item, customization: { topping: ['Unknown topping'] } }]), /không còn khả dụng/);
+  assert.equal((await call('PUT', '/api/cart', { items: [item] })).status, 200);
+  const cart = await call('GET', '/api/cart');
+  assert.deepEqual(cart.data.items[0].customization.topping, ['Extra kem muß╗æi']);
+  await require('../models/DeliveryArea').create({ district: 'Hoàn Kiếm', deliveryFee: 18000 });
+  const payload = { items: [item], orderType: 'ONLINE', district: 'Hoàn Kiếm', recipientName: 'Người nhận', recipientPhone: customer.phone, deliveryAddress: 'Hoàn Kiếm, Hà Nội', paymentMethod: 'COD', pointsToRedeem: 100, expectedTotal: 43000 };
+  const stale = await call('POST', '/api/orders', payload);
+  assert.equal(stale.status, 409); assert.equal(stale.data.finalAmount, 51000);
+  assert.equal(await Order.countDocuments(), 0);
+  assert.equal((await User.findById(customer._id)).totalPoints, 120, 'price mismatch must not spend points');
+  const placed = await call('POST', '/api/orders', { ...payload, expectedTotal: 51000 });
+  assert.equal(placed.status, 201);
+  assert.equal(placed.data.totalAmount, 53000); assert.equal(placed.data.discountAmount, 20000);
+  assert.equal(placed.data.deliveryFee, 18000); assert.equal(placed.data.finalAmount, 51000);
+  assert.equal(placed.data.pointsRedeemed, 100); assert.equal((await User.findById(customer._id)).totalPoints, 20);
+  assert.deepEqual(placed.data.items[0].customization.topping, ['Extra kem muß╗æi']);
+});

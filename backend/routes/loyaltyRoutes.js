@@ -3,108 +3,32 @@ const LoyaltyTransaction = require('../models/LoyaltyTransaction');
 const User = require('../models/User');
 const Order = require('../models/Order');
 const ShopSetting = require('../models/ShopSetting');
-const MembershipTier = require('../models/MembershipTier');
 const { protect, adminOnly, adminOrStaff } = require('../middlewares/authMiddleware');
+const { invalid, objectBody, objectId, sendError } = require('../utils/adminValidation');
+const { validateSettings } = require('../utils/shopSettings');
 
-const router = express.Router();
+const { atomicRouter } = require('../utils/atomicRoute');
+const router = atomicRouter(express.Router());
 router.use(protect);
-
-/**
- * Đảm bảo 4 hạng thành viên chuẩn luôn sẵn sàng
- */
-async function ensureDefaultTiers() {
-  const count = await MembershipTier.countDocuments();
-  if (count === 0) {
-    await MembershipTier.insertMany([
-      {
-        tierCode: 'BRONZE',
-        tierName: 'Đồng',
-        minPoints: 0,
-        minSpent: 0,
-        discountPercent: 0,
-        pointMultiplier: 1.0,
-        description: 'Hạng khởi đầu mặc định khi đăng ký hội viên.',
-        color: '#b45309'
-      },
-      {
-        tierCode: 'SILVER',
-        tierName: 'Bạc',
-        minPoints: 50,
-        minSpent: 500000,
-        discountPercent: 5,
-        pointMultiplier: 1.1,
-        description: 'Ngưỡng 50 điểm hoặc 500k chi tiêu. Giảm giá 5% và nhân 1.1 điểm.',
-        color: '#64748b'
-      },
-      {
-        tierCode: 'GOLD',
-        tierName: 'Vàng',
-        minPoints: 150,
-        minSpent: 1500000,
-        discountPercent: 10,
-        pointMultiplier: 1.25,
-        description: 'Ngưỡng 150 điểm hoặc 1.5tr chi tiêu. Giảm giá 10% và nhân 1.25 điểm.',
-        color: '#eab308'
-      },
-      {
-        tierCode: 'DIAMOND',
-        tierName: 'Kim Cương',
-        minPoints: 300,
-        minSpent: 3000000,
-        discountPercent: 15,
-        pointMultiplier: 1.5,
-        description: 'Ngưỡng 300 điểm hoặc 3tr chi tiêu. Giảm giá 15% và nhân 1.5 điểm.',
-        color: '#06b6d4'
-      }
-    ]);
-  }
-}
-
-/**
- * Helper: Tính toán và cập nhật hạng thành viên tự động dựa trên điểm tích lũy & chi tiêu
- */
-async function evaluateAndUpdateTier(user) {
-  await ensureDefaultTiers();
-  const tiers = await MembershipTier.find({}).sort({ minPoints: -1 });
-
-  // Tính tổng chi tiêu thực tế từ các đơn COMPLETED
-  const completedOrders = await Order.find({ customer: user._id, status: 'COMPLETED' });
-  const totalSpent = completedOrders.reduce((sum, o) => sum + (o.finalAmount || 0), 0);
-
-  let newTier = 'BRONZE';
-  for (const tier of tiers) {
-    if (user.totalPoints >= tier.minPoints || totalSpent >= tier.minSpent) {
-      newTier = tier.tierCode;
-      break;
-    }
-  }
-
-  const changed = user.tierName !== newTier;
-  user.tierName = newTier;
-  return { newTier, changed, totalSpent };
-}
 
 // ==========================================
 // SCREEN 29: PHONE LOYALTY MANAGEMENT APIS
 // Actors: Admin, Staff
 // ==========================================
 
-// 1. GET LOYALTY RULES & TIERS CONFIG
+// 1. GET PHONE LOYALTY RULES
 router.get('/rules', async (req, res) => {
   try {
-    await ensureDefaultTiers();
-    const [earnSetting, stepSetting, valueSetting, tiers] = await Promise.all([
+    const [earnSetting, stepSetting, valueSetting] = await Promise.all([
       ShopSetting.findOne({ settingKey: 'points_earn_unit' }),
       ShopSetting.findOne({ settingKey: 'points_step' }),
-      ShopSetting.findOne({ settingKey: 'points_step_value' }),
-      MembershipTier.find({}).sort({ minPoints: 1 })
+      ShopSetting.findOne({ settingKey: 'points_step_value' })
     ]);
 
     res.json({
       points_earn_unit: earnSetting ? Number(earnSetting.settingValue) : 1000,
       points_step: stepSetting ? Number(stepSetting.settingValue) : 10,
-      points_step_value: valueSetting ? Number(valueSetting.settingValue) : 2000,
-      tiers
+      points_step_value: valueSetting ? Number(valueSetting.settingValue) : 2000
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -114,8 +38,11 @@ router.get('/rules', async (req, res) => {
 // 2. ADMIN UPDATE LOYALTY RULES
 router.put('/rules', adminOnly, async (req, res) => {
   try {
-    const { points_earn_unit, points_step, points_step_value, tiers } = req.body;
-
+    objectBody(req.body);
+    const { points_earn_unit, points_step, points_step_value } = req.body;
+    if (Object.keys(req.body).some(key => !['points_earn_unit', 'points_step', 'points_step_value'].includes(key))) throw invalid('Chỉ cấu hình tỷ lệ tích và đổi điểm theo số điện thoại.');
+    const numericSettings = Object.fromEntries(Object.entries({ points_earn_unit, points_step, points_step_value }).filter(([, value]) => value !== undefined));
+    if (Object.keys(numericSettings).length) validateSettings(numericSettings);
     if (points_earn_unit !== undefined) {
       await ShopSetting.findOneAndUpdate(
         { settingKey: 'points_earn_unit' },
@@ -138,27 +65,9 @@ router.put('/rules', adminOnly, async (req, res) => {
       );
     }
 
-    if (Array.isArray(tiers)) {
-      for (const t of tiers) {
-        if (t.tierCode) {
-          await MembershipTier.findOneAndUpdate(
-            { tierCode: t.tierCode },
-            {
-              minPoints: Number(t.minPoints) || 0,
-              minSpent: Number(t.minSpent) || 0,
-              discountPercent: Number(t.discountPercent) || 0,
-              pointMultiplier: Number(t.pointMultiplier) || 1.0,
-              description: t.description || ''
-            },
-            { upsert: true }
-          );
-        }
-      }
-    }
-
-    res.json({ message: 'Đã lưu cấu hình quy tắc tích điểm và hạng thẻ thành công!' });
+    res.json({ message: 'Đã lưu cấu hình quy tắc tích điểm theo số điện thoại thành công!' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    sendError(res, error);
   }
 });
 
@@ -254,7 +163,7 @@ router.post('/adjust', adminOrStaff, async (req, res) => {
 
     let user = null;
     if (customerId) {
-      user = await User.findById(customerId);
+      user = await User.findOne({ _id: objectId(customerId), role: 'CUSTOMER' });
     } else if (phone) {
       const cleanPhone = phone.trim().replace(/\s/g, '');
       user = await User.findOne({ phone: cleanPhone, role: 'CUSTOMER' });
@@ -264,8 +173,8 @@ router.post('/adjust', adminOrStaff, async (req, res) => {
       return res.status(404).json({ message: 'Không tìm thấy khách hàng.' });
     }
 
-    const change = Number(pointsChange);
-    if (isNaN(change) || change === 0) {
+    const change = pointsChange;
+    if (!Number.isSafeInteger(change) || change === 0) {
       return res.status(400).json({ message: 'Số điểm thay đổi phải khác 0.' });
     }
 
@@ -275,38 +184,36 @@ router.post('/adjust', adminOrStaff, async (req, res) => {
       });
     }
 
-    user.totalPoints += change;
-
-    // Logic tự động nâng hạng thẻ (Real Business Logic)
-    const { newTier, changed: tierChanged } = await evaluateAndUpdateTier(user);
-    await user.save();
-
-    const tx = await LoyaltyTransaction.create({
+    if (reason !== undefined && (typeof reason !== 'string' || reason.length > 500)) throw invalid('Lý do điều chỉnh không hợp lệ.');
+    if (orderId && !await Order.exists({ _id: objectId(orderId), customer: user._id })) throw invalid('Đơn hàng không thuộc khách hàng này.');
+    user = await User.findOneAndUpdate({ _id: user._id, role: 'CUSTOMER', ...(change < 0 ? { totalPoints: { $gte: -change } } : {}) }, { $inc: { totalPoints: change } }, { returnDocument: 'after' });
+    if (!user) throw invalid('Số điểm không đủ để thực hiện điều chỉnh.');
+    let tx;
+    try { tx = await LoyaltyTransaction.create({
       customer: user._id,
       order: orderId || undefined,
       pointsChange: change,
       balanceAfter: user.totalPoints,
-      transactionType: change > 0 ? 'EARN' : 'REDEEM',
+      transactionType: 'ADJUST',
       reason: reason || (change > 0 ? 'Cộng điểm tích lũy' : 'Đổi điểm giảm giá'),
       performedBy: req.user._id
-    });
-
+    }); } catch (error) {
+      if (require('mongoose').transactionAsyncLocalStorage?.getStore()?.session) throw error;
+      await User.updateOne({ _id: user._id }, { $inc: { totalPoints: -change } });
+      throw error;
+    }
     res.status(201).json({
-      message: `Đã ${change > 0 ? 'cộng' : 'trừ'} ${Math.abs(change)} điểm cho khách hàng ${user.fullName}.${
-        tierChanged ? ` Khách hàng đã được cập nhật hạng thẻ mới: ${newTier}!` : ''
-      }`,
+      message: `Đã ${change > 0 ? 'cộng' : 'trừ'} ${Math.abs(change)} điểm cho khách hàng ${user.fullName}.`,
       transaction: tx,
       user: {
         _id: user._id,
         fullName: user.fullName,
         phone: user.phone,
-        tierName: user.tierName,
         totalPoints: user.totalPoints
-      },
-      tierPromoted: tierChanged
+      }
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    sendError(res, error);
   }
 });
 
@@ -330,7 +237,7 @@ router.get('/', async (req, res) => {
 
     const [transactions, total] = await Promise.all([
       LoyaltyTransaction.find(filter)
-        .populate('customer', 'fullName phone tierName totalPoints')
+        .populate('customer', 'fullName phone totalPoints')
         .populate('order', 'orderCode finalAmount createdAt')
         .populate('performedBy', 'fullName position')
         .sort({ createdAt: -1 })

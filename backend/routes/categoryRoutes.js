@@ -1,90 +1,60 @@
-﻿const express = require('express');
-const router = express.Router();
+const express = require('express');
 const Category = require('../models/Category');
 const Product = require('../models/Product');
+const catalogImage = require('../utils/catalogImage');
 const { protect, adminOnly } = require('../middlewares/authMiddleware');
-
-// 1. GET ALL - Lấy toàn bộ danh mục
-router.get('/', async (req, res) => {
-  try { res.json(await Category.find({}).sort({ createdAt: 1 })); } 
-  catch (error) { res.status(500).json({ error: error.message }); }
+const { invalid, objectBody, objectId, text, sendError } = require('../utils/adminValidation');
+const router = express.Router();
+async function parse(body, creating, id) {
+  objectBody(body);
+  const fields = {};
+  if (creating || body.name !== undefined) {
+    fields.name = text(body.name, 'Tên danh mục', 100);
+    const escaped = fields.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (await Category.exists({ name: new RegExp(`^${escaped}$`, 'i'), ...(id ? { _id: { $ne: id } } : {}) })) throw invalid('Tên danh mục đã tồn tại.', 409);
+  }
+  if (body.status !== undefined) {
+    if (!['ACTIVE', 'INACTIVE'].includes(body.status)) throw invalid('Trạng thái danh mục không hợp lệ.');
+    fields.status = body.status;
+  }
+  for (const key of ['icon', 'description']) if (body[key] !== undefined) {
+    if (body[key] !== null && typeof body[key] !== 'string') throw invalid('Thông tin danh mục không hợp lệ.');
+    fields[key] = body[key]?.trim() || null;
+  }
+  if (body.image_url !== undefined || body.imageUrl !== undefined) {
+    const image = body.image_url !== undefined ? body.image_url : body.imageUrl;
+    if (image !== null && typeof image !== 'string') throw invalid('Ảnh danh mục không hợp lệ.');
+    fields.imageUrl = fields.image_url = catalogImage(image) || null;
+  }
+  return fields;
+}
+router.get('/', async (_req, res) => {
+  try { res.json(await Category.find().sort({ createdAt: 1 })); } catch (error) { sendError(res, error); }
 });
-
-// 2. GET ONE - Lấy 1 danh mục theo ID
 router.get('/:id', async (req, res) => {
-  try { res.json(await Category.findById(req.params.id)); } 
-  catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-// 3. POST - Tạo mới danh mục
-router.post('/', protect, adminOnly, async (req, res) => {
   try {
-    const { name, icon, description, imageUrl, image_url, status } = req.body;
-    if (!name || !name.trim()) {
-      return res.status(400).json({ message: 'Tên danh mục là bắt buộc.' });
-    }
-    const cleanName = name.trim();
-    const existing = await Category.findOne({ name: { $regex: new RegExp(`^${cleanName}$`, 'i') } });
-    if (existing) {
-      return res.status(400).json({ message: 'Tên danh mục đã tồn tại (categories.name là UNIQUE).' });
-    }
-    const finalImg = image_url?.trim() || imageUrl?.trim() || null;
-    const created = await Category.create({
-      name: cleanName,
-      icon: icon || null,
-      description: description?.trim() || null,
-      imageUrl: finalImg,
-      image_url: finalImg,
-      status: status || 'ACTIVE'
-    });
-    res.status(201).json(created);
-  } 
-  catch (error) { res.status(500).json({ error: error.message }); }
+    const category = await Category.findById(objectId(req.params.id));
+    if (!category) throw invalid('Không tìm thấy danh mục.', 404);
+    res.json(category);
+  } catch (error) { sendError(res, error); }
 });
-
-// 4. PUT - Cập nhật danh mục
+router.post('/', protect, adminOnly, async (req, res) => {
+  try { res.status(201).json(await Category.create(await parse(req.body, true))); } catch (error) { sendError(res, error); }
+});
 router.put('/:id', protect, adminOnly, async (req, res) => {
   try {
-    const { name, icon, description, imageUrl, image_url, status } = req.body;
-    if (name) {
-      const cleanName = name.trim();
-      const existing = await Category.findOne({
-        name: { $regex: new RegExp(`^${cleanName}$`, 'i') },
-        _id: { $ne: req.params.id }
-      });
-      if (existing) {
-        return res.status(400).json({ message: 'Tên danh mục đã tồn tại (categories.name là UNIQUE).' });
-      }
-    }
-    const finalImg = image_url !== undefined ? (image_url?.trim() || null) : (imageUrl !== undefined ? (imageUrl?.trim() || null) : undefined);
-    const updateData = { ...req.body };
-    if (name) updateData.name = name.trim();
-    if (description !== undefined) updateData.description = description?.trim() || null;
-    if (finalImg !== undefined) {
-      updateData.imageUrl = finalImg;
-      updateData.image_url = finalImg;
-    }
-    const updated = await Category.findByIdAndUpdate(req.params.id, updateData, { returnDocument: 'after' });
-    res.json(updated); 
-  } 
-  catch (error) { res.status(500).json({ error: error.message }); }
+    const id = objectId(req.params.id);
+    const category = await Category.findByIdAndUpdate(id, { $set: await parse(req.body, false, id) }, { returnDocument: 'after', runValidators: true });
+    if (!category) throw invalid('Không tìm thấy danh mục.', 404);
+    res.json(category);
+  } catch (error) { sendError(res, error); }
 });
-
-// 5. DELETE - Xóa danh mục
 router.delete('/:id', protect, adminOnly, async (req, res) => {
-  try { 
-    // Kiểm tra ràng buộc khóa ngoại fk_product_category
-    const count = await Product.countDocuments({ category: req.params.id });
-    if (count > 0) {
-      return res.status(400).json({ 
-        message: 'Không thể xóa: danh mục đang có sản phẩm (ràng buộc fk_product_category).' 
-      });
-    }
-    await Category.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Đã xóa danh mục thành công!' }); 
-  } 
-  catch (error) { res.status(500).json({ error: error.message }); }
+  try {
+    const id = objectId(req.params.id);
+    if (await Product.exists({ category: id })) throw invalid('Không thể xóa danh mục đang có sản phẩm.', 409);
+    if (!await Category.findByIdAndDelete(id)) throw invalid('Không tìm thấy danh mục.', 404);
+    res.json({ message: 'Đã xóa danh mục.' });
+  } catch (error) { sendError(res, error); }
 });
-
 module.exports = router;
-

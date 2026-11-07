@@ -4,10 +4,13 @@ const PurchaseOrder = require('../models/PurchaseOrder');
 const PurchaseOrderItem = require('../models/PurchaseOrderItem');
 const Ingredient = require('../models/Ingredient');
 const Supplier = require('../models/Supplier');
-const InventoryTransaction = require('../models/InventoryTransaction');
+const { receivePurchase } = require('../utils/receivePurchase');
+const { normalizePurchaseItems } = require('../utils/purchaseInput');
 const { protect, adminOnly } = require('../middlewares/authMiddleware');
+const { latestPurchasePrices } = require('../utils/purchasePrices');
 
-const router = express.Router();
+const { atomicRouter } = require('../utils/atomicRoute');
+const router = atomicRouter(express.Router());
 const STATUSES = ['DRAFT', 'ORDERED', 'RECEIVED', 'CANCELLED'];
 const ALLOWED_TRANSITIONS = { DRAFT: ['ORDERED', 'CANCELLED'], ORDERED: ['RECEIVED', 'CANCELLED'], RECEIVED: [], CANCELLED: [] };
 
@@ -21,17 +24,12 @@ const populateOrder = (query) => query
 // Complete payload used by the Purchase Order management screen.
 router.get('/management-overview', async (req, res) => {
   try {
-    const [orders, suppliers, ingredients, purchaseItems] = await Promise.all([
+    const [orders, suppliers, ingredients, latestPrices] = await Promise.all([
       populateOrder(PurchaseOrder.find().sort({ createdAt: -1 })).lean(),
       Supplier.find({ status: 'ACTIVE' }).sort({ name: 1 }).lean(),
       Ingredient.find().populate('supplier', 'name status').sort({ name: 1 }).lean(),
-      PurchaseOrderItem.find().select('ingredient unitPrice createdAt').sort({ createdAt: -1, _id: -1 }).lean()
+      latestPurchasePrices()
     ]);
-    const latestPrices = new Map();
-    for (const item of purchaseItems) {
-      const key = String(item.ingredient);
-      if (!latestPrices.has(key)) latestPrices.set(key, item.unitPrice);
-    }
     const ingredientRows = ingredients.map((ingredient) => ({
       ...ingredient,
       latestUnitPrice: latestPrices.get(String(ingredient._id)) ?? 0
@@ -46,17 +44,12 @@ router.get('/management-overview', async (req, res) => {
 // Aggregated data used by the Restock Request screen.
 router.get('/restock-overview', async (req, res) => {
   try {
-    const [ingredients, orders, purchaseItems] = await Promise.all([
+    const [ingredients, orders, latestPrices] = await Promise.all([
       Ingredient.find().populate('supplier', 'name phone status').sort({ name: 1 }).lean(),
       populateOrder(PurchaseOrder.find({ status: { $in: ['DRAFT', 'ORDERED'] } }).sort({ createdAt: -1 })).lean(),
-      PurchaseOrderItem.find().select('ingredient unitPrice createdAt').sort({ createdAt: -1, _id: -1 }).lean()
+      latestPurchasePrices()
     ]);
 
-    const latestPrices = new Map();
-    for (const item of purchaseItems) {
-      const key = String(item.ingredient);
-      if (!latestPrices.has(key)) latestPrices.set(key, item.unitPrice);
-    }
     const ingredientRows = ingredients.map((ingredient) => ({
       ...ingredient,
       latestUnitPrice: latestPrices.get(String(ingredient._id)) ?? 0,
@@ -98,30 +91,27 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { supplier, items, note } = req.body;
+    const { supplier, items, note, status = 'DRAFT' } = req.body;
+    if (!['DRAFT', 'ORDERED', 'RECEIVED'].includes(status)) return res.status(400).json({ message: 'Trạng thái phiếu mới không hợp lệ.' });
     if (!mongoose.isValidObjectId(supplier) || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'Vui lòng chọn nhà cung cấp và ít nhất một nguyên liệu nhập.' });
     }
     if (typeof note === 'string' && note.length > 500) return res.status(400).json({ message: 'Ghi chú không được vượt quá 500 ký tự.' });
 
-    const normalizedItems = items.map((item) => ({ ingredient: item.ingredient, quantity: Number(item.quantity), unitPrice: Number(item.unitPrice) }));
-    const invalidItem = normalizedItems.some((item) => !mongoose.isValidObjectId(item.ingredient) || !Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.unitPrice) || item.unitPrice < 0);
-    if (invalidItem) return res.status(400).json({ message: 'Nguyên liệu, số lượng hoặc đơn giá không hợp lệ.' });
-    if (new Set(normalizedItems.map((item) => String(item.ingredient))).size !== normalizedItems.length) return res.status(400).json({ message: 'Một nguyên liệu không được xuất hiện nhiều lần trong cùng phiếu.' });
+    const normalizedItems = normalizePurchaseItems(items);
 
-    const [supplierRecord, ingredientRecords] = await Promise.all([
-      Supplier.findOne({ _id: supplier, status: 'ACTIVE' }),
-      Ingredient.find({ _id: { $in: normalizedItems.map((item) => item.ingredient) } })
-    ]);
+    const supplierRecord = await Supplier.findOne({ _id: supplier, status: 'ACTIVE' });
+    const ingredientRecords = await Ingredient.find({ _id: { $in: normalizedItems.map((item) => item.ingredient) } });
     if (!supplierRecord) return res.status(404).json({ message: 'Không tìm thấy nhà cung cấp đang hoạt động.' });
     if (ingredientRecords.length !== normalizedItems.length) return res.status(404).json({ message: 'Có nguyên liệu không tồn tại.' });
     if (ingredientRecords.some((ingredient) => String(ingredient.supplier) !== String(supplier))) return res.status(400).json({ message: 'Nguyên liệu không thuộc nhà cung cấp đã chọn.' });
 
-    const totalCost = normalizedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    const totalCost = normalizedItems.reduce((sum, item) => sum + item.totalCost, 0);
     let order;
     try {
-      order = await PurchaseOrder.create({ supplier, creator: req.user._id, totalCost, status: 'DRAFT', note: typeof note === 'string' ? note.trim() : '', items: normalizedItems });
+      order = await PurchaseOrder.create({ supplier, creator: req.user._id, totalCost, status: status === 'RECEIVED' ? 'ORDERED' : status, note: typeof note === 'string' ? note.trim() : '', items: normalizedItems });
       await PurchaseOrderItem.insertMany(normalizedItems.map((item) => ({ purchaseOrder: order._id, ...item })));
+      if (status === 'RECEIVED') await receivePurchase(order, req.user._id, note);
     } catch (error) {
       if (order) {
         await PurchaseOrderItem.deleteMany({ purchaseOrder: order._id });
@@ -132,7 +122,7 @@ router.post('/', async (req, res) => {
     const populated = await populateOrder(PurchaseOrder.findById(order._id));
     res.status(201).json(populated);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(error.status || 500).json({ message: error.message });
   }
 });
 
@@ -146,44 +136,18 @@ router.put('/:id/status', async (req, res) => {
     if (!ALLOWED_TRANSITIONS[order.status].includes(status)) return res.status(409).json({ message: `Không thể chuyển phiếu từ ${order.status} sang ${status}.` });
 
     if (status === 'RECEIVED') {
-      const ingredientIds = order.items.map((item) => item.ingredient);
-      if (await Ingredient.countDocuments({ _id: { $in: ingredientIds } }) !== ingredientIds.length) {
-        return res.status(409).json({ message: 'Phiếu nhập có nguyên liệu không còn tồn tại.' });
-      }
-      const statusUpdate = { status: 'RECEIVED' };
-      if (typeof note === 'string') statusUpdate.note = note.trim();
-      const lockedOrder = await PurchaseOrder.findOneAndUpdate(
-        { _id: order._id, status: 'ORDERED' },
-        { $set: statusUpdate },
-        { returnDocument: 'after', runValidators: true }
-      );
-      if (!lockedOrder) return res.status(409).json({ message: 'Phiếu nhập đã được xử lý bởi một yêu cầu khác.' });
-
-      const stockOperations = order.items.map((item) => ({ updateOne: { filter: { _id: item.ingredient }, update: { $inc: { currentStock: item.quantity } } } }));
-      let stockUpdated = false;
-      try {
-        await Ingredient.bulkWrite(stockOperations);
-        stockUpdated = true;
-        await InventoryTransaction.insertMany(order.items.map((item) => ({
-          ingredient: item.ingredient, transactionType: 'IN_PURCHASE', quantity: item.quantity,
-          stockDelta: item.quantity, referenceType: 'PURCHASE_ORDER', referenceId: order._id, createdBy: req.user._id
-        })));
-      } catch (error) {
-        if (stockUpdated) await Ingredient.bulkWrite(order.items.map((item) => ({ updateOne: { filter: { _id: item.ingredient }, update: { $inc: { currentStock: -item.quantity } } } })));
-        await PurchaseOrder.updateOne({ _id: order._id, status: 'RECEIVED' }, { $set: { status: 'ORDERED' } });
-        throw error;
-      }
+      await receivePurchase(order, req.user._id, note);
       const populated = await populateOrder(PurchaseOrder.findById(order._id));
       return res.json({ message: 'Cập nhật trạng thái phiếu nhập thành công!', purchaseOrder: populated });
     }
 
-    order.status = status;
-    if (typeof note === 'string') order.note = note.trim();
-    await order.save();
+    const changes = { status, ...(typeof note === 'string' ? { note: note.trim() } : {}) };
+    const changed = await PurchaseOrder.findOneAndUpdate({ _id: order._id, status: order.status }, { $set: changes }, { returnDocument: 'after', runValidators: true });
+    if (!changed) return res.status(409).json({ message: 'Phiếu nhập đã được xử lý bởi một yêu cầu khác.' });
     const populated = await populateOrder(PurchaseOrder.findById(order._id));
     res.json({ message: 'Cập nhật trạng thái phiếu nhập thành công!', purchaseOrder: populated });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(error.status || 500).json({ message: error.message });
   }
 });
 

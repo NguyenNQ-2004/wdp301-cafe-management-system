@@ -372,7 +372,7 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
                 <span className="material-symbols-outlined text-[18px]">print</span>
                 Hóa đơn
               </button>
-              {isOpen(selected) ? (
+              {['PENDING', 'CONFIRMED'].includes(selected.status) ? (
                 <button
                   onClick={() => handleCancel(selected)}
                   className="py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-medium flex items-center justify-center gap-1 border border-rose-200"

@@ -9,10 +9,12 @@ import AdminShiftsPage from './pages/admin/AdminShiftsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminSchedulesPage from './pages/admin/AdminSchedulesPage';
 import AdminAttendancePage from './pages/admin/AdminAttendancePage';
+import AdminHandoversPage from './pages/admin/AdminHandoversPage';
 import AdminCategoriesPage from './pages/admin/AdminCategoriesPage';
 import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 import AdminStockPage from './pages/admin/AdminStockPage';
 import AdminRestockPage from './pages/admin/AdminRestockPage';
+import AdminRestockRequestsPage from './pages/admin/AdminRestockRequestsPage';
 import AdminSuppliersPage from './pages/admin/AdminSuppliersPage';
 import AdminPurchasesPage from './pages/admin/AdminPurchasesPage';
 import AdminRecipesPage from './pages/admin/AdminRecipesPage';
@@ -23,6 +25,7 @@ import AdminMembershipsPage from './pages/admin/AdminMembershipsPage';
 import AdminComplaintsPage from './pages/admin/AdminComplaintsPage';
 import AdminReportsPage from './pages/admin/AdminReportsPage';
 import AdminSettingsPage from './pages/admin/AdminSettingsPage';
+import AdminDeliveryAreasPage from './pages/admin/AdminDeliveryAreasPage';
 import CounterPaymentsPage from './pages/pos/CounterPaymentsPage';
 import PosHandoverPage from './pages/pos/PosHandoverPage';
 import CartPage from './pages/CartPage';
@@ -36,6 +39,7 @@ import { AuthModal } from './components/AuthModal';
 import { DbContextProvider } from './data/DbContext';
 import type { PageRoute } from './types';
 import SourceScreen from './interface/SourceScreen';
+import { isSafeLocalPath } from './lib/RedirectUtil';
 import { DbProvider as InterfaceProvider } from './interface/LiveProvider';
 
 /** Trả về đường dẫn phù hợp sau khi đăng nhập */
@@ -48,7 +52,7 @@ const getRoleRedirectPath = (user: { role: string; position?: string } | null, c
     if (user.position === 'SHIPPER') return '/delivery';
   }
   // CUSTOMER: Không chuyển sang trang profile đơn độc, ở lại trang hiện tại hoặc về Trang chủ để tiếp tục mua hàng
-  return currentPath && !['/login', '/register'].includes(currentPath) ? currentPath : '/';
+  return currentPath && isSafeLocalPath(currentPath) && !['/login', '/register'].includes(currentPath) ? currentPath : '/';
 };
 
 // Wrapper component to provide Header and AuthModal context to all routes
@@ -58,6 +62,9 @@ const AppLayout = () => {
   const { user, login, logout } = useAuthStore();
   const cartCount = useCartStore((state) => state.items.reduce((count, item) => count + item.quantity, 0));
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const requestedTab = new URLSearchParams(location.search).get('tab');
+  const authTab = location.pathname === '/register' || requestedTab === 'register' ? 'register' : location.pathname === '/forgot-password' || requestedTab === 'forgot' ? 'forgot' : 'login';
+  const authRoute = ['/login', '/register', '/forgot-password'].includes(location.pathname) || ['login', 'register', 'forgot'].includes(requestedTab || '');
   useCartSync(user?.role === 'CUSTOMER' ? user : null);
 
   useEffect(() => {
@@ -81,6 +88,7 @@ const AppLayout = () => {
 
   const handleNavigate = (route: PageRoute) => {
     if (route === 'home') navigate('/');
+    else if (route === 'admin-loyalty') navigate('/admin/memberships');
     else if (route.startsWith('admin-')) navigate(`/admin/${route.replace('admin-', '')}`);
     else navigate(`/${route}`);
   };
@@ -123,10 +131,18 @@ const AppLayout = () => {
           }}
         />
       )}
-      <main className={`flex-1 ${!isDedicatedScreen ? user ? 'pt-20' : 'pt-32 sm:pt-20' : ''}`}>
+      <main className="flex-1">
         <Routes>
           <Route path="/" element={<SourceScreen screen="home" />} />
           <Route path="/home" element={<SourceScreen screen="home" />} />
+          <Route path="/customer" element={<Navigate to="/" replace />} />
+          <Route path="/admin/feedback" element={<Navigate to="/admin/complaints" replace />} />
+          <Route path="/admin/loyalty" element={<Navigate to="/admin/memberships" replace />} />
+          <Route path="/admin/restock-requests" element={user?.role === 'ADMIN' ? <AdminRestockRequestsPage /> : <Navigate to="/" />} />
+          <Route path="/counter-orders" element={<Navigate to="/cashier/orders" replace />} />
+          <Route path="/counter-order" element={<Navigate to="/cashier" replace />} />
+          <Route path="/staff/schedule" element={<Navigate to="/my-schedule" replace />} />
+          <Route path="/staff/attendance" element={<Navigate to="/my-attendance" replace />} />
 
           {/* Main User Routes */}
           <Route path="/menu" element={<SourceScreen screen="menu" />} />
@@ -254,6 +270,8 @@ const AppLayout = () => {
             path="/my-attendance"
             element={user?.role === 'STAFF' ? <AdminAttendancePage /> : <Navigate to="/" />}
           />
+          <Route path="/admin/handovers" element={user?.role === 'ADMIN' ? <AdminHandoversPage /> : <Navigate to="/" />} />
+          <Route path="/admin/handover" element={<Navigate to="/admin/handovers" replace />} />
           <Route
             path="/admin/customers"
             element={
@@ -279,6 +297,10 @@ const AppLayout = () => {
             element={user?.role === 'ADMIN' ? <AdminSettingsPage /> : <Navigate to="/" />}
           />
           <Route
+            path="/admin/delivery-areas"
+            element={user?.role === 'ADMIN' ? <AdminDeliveryAreasPage /> : <Navigate to="/" />}
+          />
+          <Route
             path="/admin/*"
             element={
               user?.role === 'ADMIN' ? (
@@ -296,7 +318,7 @@ const AppLayout = () => {
           <Route
             path="/cashier"
             element={
-              user?.role === 'ADMIN' || user?.position === 'CASHIER' || user?.position === 'MANAGER'
+              user?.role === 'ADMIN' || (user?.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user.position || ''))
                 ? <SourceScreen screen="pos-create" />
                 : <Navigate to="/" />
             }
@@ -312,7 +334,7 @@ const AppLayout = () => {
           <Route
             path="/barista"
             element={
-              user?.role === 'ADMIN' || user?.position === 'BARISTA'
+              user?.role === 'ADMIN' || (user?.role === 'STAFF' && user.position === 'BARISTA')
                 ? <SourceScreen screen="kds-terminal" />
                 : <Navigate to="/" />
             }
@@ -321,6 +343,7 @@ const AppLayout = () => {
 
           <Route path="/login" element={<SourceScreen screen="home" />} />
           <Route path="/register" element={<SourceScreen screen="home" />} />
+          <Route path="/forgot-password" element={<SourceScreen screen="home" />} />
           <Route path="/products/:id" element={<SourceScreen screen="customize" />} />
           <Route path="/product" element={<SourceScreen screen="customize" />} />
           <Route path="/customize" element={<SourceScreen screen="customize" />} />
@@ -337,12 +360,12 @@ const AppLayout = () => {
       {!isDedicatedScreen && <Footer onNavigate={handleNavigate} />}
 
       <AuthModal
-        key={location.pathname === '/register' ? 'register' : 'login'}
-        initialTab={location.pathname === '/register' ? 'register' : 'login'}
-        isOpen={isAuthOpen || (['/login', '/register'].includes(location.pathname) && !user)}
+        key={authTab}
+        initialTab={authTab}
+        isOpen={isAuthOpen || (authRoute && !user)}
         onClose={() => {
           setIsAuthOpen(false);
-          if (['/login', '/register'].includes(location.pathname) && !useAuthStore.getState().user) navigate('/', { replace: true });
+          if (authRoute && !useAuthStore.getState().user) navigate('/', { replace: true });
         }}
         onLoginSuccess={(userData) => {
           // Lưu vào global store

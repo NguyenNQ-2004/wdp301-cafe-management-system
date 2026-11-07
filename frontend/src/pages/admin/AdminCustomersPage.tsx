@@ -1,3 +1,4 @@
+import { API_BASE } from '../../lib/shopApi';
 import React, { useState, useEffect, useCallback } from 'react';
 import useAuthStore from '../../store/authStore';
 import { AdminLayout, Badge, Field, FormActions, Modal, PrimaryButton, GhostButton, StatCard, inputCls } from './AdminUi';
@@ -11,7 +12,7 @@ interface CustomerItem {
   address?: string;
   role: string;
   status: 'ACTIVE' | 'INACTIVE' | 'LOCKED';
-  tierName: 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND';
+
   totalPoints: number;
   totalOrders: number;
   completedOrders: number;
@@ -63,13 +64,6 @@ interface CustomerDetailResponse {
   loyaltyHistory: LoyaltyItem[];
 }
 
-const TIER_CONFIG: Record<string, { label: string; cls: string; icon: string }> = {
-  BRONZE: { label: 'Đồng', cls: 'bg-amber-100 text-amber-900 border border-amber-300', icon: 'military_tech' },
-  SILVER: { label: 'Bạc', cls: 'bg-slate-200 text-slate-800 border border-slate-300', icon: 'workspace_premium' },
-  GOLD: { label: 'Vàng', cls: 'bg-yellow-100 text-yellow-800 border border-yellow-300', icon: 'stars' },
-  DIAMOND: { label: 'Kim Cương', cls: 'bg-cyan-100 text-cyan-900 border border-cyan-300 font-bold', icon: 'diamond' }
-};
-
 const ORDER_STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   PENDING: { label: 'Chờ duyệt', cls: 'bg-stone-100 text-stone-700' },
   CONFIRMED: { label: 'Đã xác nhận', cls: 'bg-blue-100 text-blue-800' },
@@ -110,7 +104,6 @@ export const AdminCustomersPage: React.FC = () => {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [selectedTier, setSelectedTier] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
 
   // Modals
@@ -139,10 +132,9 @@ export const AdminCustomersPage: React.FC = () => {
     try {
       const params = new URLSearchParams();
       if (search.trim()) params.append('search', search.trim());
-      if (selectedTier !== 'ALL') params.append('tier', selectedTier);
       if (selectedStatus !== 'ALL') params.append('status', selectedStatus);
 
-      const res = await fetch(`http://localhost:5000/api/users/customers?${params.toString()}`, {
+      const res = await fetch(`${API_BASE}/api/users/customers?${params.toString()}`, {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       const data = await res.json();
@@ -154,7 +146,7 @@ export const AdminCustomersPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user?.token, search, selectedTier, selectedStatus]);
+  }, [user?.token, search, selectedStatus]);
 
   useEffect(() => {
     fetchCustomers();
@@ -165,7 +157,7 @@ export const AdminCustomersPage: React.FC = () => {
     if (!user?.token) return;
     setDetailLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/users/customers/${customerId}`, {
+      const res = await fetch(`${API_BASE}/api/users/customers/${customerId}`, {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       const data = await res.json();
@@ -184,7 +176,7 @@ export const AdminCustomersPage: React.FC = () => {
     if (!createForm || !user?.token) return;
     setSubmitting(true);
     try {
-      const res = await fetch('http://localhost:5000/api/users/customers', {
+      const res = await fetch(`${API_BASE}/api/users/customers`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -210,7 +202,7 @@ export const AdminCustomersPage: React.FC = () => {
     if (!editCustomer || !user?.token) return;
     setSubmitting(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/users/customers/${editCustomer._id}`, {
+      const res = await fetch(`${API_BASE}/api/users/customers/${editCustomer._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -221,7 +213,7 @@ export const AdminCustomersPage: React.FC = () => {
           email: editCustomer.email,
           birthday: editCustomer.birthday,
           address: editCustomer.address,
-          tierName: editCustomer.tierName,
+
           status: editCustomer.status
         })
       });
@@ -241,7 +233,7 @@ export const AdminCustomersPage: React.FC = () => {
   const handleToggleLock = async (c: CustomerItem) => {
     if (!user?.token) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/users/customers/${c._id}/toggle-lock`, {
+      const res = await fetch(`${API_BASE}/api/users/customers/${c._id}/toggle-lock`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${user.token}` }
       });
@@ -343,20 +335,6 @@ export const AdminCustomersPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="flex items-center gap-1.5">
-            <span className="text-stone-500 font-medium whitespace-nowrap">Hạng:</span>
-            <select
-              value={selectedTier}
-              onChange={(e) => setSelectedTier(e.target.value)}
-              className="px-2.5 py-1.5 rounded-xl border border-stone-200 bg-stone-50 font-medium outline-none focus:border-red-600"
-            >
-              <option value="ALL">Tất cả hạng</option>
-              <option value="BRONZE">Đồng (Bronze)</option>
-              <option value="SILVER">Bạc (Silver)</option>
-              <option value="GOLD">Vàng (Gold)</option>
-              <option value="DIAMOND">Kim Cương (Diamond)</option>
-            </select>
-          </div>
 
           <div className="flex items-center gap-1.5">
             <span className="text-stone-500 font-medium whitespace-nowrap">Trạng thái:</span>
@@ -387,7 +365,6 @@ export const AdminCustomersPage: React.FC = () => {
                 <th className="p-3.5">Khách hàng</th>
                 <th className="p-3.5">Số điện thoại</th>
                 <th className="p-3.5">Email</th>
-                <th className="p-3.5 text-center">Hạng thẻ</th>
                 <th className="p-3.5 text-center">Điểm tích lũy</th>
                 <th className="p-3.5 text-center">Số đơn</th>
                 <th className="p-3.5 text-right">Tổng chi tiêu</th>
@@ -399,7 +376,7 @@ export const AdminCustomersPage: React.FC = () => {
             <tbody className="divide-y divide-stone-100">
               {loading ? (
                 <tr>
-                  <td colSpan={11} className="p-8 text-center text-stone-400">
+                  <td colSpan={10} className="p-8 text-center text-stone-400">
                     <div className="flex items-center justify-center gap-2">
                       <span className="w-4 h-4 border-2 border-red-700 border-t-transparent rounded-full animate-spin"></span>
                       <span>Đang tải danh sách khách hàng...</span>
@@ -408,13 +385,12 @@ export const AdminCustomersPage: React.FC = () => {
                 </tr>
               ) : customers.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="p-8 text-center text-stone-400">
+                  <td colSpan={10} className="p-8 text-center text-stone-400">
                     Không tìm thấy khách hàng nào phù hợp với bộ lọc.
                   </td>
                 </tr>
               ) : (
                 customers.map((c) => {
-                  const tier = TIER_CONFIG[c.tierName] || TIER_CONFIG.BRONZE;
                   return (
                     <tr key={c._id} className="hover:bg-stone-50/70 transition-colors">
                       <td className="p-3.5 font-mono font-bold text-stone-400">
@@ -430,12 +406,6 @@ export const AdminCustomersPage: React.FC = () => {
                       </td>
                       <td className="p-3.5 font-mono font-medium text-stone-800">{c.phone}</td>
                       <td className="p-3.5 text-stone-500">{c.email || '—'}</td>
-                      <td className="p-3.5 text-center">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] ${tier.cls}`}>
-                          <span className="material-symbols-outlined text-[13px]">{tier.icon}</span>
-                          {tier.label}
-                        </span>
-                      </td>
                       <td className="p-3.5 text-center font-mono font-bold text-red-700">
                         {fmtNumber(c.totalPoints)}
                       </td>
@@ -519,10 +489,6 @@ export const AdminCustomersPage: React.FC = () => {
                   )}
                 </div>
                 <div>
-                  <span className="text-[10px] text-stone-400 uppercase font-bold block">Hạng thành viên</span>
-                  <span className="font-bold text-sm text-amber-700 block mt-0.5">
-                    {TIER_CONFIG[detailData.customer.tierName]?.label || detailData.customer.tierName}
-                  </span>
                   <span className="text-[11px] text-stone-500">
                     Điểm thưởng: <strong className="text-red-700 font-mono">{fmtNumber(detailData.customer.totalPoints)}</strong>
                   </span>
@@ -721,7 +687,7 @@ export const AdminCustomersPage: React.FC = () => {
                 className={inputCls}
               />
               <span className="text-[10px] text-stone-400 block mt-1">
-                Khách sẽ tự động được xếp hạng tương ứng với số điểm khởi tạo (Đồng, Bạc, Vàng, Kim Cương).
+                Điểm khởi tạo được ghi vào số dư và lịch sử điểm của khách hàng theo số điện thoại.
               </span>
             </Field>
 
@@ -779,18 +745,6 @@ export const AdminCustomersPage: React.FC = () => {
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Hạng thành viên" column="users.tierName">
-                <select
-                  value={editCustomer.tierName}
-                  onChange={(e) => setEditCustomer({ ...editCustomer, tierName: e.target.value as any })}
-                  className={inputCls}
-                >
-                  <option value="BRONZE">Đồng</option>
-                  <option value="SILVER">Bạc</option>
-                  <option value="GOLD">Vàng</option>
-                  <option value="DIAMOND">Kim Cương</option>
-                </select>
-              </Field>
               <Field label="Trạng thái" column="users.status">
                 <select
                   value={editCustomer.status}

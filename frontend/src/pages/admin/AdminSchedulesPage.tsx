@@ -5,10 +5,10 @@ import { shopApi } from '../../lib/shopApi';
 import useAuthStore from '../../store/authStore';
 import { AdminLayout, inputCls } from './AdminUi';
 
-type ShiftName = 'MORNING' | 'AFTERNOON' | 'EVENING';
+type ShiftName = string;
 type ScheduleStatus = 'SCHEDULED' | 'PRESENT' | 'ABSENT' | 'COMPLETED';
 interface Employee { _id: string; fullName: string; phone: string; position: string; status: string }
-interface Schedule { _id: string; user: Employee; workDate: string; shiftName: ShiftName; status: ScheduleStatus; note?: string }
+interface Schedule { _id: string; user: Employee | null; workDate: string; shiftName: ShiftName; status: ScheduleStatus; note?: string }
 interface Shift { code: ShiftName; name: string; startTime: string; endTime: string }
 interface FormState { id?: string; originalUserId?: string; userId: string; workDate: string; shiftName: ShiftName; note: string }
 
@@ -66,14 +66,14 @@ export default function AdminSchedulesPage() {
     setLoading(true);
     const requests: [Promise<Schedule[]>, Promise<{ shifts: Shift[] }>, Promise<Employee[]>] = [
       shopApi<Schedule[]>(`/api/work-schedules?weekStart=${weekStart}`, { token }),
-      shopApi<{ shifts: Shift[] }>('/api/work-shifts', { token }),
+      shopApi<{ shifts: Shift[] }>(`/api/work-shifts?weekStart=${weekStart}`, { token }),
       isAdmin ? shopApi<Employee[]>('/api/employees', { token }) : Promise.resolve([])
     ];
     Promise.all(requests)
       .then(([weekSchedules, shiftResponse, staff]) => {
         if (!active) return;
         setSchedules(weekSchedules);
-        setShifts(shiftResponse.shifts);
+        setShifts(shiftResponse.shifts.length ? shiftResponse.shifts : [...new Map(weekSchedules.map(schedule => [schedule.shiftName, { code: schedule.shiftName, name: schedule.shiftName, startTime: '', endTime: '' }])).values()]);
         setEmployees(staff);
         setError('');
       })
@@ -97,6 +97,7 @@ export default function AdminSchedulesPage() {
     setNotice('');
   };
   const openEdit = (schedule: Schedule) => {
+    if (!schedule.user) { setError('Nhân viên của phân ca không còn tồn tại.'); return; }
     setForm({
       id: schedule._id, originalUserId: schedule.user._id, userId: schedule.user._id,
       workDate: schedule.workDate.slice(0, 10), shiftName: schedule.shiftName, note: schedule.note || ''
@@ -125,7 +126,7 @@ export default function AdminSchedulesPage() {
     finally { setBusy(false); }
   };
   const remove = async (schedule: Schedule) => {
-    if (!token || busy || !window.confirm(`Bỏ phân ca của ${schedule.user.fullName}?`)) return;
+    if (!token || busy || !window.confirm(`Bỏ phân ca của ${schedule.user?.fullName || 'nhân viên đã xóa'}?`)) return;
     setBusy(true);
     setError('');
     setNotice('');
@@ -172,7 +173,7 @@ export default function AdminSchedulesPage() {
             {shifts.map((shift) => <option key={shift.code} value={shift.code}>{shift.name} · {shift.startTime}–{shift.endTime}</option>)}
           </select>
         </label>
-        <label className="text-xs font-semibold text-stone-700">Ghi chú<input value={form.note} maxLength={300} onChange={(event) => setForm({ ...form, note: event.target.value })} className={`mt-1 ${inputCls}`} /></label>
+        <label className="text-xs font-semibold text-stone-700">Ghi chú<input value={form.note} maxLength={500} onChange={(event) => setForm({ ...form, note: event.target.value })} className={`mt-1 ${inputCls}`} /></label>
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <button type="button" onClick={() => setForm(null)} className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold">Hủy</button>
@@ -209,6 +210,7 @@ export default function AdminSchedulesPage() {
       </table>
     </div>
     {loading && <p className="text-sm text-stone-500">Đang tải lịch làm việc...</p>}
+    {!loading && shifts.length === 0 && <p className="text-sm text-stone-500">Tuần chưa có ca làm. Hãy cấu hình ca trong trang Quản lý ca làm việc trước khi phân công.</p>}
     {isAdmin && !loading && activeEmployees.length === 0 && <p className="text-sm text-stone-500">Cần có nhân viên đang hoạt động trước khi phân ca.</p>}
   </div>;
 

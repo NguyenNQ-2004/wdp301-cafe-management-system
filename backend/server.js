@@ -9,7 +9,7 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '3mb' }));
 
 app.get('/', (req, res) => {
   res.send('API của hệ thống Aura Cafe ERP đang hoạt động...');
@@ -43,7 +43,9 @@ app.use('/api/suppliers', require('./routes/supplierRoutes'));
 app.use('/api/product-ingredients', require('./routes/productIngredientRoutes'));
 app.use('/api/inventory-transactions', require('./routes/inventoryTransactionRoutes'));
 app.use('/api/purchase-orders', require('./routes/purchaseOrderRoutes'));
+app.use('/api/restock-requests', require('./routes/restockRequestRoutes'));
 app.use('/api/shop-settings', require('./routes/shopSettingRoutes'));
+app.use('/api/delivery-areas', require('./routes/deliveryAreaRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
 
 // ==========================================

@@ -4,6 +4,7 @@ const cartItemSchema = new mongoose.Schema({
   product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
   quantity: { type: Number, required: true, min: 1, max: 99 },
   size: { type: String, default: 'M' },
+  customization: { type: Object },
   checked: { type: Boolean, default: true }
 }, { _id: false });
 

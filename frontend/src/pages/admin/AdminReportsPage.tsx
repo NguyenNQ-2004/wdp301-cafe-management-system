@@ -244,7 +244,7 @@ const AdminReportsPage = () => {
         {!loading && !error && report && (
           <>
             <section className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              <SummaryCard label="Doanh thu (đơn hoàn thành)" value={formatVnd(report.overview.revenue)} detail="Doanh thu đã thanh toán" tone="rose" />
+              <SummaryCard label="Doanh thu đã thanh toán" value={formatVnd(report.overview.revenue)} detail="Giao dịch thành công, loại đơn đã hủy" tone="rose" />
               <SummaryCard label="Số đơn" value={report.overview.orderCount.toLocaleString('vi-VN')} detail={`${report.overview.completedOrderCount} hoàn thành · ${report.orderStatuses.find((item) => item.status === 'CANCELLED')?.orderCount || 0} hủy`} />
               <SummaryCard label="Giá trị TB / đơn" value={formatVnd(report.overview.averageOrderValue)} detail="Trung bình trên đơn hoàn thành" />
               <SummaryCard label="Đang xử lý" value={report.overview.inProgressCount.toLocaleString('vi-VN')} detail="Đơn chưa hoàn thành hoặc hủy" tone="green" />
@@ -266,7 +266,7 @@ const AdminReportsPage = () => {
                   <BarChart3 className="text-[#800020]" size={20} />
                 </div>
                 {chartBars.length === 0 ? (
-                  <EmptyState message="Chưa có doanh thu hoàn thành trong khoảng thời gian này." />
+                  <EmptyState message="Chưa có doanh thu đã thanh toán trong khoảng thời gian này." />
                 ) : (
                   <>
                     <div className="mb-1 flex justify-between text-[10px] text-stone-400">

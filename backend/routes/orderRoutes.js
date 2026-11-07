@@ -6,17 +6,25 @@ const OrderItem = require('../models/OrderItem');
 const Payment = require('../models/Payment');
 const LoyaltyTransaction = require('../models/LoyaltyTransaction');
 const User = require('../models/User');
-const Cart = require('../models/Cart');
 const RewardItem = require('../models/RewardItem');
+const ShopSetting = require('../models/ShopSetting');
+const DeliveryArea = require('../models/DeliveryArea');
 const { protect } = require('../middlewares/authMiddleware');
 const { normalizeCartItems } = require('../utils/cartItems');
 const { demoPaymentsEnabled } = require('../utils/paymentMode');
+const paymentGateway = require('../utils/paymentGateway');
+const { awardOrderPoints, refundRedemption } = require('../utils/orderLoyalty');
+const { deductOrderStock, checkCheckoutStock } = require('../utils/orderInventory');
+const { checkoutIdentity } = require('../utils/checkoutIdentity');
+const { clearCheckoutCart } = require('../utils/checkoutCart');
 const { withOrderMutation } = require('../utils/orderMutation');
 const { adminOrCashier, authorizePosition } = require('../middlewares/authMiddleware');
 
-const router = express.Router();
+const { atomicRouter } = require('../utils/atomicRoute');
+const router = atomicRouter(express.Router());
 router.use(protect);
 const orderError = (message, status = 400) => Object.assign(new Error(message), { status });
+const { lockOrder } = require('../utils/orderMutation');
 const validPhone = (value) => typeof value === 'string'
   && value.trim().length <= 30
   && /^\+?[0-9 .()-]+$/.test(value.trim())
@@ -28,25 +36,41 @@ router.get('/', async (req, res) => {
   try {
     const isStaffOrAdmin = ['ADMIN', 'STAFF'].includes(req.user.role);
     const filter = isStaffOrAdmin ? {} : { customer: req.user._id };
+    if (req.user.role === 'STAFF' && req.user.position === 'SHIPPER') {
+      filter.orderType = 'ONLINE';
+      filter.$or = [{ shipper: req.user._id }, { status: 'READY', shipper: null }];
+    }
+    if (req.user.role === 'STAFF' && req.user.position === 'BARISTA') {
+      const paid = await Payment.distinct('order', { status: 'SUCCESS' });
+      filter.$or = [{ _id: { $in: paid } }, { orderType: 'ONLINE', paymentMethod: 'COD' }];
+    }
     
     // Hỗ trợ query params: status, orderType
     if (req.query.status) {
-      filter.status = req.query.status;
+      const statuses = typeof req.query.status === 'string' ? req.query.status.split(',') : [];
+      if (!statuses.length || statuses.some(value => !['PENDING','CONFIRMED','PREPARING','READY','DELIVERING','COMPLETED','CANCELLED'].includes(value))) throw orderError('Bộ lọc trạng thái không hợp lệ.');
+      filter.status = { $in: statuses };
     }
     if (req.query.orderType) {
+      if (filter.orderType && req.query.orderType !== filter.orderType) return res.json([]);
       filter.orderType = req.query.orderType;
     }
 
     const orders = await Order.find(filter)
       .sort({ createdAt: -1 })
-      .populate('customer', 'fullName phone totalPoints tierName')
+      .populate('customer', 'fullName phone totalPoints')
       .populate('cashier', 'fullName phone')
       .populate('shipper', 'fullName phone')
       .populate('items.product', 'imageUrl name basePrice');
 
-    res.json(orders);
+    const payments = await Payment.find({ order: { $in: orders.map(order => order._id) } }).select('order amount status');
+    const byOrder = new Map(payments.map(payment => [String(payment.order), payment]));
+    res.json(orders.map(order => {
+      const payment = byOrder.get(String(order._id));
+      return { ...order.toObject(), paymentStatus: payment?.status, kitchenEligible: (payment?.status === 'SUCCESS' && payment.amount === order.finalAmount) || (order.orderType === 'ONLINE' && order.paymentMethod === 'COD') };
+    }));
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(error.status || 500).json({ message: error.message });
   }
 });
 
@@ -54,7 +78,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate('customer', 'fullName phone totalPoints tierName')
+      .populate('customer', 'fullName phone totalPoints')
       .populate('cashier', 'fullName phone')
       .populate('shipper', 'fullName phone')
       .populate('items.product', 'imageUrl name basePrice');
@@ -65,6 +89,7 @@ router.get('/:id', async (req, res) => {
     if (req.user.role === 'CUSTOMER' && String(order.customer?._id || order.customer) !== String(req.user._id)) {
       return res.status(403).json({ message: 'Không có quyền xem đơn hàng này.' });
     }
+    if (req.user.role === 'STAFF' && req.user.position === 'SHIPPER' && String(order.shipper?._id || order.shipper || '') !== String(req.user._id)) return res.status(403).json({ message: 'Chỉ được xem đơn giao hàng được phân công.' });
     
     res.json(order);
   } catch (error) {
@@ -74,11 +99,11 @@ router.get('/:id', async (req, res) => {
 
 // 3. CREATE ORDER (Khách đặt online / mang về, hoặc Thu ngân POS tạo tại quầy)
 router.post('/', async (req, res) => {
+  let unlockCheckout;
   let pointsReserved = 0;
-  let reservedRewardId = null;
-  let createdOrder = null;
-  let committed = false;
+  let pointsOwnerId;
   try {
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) throw orderError('Dữ liệu đặt hàng không hợp lệ.');
     const {
       items: rawItems,
       orderType,
@@ -93,21 +118,42 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     const isStaffOrAdmin = ['ADMIN', 'STAFF'].includes(req.user.role);
+    const checkoutFlow = req.body.checkoutFlow === true;
+    let identity = {};
+    let unfinished;
+    if (checkoutFlow && (req.user.role !== 'CUSTOMER' || orderType !== 'ONLINE')) throw orderError('Đặt hàng trên web chỉ hỗ trợ khách hàng và giao tận nơi.', 400);
+    if (checkoutFlow) {
+      identity = checkoutIdentity(req);
+      unlockCheckout = lockOrder(`checkout:${req.user._id}:${identity.checkoutSessionId}`);
+      const existing = await Order.findOne({ customer: req.user._id, idempotencyKey: identity.idempotencyKey });
+      if (existing) {
+        if (existing.requestHash !== identity.requestHash) throw orderError('Khóa yêu cầu đã được dùng cho nội dung khác.', 409);
+        return res.status(201).json(existing);
+      }
+      unfinished = await Order.findOne({ customer: req.user._id, checkoutFlow: true, checkoutSessionId: identity.checkoutSessionId, status: 'PENDING', paymentMethod: 'BANK_TRANSFER' });
+      if (!/^0\d{9,10}$/.test(String(recipientPhone || '').replace(/[\s.]/g, ''))) throw orderError('Số điện thoại cần 10–11 chữ số, bắt đầu bằng số 0.');
+      for (const [key, minimum, maximum] of [['district', 2, 100], ['ward', 2, 100], ['addressDetail', 5, 150]]) {
+        if (typeof req.body[key] !== 'string' || req.body[key].trim().length < minimum || req.body[key].trim().length > maximum) throw orderError('Vui lòng nhập đầy đủ Quận/Huyện, Phường/Xã và địa chỉ chi tiết.');
+      }
+    }
 
     // Chuẩn hóa danh sách món
     let items;
     try { items = await normalizeCartItems(rawItems); }
     catch (error) { throw orderError(error.message); }
     if (!items.length) throw orderError('Vui lòng chọn ít nhất một món.');
+    if (checkoutFlow) await checkCheckoutStock(items);
     if (!['DINE_IN', 'TAKEAWAY', 'ONLINE'].includes(orderType)) {
       throw orderError('Loại đơn hàng không hợp lệ (DINE_IN, TAKEAWAY, ONLINE).');
     }
+    if (orderType === 'ONLINE' && req.user.role !== 'CUSTOMER') throw orderError('Chỉ khách hàng được tạo đơn online.', 403);
+    if (req.user.role === 'STAFF' && !['CASHIER', 'MANAGER'].includes(req.user.position)) throw orderError('Chỉ thu ngân hoặc quản lý được tạo đơn tại quầy.', 403);
 
     if (req.user.role === 'CUSTOMER' && orderType === 'DINE_IN') throw orderError('Phương thức nhận hàng không hợp lệ.');
     const needsContact = req.user.role === 'CUSTOMER' || orderType === 'ONLINE';
     const finalRecipientName = typeof recipientName === 'string' ? recipientName.trim() : '';
     const finalRecipientPhone = typeof recipientPhone === 'string' ? recipientPhone.trim() : '';
-    const finalDeliveryAddress = typeof deliveryAddress === 'string' ? deliveryAddress.trim() : '';
+    const finalDeliveryAddress = checkoutFlow ? `${req.body.addressDetail.trim()}, ${req.body.ward.trim()}, ${req.body.district.trim()}, Hà Nội` : typeof deliveryAddress === 'string' ? deliveryAddress.trim() : '';
     if (needsContact && (!finalRecipientName || finalRecipientName.length > 100)) throw orderError('Tên người nhận phải từ 1 đến 100 ký tự.');
     if (needsContact && !validPhone(finalRecipientPhone)) throw orderError('Số điện thoại nhận hàng không hợp lệ.');
     if (orderType === 'ONLINE' && (finalDeliveryAddress.length < 5 || finalDeliveryAddress.length > 300)) throw orderError('Địa chỉ giao hàng phải từ 5 đến 300 ký tự.');
@@ -115,13 +161,17 @@ router.post('/', async (req, res) => {
     if (tableNumber != null && (typeof tableNumber !== 'string' || tableNumber.length > 20)) throw orderError('Số bàn không hợp lệ.');
     const finalPaymentMethod = isStaffOrAdmin
       ? (paymentMethod || (orderType === 'ONLINE' ? 'COD' : 'CASH'))
-      : (orderType === 'ONLINE' ? (paymentMethod === 'DEMO_ONLINE' ? 'DEMO_ONLINE' : 'COD') : 'PAY_AT_COUNTER');
+      : (checkoutFlow ? 'BANK_TRANSFER' : orderType === 'ONLINE' ? (['DEMO_ONLINE', 'BANK_TRANSFER'].includes(paymentMethod) ? paymentMethod : 'COD') : 'PAY_AT_COUNTER');
     if (!['COD', 'PAY_AT_COUNTER', 'CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER', 'DEMO_ONLINE'].includes(finalPaymentMethod)) throw orderError('Phương thức thanh toán không hợp lệ.');
     if (finalPaymentMethod === 'DEMO_ONLINE' && (orderType !== 'ONLINE' || req.user.role !== 'CUSTOMER' || !demoPaymentsEnabled())) throw orderError('Thanh toán mô phỏng hiện không khả dụng.', 403);
+    if (!checkoutFlow && orderType === 'ONLINE' && finalPaymentMethod === 'BANK_TRANSFER' && !paymentGateway.enabled()) throw orderError('Thanh toán chuyển khoản chưa được cấu hình.', 503);
     if (demoProvider != null && (finalPaymentMethod !== 'DEMO_ONLINE' || !['MOMO', 'VNPAY', 'BANK_TRANSFER'].includes(demoProvider))) throw orderError('Kênh thanh toán mô phỏng không hợp lệ.');
 
     const totalAmount = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+    pointsOwnerId = req.user.role === 'CUSTOMER' ? req.user._id : req.body.customerId;
+    if (pointsOwnerId && (!mongoose.isValidObjectId(pointsOwnerId) || !await User.exists({ _id: pointsOwnerId, role: 'CUSTOMER', status: 'ACTIVE' }))) throw orderError('Khách hàng không hợp lệ.');
     let reward = null;
+    let requestedPoints = 0;
     let discountAmount = 0;
     if (rewardId != null) {
       if (req.user.role !== 'CUSTOMER') throw orderError('Chỉ tài khoản khách hàng được sử dụng điểm tích lũy.', 403);
@@ -132,22 +182,65 @@ router.post('/', async (req, res) => {
       if (totalAmount < reward.minOrderValue) throw orderError('Đơn hàng chưa đạt mức tối thiểu để đổi ưu đãi điểm.', 409);
       discountAmount = Math.min(reward.discountValue, totalAmount);
     }
-    if (isStaffOrAdmin && req.body.discountAmount != null) {
-      const staffDiscount = Number(req.body.discountAmount);
-      if (!Number.isInteger(staffDiscount) || staffDiscount < 0 || staffDiscount > totalAmount) throw orderError('Số tiền giảm giá không hợp lệ.');
-      discountAmount = staffDiscount;
+    if (req.body.pointsToRedeem != null && req.body.pointsToRedeem !== 0) {
+      if (rewardId != null || !pointsOwnerId || !Number.isSafeInteger(req.body.pointsToRedeem) || req.body.pointsToRedeem < 0) throw orderError('Điểm đổi không hợp lệ.');
+      const settings = await ShopSetting.find({ settingKey: { $in: ['points_step', 'points_step_value'] } });
+      const rules = Object.fromEntries(settings.map(item => [item.settingKey, Number(item.settingValue)]));
+      const step = rules.points_step ?? 10;
+      const value = rules.points_step_value ?? 2000;
+      if (!Number.isSafeInteger(step) || step < 1 || !Number.isSafeInteger(value) || value < 1) throw orderError('Quy tắc đổi điểm chưa khả dụng.', 409);
+      const customer = await User.findById(pointsOwnerId).select('totalPoints');
+      const availablePoints = customer.totalPoints + (unfinished?.pointsRedeemed || 0);
+      const steps = Math.floor(req.body.pointsToRedeem / step);
+      if (req.body.pointsToRedeem > availablePoints || steps * value > totalAmount) throw orderError('Điểm đổi không được vượt số dư hoặc tiền món.', 409);
+      requestedPoints = steps * step;
+      if (!requestedPoints) throw orderError('Không đủ điểm hoặc giá trị đơn để đổi điểm.', 409);
+      discountAmount = steps * value;
     }
-    const deliveryFee = orderType === 'ONLINE' && totalAmount < 150000 ? 18000 : 0;
+    const shippingSettings = Object.fromEntries((await ShopSetting.find({ settingKey: { $in: ['freeship_threshold', 'delivery_fee'] } }).lean()).map(setting => [setting.settingKey, Number(setting.settingValue)]));
+    const threshold = shippingSettings.freeship_threshold ?? 150000;
+    const configuredFee = shippingSettings.delivery_fee ?? 18000;
+    if (![threshold, configuredFee].every(value => Number.isSafeInteger(value) && value >= 0)) throw orderError('Cấu hình phí giao hàng không hợp lệ.', 409);
+
+    let areaFee = configuredFee;
+    if (orderType === 'ONLINE' && (typeof req.body.district !== 'string' || req.body.district.trim().length < 2 || req.body.district.trim().length > 100)) throw orderError('Vui lòng chọn khu vực giao hàng được phục vụ.');
+    if (orderType === 'ONLINE' && req.body.district && typeof req.body.district === 'string') {
+      const trimmedDistrict = req.body.district.trim();
+      const area = await DeliveryArea.findOne({
+        district: { $regex: new RegExp(`^${trimmedDistrict.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      });
+      if (!area) throw orderError('Khu vực này chưa được phục vụ giao hàng.');
+      if (area) {
+        if (!area.isActive) throw orderError(`Khu vực "${trimmedDistrict}" hiện đang tạm ngưng nhận giao hàng.`, 400);
+        areaFee = area.deliveryFee;
+      }
+    }
+    const deliveryFee = orderType === 'ONLINE' && totalAmount < threshold ? areaFee : 0;
     const finalAmount = totalAmount + deliveryFee - discountAmount;
     if (req.user.role === 'CUSTOMER' && (!Number.isInteger(req.body.expectedTotal) || req.body.expectedTotal !== finalAmount)) return res.status(409).json({ message: 'Giá món, ưu đãi điểm hoặc phí giao hàng đã thay đổi. Vui lòng kiểm tra lại giỏ hàng trước khi đặt.', finalAmount });
-    if (reward) {
-      const customer = await User.findOneAndUpdate({ _id: req.user._id, role: 'CUSTOMER', totalPoints: { $gte: reward.pointsCost } }, { $inc: { totalPoints: -reward.pointsCost } }, { returnDocument: 'after' });
+    // Validation is complete. Replacement and all subsequent effects share the
+    // same database transaction as callbacks/cancellation, not just a JS lock.
+    if (checkoutFlow) {
+      // A common write serializes concurrent checkouts across API processes,
+      // including the first order where there is no existing Order to lock.
+      const claim = await User.updateOne({ _id: req.user._id, role: 'CUSTOMER', status: 'ACTIVE' }, { $inc: { checkoutRevision: 1 } });
+      if (claim.matchedCount !== 1) throw orderError('Tài khoản không còn khả dụng.', 409);
+    }
+    if (unfinished) {
+      if (await Payment.exists({ order: unfinished._id, status: 'SUCCESS' })) throw orderError('Đơn trước đã thanh toán, không thể thay thế.', 409);
+      const replaced = await Order.findOneAndUpdate({ _id: unfinished._id, customer: req.user._id, checkoutSessionId: identity.checkoutSessionId, status: 'PENDING', paymentMethod: 'BANK_TRANSFER' }, { $set: { status: 'CANCELLED', cancelReason: 'Khách đặt lại đơn mới trong cùng phiên' } }, { returnDocument: 'after' });
+      if (!replaced) throw orderError('Đơn trước vừa được cập nhật.', 409);
+      await refundRedemption(replaced);
+      await Payment.updateMany({ order: replaced._id, status: 'PENDING' }, { $set: { status: 'FAILED' } });
+    }
+    if (reward || requestedPoints) {
+      const cost = reward ? reward.pointsCost : requestedPoints;
+      const customer = await User.findOneAndUpdate({ _id: pointsOwnerId, role: 'CUSTOMER', status: 'ACTIVE', totalPoints: { $gte: cost } }, { $inc: { totalPoints: -cost } }, { returnDocument: 'after' });
       if (!customer) throw orderError('Bạn không còn đủ điểm để đổi ưu đãi này.', 409);
-      pointsReserved = reward.pointsCost;
-      if (reward.stock !== -1) {
+      pointsReserved = cost;
+      if (reward && reward.stock !== -1) {
         const claimed = await RewardItem.findOneAndUpdate({ _id: reward._id, status: 'ACTIVE', stock: { $gt: 0 } }, { $inc: { stock: -1 } });
         if (!claimed) throw orderError('Ưu đãi điểm vừa hết số lượng.', 409);
-        reservedRewardId = reward._id;
       }
     }
 
@@ -156,15 +249,17 @@ router.post('/', async (req, res) => {
 
     const orderData = {
       orderCode,
+      checkoutFlow,
+      ...identity,
       customer: req.user.role === 'CUSTOMER' ? req.user._id : (req.body.customerId || undefined),
       cashier: isStaffOrAdmin ? req.user._id : undefined,
       orderType,
-      status: orderType === 'DINE_IN' && isStaffOrAdmin ? 'PREPARING' : 'PENDING',
-      items: items.map(({ product, quantity, size, unitPrice }) => ({
+      status: 'PENDING',
+      items: items.map(({ product, quantity, customization, unitPrice }) => ({
         product: product._id,
         productNameAtTime: product.name,
         unitPrice,
-        customization: { size },
+        customization,
         quantity,
         subtotal: unitPrice * quantity,
         isPrepared: false
@@ -174,6 +269,9 @@ router.post('/', async (req, res) => {
       pointsRedeemed: pointsReserved,
       discountAmount,
       deliveryFee,
+      district: orderType === 'ONLINE' && req.body.district ? req.body.district.trim() : undefined,
+      ward: orderType === 'ONLINE' && req.body.ward ? req.body.ward.trim() : undefined,
+      addressDetail: orderType === 'ONLINE' && req.body.addressDetail ? req.body.addressDetail.trim() : undefined,
       finalAmount,
       recipientName: finalRecipientName || undefined,
       recipientPhone: finalRecipientPhone || undefined,
@@ -185,7 +283,6 @@ router.post('/', async (req, res) => {
     };
 
     const order = await Order.create(orderData);
-    createdOrder = order;
 
     // Đồng bộ vào bảng order_items (Table 6)
     for (const it of orderData.items) {
@@ -208,60 +305,37 @@ router.post('/', async (req, res) => {
       ...(finalPaymentMethod === 'DEMO_ONLINE' && demoProvider ? { demoProvider } : {}),
       amount: finalAmount,
       status: 'PENDING',
-      paymentNote: finalPaymentMethod === 'DEMO_ONLINE' ? 'Giao dịch mô phỏng, không thu tiền thật' : orderType === 'ONLINE' ? 'Đơn đặt online' : 'Thanh toán tại quầy'
+      paymentNote: finalPaymentMethod === 'DEMO_ONLINE' ? 'Giao dịch mô phỏng, không thu tiền thật' : orderType === 'ONLINE' ? 'Đơn đặt online' : 'Thanh toán tại quầy',
+      ...(orderType === 'ONLINE' && finalPaymentMethod === 'BANK_TRANSFER' ? { transactionCode: `QR-${randomBytes(12).toString('hex').toUpperCase()}` } : {})
     });
 
-    if (reward) await LoyaltyTransaction.create({ customer: req.user._id, order: order._id, pointsChange: -pointsReserved, transactionType: 'REDEEM' });
-    committed = true;
+    if (pointsReserved) await LoyaltyTransaction.create({ customer: pointsOwnerId, order: order._id, pointsChange: -pointsReserved, transactionType: 'REDEEM' });
+    if (order.status === 'PREPARING') await deductOrderStock(order, req.user._id);
 
     // Dọn dẹp giỏ hàng nếu là customer
-    if (req.user.role === 'CUSTOMER') {
-      try {
-        const cart = await Cart.findOne({ customer: req.user._id });
-        if (cart) {
-          const ordered = new Set(items.map(({ product, size }) => `${product._id}:${size}`));
-          cart.items = cart.items.filter((item) => !ordered.has(`${item.product}:${item.size}`));
-          await cart.save();
-        }
-      } catch (cartError) {
-        console.error('Lỗi dọn giỏ hàng:', cartError);
-      }
+    if (req.user.role === 'CUSTOMER' && !checkoutFlow) {
+      await clearCheckoutCart(order);
     }
 
     res.status(201).json(order);
   } catch (error) {
-    if (!committed && createdOrder) {
-      try {
-        await Promise.all([Order.deleteOne({ _id: createdOrder._id }), OrderItem.deleteMany({ order: createdOrder._id }), Payment.deleteMany({ order: createdOrder._id })]);
-      } catch (deleteError) {
-        console.error('Could not remove incomplete order:', deleteError);
-        return res.status(500).json({ message: 'Không thể hoàn tất đơn hàng. Vui lòng liên hệ cửa hàng.', orderCode: createdOrder.orderCode });
-      }
-    }
-    if (!committed) {
-      const rollbacks = [];
-      if (reservedRewardId) rollbacks.push(RewardItem.updateOne({ _id: reservedRewardId }, { $inc: { stock: 1 } }));
-      if (pointsReserved) rollbacks.push(User.updateOne({ _id: req.user._id }, { $inc: { totalPoints: pointsReserved } }));
-      const results = await Promise.allSettled(rollbacks);
-      if (results.some((result) => result.status === 'rejected')) {
-        console.error('Loyalty reservation rollback failed:', results);
-        return res.status(500).json({ message: 'Không thể hoàn tất đơn hàng. Vui lòng liên hệ cửa hàng.' });
-      }
-    }
-    res.status(error.status || (error.name === 'ValidationError' ? 400 : 500)).json({ message: error.message });
-  }
+    if (error.hasErrorLabel?.('TransientTransactionError')) throw error;
+    res.status(error.status || (error.code === 11000 || error.name === 'VersionError' ? 409 : error.name === 'ValidationError' ? 400 : 500)).json({ message: error.message });
+  } finally { unlockCheckout?.(); }
 });
 
 // 4. UPDATE ORDER STATUS (Dành cho Thu ngân, Pha chế, Shipper, Quản lý)
 router.put('/:id/status', withOrderMutation(async (req, res) => {
+  let unlock;
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã đơn hàng không hợp lệ.' });
+    unlock = lockOrder(req.params.id);
     if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
       return res.status(400).json({ message: 'Dữ liệu cập nhật đơn hàng không hợp lệ.' });
     }
     const { status, cancelReason, shipperId } = req.body;
     const validStatuses = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'DELIVERING', 'COMPLETED', 'CANCELLED'];
-    if (Object.keys(req.body || {}).some((key) => !['status', 'cancelReason', 'shipperId', 'orderNote'].includes(key))) {
+    if (Object.keys(req.body || {}).some((key) => !['status', 'cancelReason', 'shipperId', 'orderNote', 'collectedAmount'].includes(key))) {
       return res.status(400).json({ message: 'Dữ liệu cập nhật đơn hàng không hợp lệ.' });
     }
     if (!validStatuses.includes(status)) {
@@ -290,8 +364,8 @@ router.put('/:id/status', withOrderMutation(async (req, res) => {
 
     if (req.user.role === 'CUSTOMER') {
       if (String(order.customer) !== String(req.user._id)) return res.status(403).json({ message: 'Bạn không có quyền cập nhật đơn hàng này.' });
-      if (status !== 'CANCELLED' || !['PENDING', 'CONFIRMED'].includes(order.status)) {
-        return res.status(409).json({ message: 'Khách hàng chỉ có thể hủy đơn trước khi quán bắt đầu pha chế.' });
+      if (status !== 'CANCELLED' || order.status !== 'PENDING' || await Payment.exists({ order: order._id, status: 'SUCCESS' })) {
+        return res.status(409).json({ message: 'Khách hàng chỉ có thể hủy đơn PENDING chưa thanh toán.' });
       }
       if (shipperId !== undefined) return res.status(403).json({ message: 'Khách hàng không được thay đổi nhân viên giao hàng.' });
     }
@@ -359,73 +433,82 @@ router.put('/:id/status', withOrderMutation(async (req, res) => {
         if (order.orderType !== 'ONLINE' || !['PENDING', 'CONFIRMED', 'PREPARING', 'READY'].includes(order.status)) return res.status(409).json({ message: 'Chỉ có thể gán shipper cho đơn giao hàng chưa kết thúc.' });
         if (!isAdmin && !(isStaff && ['MANAGER', 'SHIPPER'].includes(position))) return res.status(403).json({ message: 'Bạn không có quyền gán nhân viên giao hàng.' });
         if (isShipper && String(shipperId) !== String(req.user._id)) return res.status(403).json({ message: 'Shipper chỉ được nhận đơn cho chính mình.' });
-        if (order.shipper && String(order.shipper) !== String(shipperId)) return res.status(409).json({ message: 'Đơn hàng đã được gán cho shipper khác.' });
+        if (isShipper && order.shipper && String(order.shipper) !== String(shipperId)) return res.status(409).json({ message: 'Đơn hàng đã được gán cho shipper khác.' });
         order.shipper = shipper._id;
       }
     }
 
+    const previousStatus = order.status;
+    const previousCancelReason = order.cancelReason;
+    if (isStaff && position === 'CASHIER' && status === 'CANCELLED' && (order.orderType === 'ONLINE' || !['PENDING', 'CONFIRMED', 'CANCELLED'].includes(order.status))) return res.status(409).json({ message: 'Thu ngân chỉ được hủy đơn tại quầy đang chờ hoặc đã xác nhận.' });
+    if (status === 'COMPLETED' && order.status !== 'COMPLETED' && order.orderType === 'ONLINE' && order.paymentMethod === 'COD' && req.body.collectedAmount !== order.finalAmount) return res.status(409).json({ message: 'Số tiền COD thực thu phải bằng số tiền của đơn hàng.' });
+    if (['PREPARING','READY','COMPLETED'].includes(status) && !(order.orderType === 'ONLINE' && order.paymentMethod === 'COD') && !await Payment.exists({ order: order._id, status: 'SUCCESS', amount: order.finalAmount })) {
+      return res.status(409).json({ message: 'Đơn hàng phải thanh toán trước khi pha chế hoặc bàn giao.' });
+    }
+    if (status === 'READY' && order.status === 'PREPARING' && (!order.items.length || order.items.some(item => !item.isPrepared))) return res.status(409).json({ message: 'Cần đánh dấu tất cả món đã pha xong trước khi hoàn thành đơn.' });
+    if (['PREPARING', 'READY'].includes(status)) await deductOrderStock(order, req.user._id);
     order.status = status;
     if (cancelReason !== undefined) order.cancelReason = cancelReason.trim();
     if (req.body.orderNote !== undefined) order.orderNote = req.body.orderNote.trim();
 
+    await order.save();
     // COD được thu khi giao xong; đơn tại quầy và demo có bước xác nhận riêng.
     if (status === 'COMPLETED') {
       if (order.orderType === 'ONLINE' && order.paymentMethod === 'COD') {
         await Payment.findOneAndUpdate(
           { order: order._id, status: 'PENDING', paymentMethod: 'CASH' },
-          { $set: { status: 'SUCCESS', paidAt: new Date(), paymentNote: 'Thu tiền COD khi giao hàng hoàn tất' } },
+          { $set: { status: 'SUCCESS', paidAt: new Date(), receivedBy: req.user._id, paymentNote: 'Thu tiền COD khi giao hàng hoàn tất' } },
           { returnDocument: 'after' }
         );
       }
-
-      // Nếu có khách hàng và chưa cộng điểm cho đơn này: cộng điểm (1.000đ = 1 điểm)
-      if (order.customer) {
-        const existingTx = await LoyaltyTransaction.findOne({ order: order._id, transactionType: 'EARN' });
-        if (!existingTx) {
-          const pointsEarned = Math.floor(order.finalAmount / 1000);
-          if (pointsEarned > 0) {
-            await LoyaltyTransaction.create({
-              customer: order.customer,
-              order: order._id,
-              pointsChange: pointsEarned,
-              transactionType: 'EARN'
-            });
-            await User.findByIdAndUpdate(order.customer, {
-              $inc: { totalPoints: pointsEarned }
-            });
-          }
-        }
-      }
     }
 
-    await order.save();
+    if (status === 'COMPLETED') await awardOrderPoints(order._id);
+    if (status === 'CANCELLED') {
+      try { await refundRedemption(order); }
+      catch (error) {
+        order.status = previousStatus;
+        order.cancelReason = previousCancelReason;
+        await order.save();
+        throw error;
+      }
+      await Payment.updateMany({ order: order._id, status: 'PENDING' }, { $set: { status: 'FAILED' } });
+    }
     res.json({ message: 'Cập nhật trạng thái thành công!', order });
   } catch (error) {
-    res.status(error.status || (error.name === 'ValidationError' ? 400 : 500)).json({ message: error.message });
-  }
+    res.status(error.status || (error.name === 'VersionError' ? 409 : error.name === 'ValidationError' ? 400 : 500)).json({ message: error.message });
+  } finally { unlock?.(); }
 }));
 
 // 5. BARISTA KDS: TOGGLE ITEM PREPARED (Tích từng món đã pha xong)
 router.put('/:id/items/:itemIndex/prepared', authorizePosition('BARISTA', 'MANAGER'), withOrderMutation(async (req, res) => {
+  let unlock;
   try {
+    if (req.user.role !== 'ADMIN' && !(req.user.role === 'STAFF' && ['BARISTA', 'MANAGER'].includes(req.user.position))) return res.status(403).json({ message: 'Chỉ nhân viên pha chế hoặc quản lý được cập nhật chế biến.' });
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã đơn hàng không hợp lệ.' });
+    unlock = lockOrder(req.params.id);
     const { itemIndex } = req.params;
     const { isPrepared } = req.body;
 
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Không tìm thấy đơn hàng.' });
+    if (!['PREPARING', 'READY'].includes(order.status)) return res.status(409).json({ message: 'Đơn hàng không ở bước pha chế.' });
+    if (isPrepared !== undefined && typeof isPrepared !== 'boolean') return res.status(400).json({ message: 'Trạng thái chế biến không hợp lệ.' });
 
-    const idx = parseInt(itemIndex, 10);
+    const idx = /^\d+$/.test(itemIndex) ? Number(itemIndex) : NaN;
     if (isNaN(idx) || idx < 0 || idx >= order.items.length) {
       return res.status(400).json({ message: 'Mã số món không hợp lệ.' });
     }
 
+    await deductOrderStock(order, req.user._id);
     order.items[idx].isPrepared = isPrepared !== undefined ? isPrepared : !order.items[idx].isPrepared;
     
     // Nếu tất cả các món đã pha xong -> có thể chuyển sang READY
     const allPrepared = order.items.every(it => it.isPrepared);
-    if (allPrepared && order.status === 'PREPARING') {
+    if (allPrepared && order.status === 'PREPARING' && req.body.autoReady !== false) {
       order.status = 'READY';
     }
+    if (!allPrepared && order.status === 'READY') order.status = 'PREPARING';
 
     await order.save();
 
@@ -438,16 +521,11 @@ router.put('/:id/items/:itemIndex/prepared', authorizePosition('BARISTA', 'MANAG
 
     res.json({ message: 'Đã cập nhật trạng thái chế biến món!', order });
   } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    res.status(error.status || (error.name === 'VersionError' ? 409 : 500)).json({ message: error.message });
+  } finally { unlock?.(); }
 }));
-
 // Edit counter orders before payment or the first item is marked prepared.
 router.put('/:id/counter', adminOrCashier, withOrderMutation(async (req, res) => {
-  let original;
-  let originalItems;
-  let payment;
-  let changed = false;
   try {
     const body = req.body;
     if (!body || Array.isArray(body) || typeof body !== 'object'
@@ -456,6 +534,7 @@ router.put('/:id/counter', adminOrCashier, withOrderMutation(async (req, res) =>
     }
     const order = await Order.findById(req.params.id);
     if (!['DINE_IN', 'TAKEAWAY'].includes(order.orderType)) throw orderError('Chỉ được sửa đơn tại quầy.', 409);
+    if (order.inventoryDeductedAt || order.inventoryProcessing) throw orderError('Đơn đã xuất nguyên liệu, không thể thay đổi món.', 409);
     if (!['PENDING', 'CONFIRMED', 'PREPARING'].includes(order.status) || order.items.some(item => item.isPrepared)) {
       throw orderError('Không thể sửa đơn đã có món được pha hoặc đã kết thúc.', 409);
     }
@@ -483,12 +562,10 @@ router.put('/:id/counter', adminOrCashier, withOrderMutation(async (req, res) =>
     });
     const totalAmount = items.reduce((sum, item) => sum + item.subtotal, 0);
     if (totalAmount < order.discountAmount) throw orderError('Tổng tiền món không được nhỏ hơn số tiền giảm giá.');
-    original = order.toObject();
-    originalItems = await OrderItem.find({ order: order._id }).lean();
-    payment = payments[0];
+    await checkCheckoutStock(normalized);
+    const payment = payments[0];
     Object.assign(order, { items, totalAmount, finalAmount: totalAmount + order.deliveryFee - order.discountAmount,
       tableNumber: order.orderType === 'DINE_IN' ? body.tableNumber.trim() : undefined, orderNote: body.orderNote.trim() });
-    changed = true;
     await order.save();
     await OrderItem.deleteMany({ order: order._id });
     await OrderItem.insertMany(items.map(item => ({ ...item, order: order._id })));
@@ -496,19 +573,7 @@ router.put('/:id/counter', adminOrCashier, withOrderMutation(async (req, res) =>
     if (result.matchedCount !== 1) throw orderError('Khoản thanh toán đã thay đổi.', 409);
     res.json({ message: 'Đã cập nhật đơn tại quầy.', order });
   } catch (error) {
-    if (changed) {
-      try {
-        const { _id, __v, ...snapshot } = original;
-        await Order.updateOne({ _id }, { $set: { ...snapshot, tableNumber: original.tableNumber || null, orderNote: original.orderNote || null } }, { timestamps: false });
-        await OrderItem.deleteMany({ order: _id });
-        if (originalItems.length) await OrderItem.insertMany(originalItems);
-        await Payment.updateOne({ _id: payment._id }, { $set: { amount: payment.amount, updatedAt: payment.updatedAt } }, { timestamps: false });
-      } catch (rollbackError) {
-        res.locals.retainMutationLock = true;
-        console.error('Counter order rollback failed:', String(original._id), rollbackError.message);
-        return res.status(500).json({ message: 'Đơn đang tạm khóa để kiểm tra đồng bộ dữ liệu. Vui lòng liên hệ quản lý.' });
-      }
-    }
+    if (error.hasErrorLabel?.('TransientTransactionError')) throw error;
     res.status(error.status || 500).json({ message: error.message });
   }
 }));

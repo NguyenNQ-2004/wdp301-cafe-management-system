@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const productSchema = new mongoose.Schema({
   category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
   name: { type: String, required: true },
-  basePrice: { type: Number, required: true },
+  basePrice: { type: Number, required: true, min: 0 },
   badge: { type: String },
   subtitle: { type: String },
   variantsConfig: { type: Object }, // JSON cho sizes, toppings

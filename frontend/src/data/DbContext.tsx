@@ -1,11 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import axios from 'axios';
+import { useLocation } from 'react-router-dom';
+import { API_BASE as SHOP_API_BASE } from '../lib/shopApi';
+import { normalizeProductBadge } from '../lib/productBadge';
+import { repairDisplayData } from '../lib/displayText';
 import type { Category, Product, ActiveStatus, OrderStatus, OrderType } from '../types';
 
 import useAuthStore from '../store/authStore';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = `${SHOP_API_BASE}/api`;
 
 export interface Transaction {
   insert: <T extends Record<string, any>>(table: string, data: T) => T & { id: any; _id?: any };
@@ -72,6 +76,7 @@ const defaultContextValue: DbContextValue = {
 export const DbContext = createContext<DbContextValue>(defaultContextValue);
 
 export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const location = useLocation();
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
@@ -130,7 +135,7 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
         status: p.status || (p.isAvailable ? 'ACTIVE' : 'INACTIVE'),
         isAvailable: p.isAvailable !== undefined ? p.isAvailable : (p.is_available !== undefined ? p.is_available : true),
         is_available: p.is_available !== undefined ? p.is_available : (p.isAvailable !== undefined ? p.isAvailable : true),
-        badge: p.badge,
+        badge: normalizeProductBadge(p.badge),
         subtitle: p.subtitle,
         description: p.description,
         variantsConfig: p.variantsConfig || p.variants_config,
@@ -211,6 +216,8 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
         _id: item._id || String(id),
         name: item.name,
         unit: item.unit,
+        stockLots: item.stockLots,
+        stockValuation: item.stockValuation,
         currentStock: item.currentStock ?? item.current_stock ?? 0,
         current_stock: item.currentStock ?? item.current_stock ?? 0,
         minStockLevel: item.minStockLevel ?? item.min_stock_level ?? 0,
@@ -283,6 +290,9 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
       }
 
       const results = await Promise.allSettled(promises);
+      for (const result of results) {
+        if (result.status === 'fulfilled') result.value.data = repairDisplayData(result.value.data);
+      }
       if (version !== refreshVersion.current || token !== useAuthStore.getState().user?.token) return;
       const catRes = results[0];
       const prodRes = results[1];
@@ -325,6 +335,8 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
           (po.items || []).map((it: any) => ({
             ...it,
             order_id: po._id || po.id,
+            status: po.status,
+            purchasedAt: po.createdAt || po.created_at,
             ingredient_id: it.ingredient?._id || it.ingredient || it.ingredient_id
           }))
         );
@@ -348,7 +360,7 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   useEffect(() => {
     refresh();
-  }, [refresh, sessionToken]);
+  }, [refresh, sessionToken, location.pathname]);
 
   const setOrderStatus = useCallback(async (orderId: any, status: OrderStatus) => {
     setOrders(prev =>

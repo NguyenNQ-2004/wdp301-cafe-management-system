@@ -20,9 +20,11 @@ const customerReviewSchema = new mongoose.Schema(
     },
     adminResponse: { type: String },
     respondedAt: { type: Date },
-    respondedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    respondedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    submissionKey: { type: String }
   },
   { timestamps: true }
 );
+customerReviewSchema.index({ submissionKey: 1 }, { unique: true, partialFilterExpression: { submissionKey: { $type: 'string' } } });
 
 module.exports = mongoose.model('CustomerReview', customerReviewSchema);

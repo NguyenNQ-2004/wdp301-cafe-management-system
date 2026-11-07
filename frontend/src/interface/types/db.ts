@@ -65,6 +65,7 @@ export interface VariantsConfig {
 // 4. products
 export interface Product {
   id: number;
+  total_sold?: number;
   category_id: number;
   name: string;
   base_price: number;
@@ -88,6 +89,8 @@ export type OrderStatus =
 
 // 5. orders
 export interface Order {
+  kitchen_eligible?: boolean;
+  payment_status?: 'PENDING' | 'SUCCESS' | 'FAILED';
   update_token?: string;
   id: number;
   order_code: string;
@@ -147,7 +150,7 @@ export interface Payment {
   payment_note: string | null;
 }
 
-export type LoyaltyType = 'EARN' | 'REDEEM';
+export type LoyaltyType = 'EARN' | 'REDEEM' | 'REFUND' | 'ADJUST';
 
 // 8. loyalty_transactions (EARN: points_change > 0, REDEEM: points_change < 0)
 export interface LoyaltyTransaction {

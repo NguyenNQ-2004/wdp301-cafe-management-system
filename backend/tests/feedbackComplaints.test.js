@@ -120,17 +120,21 @@ test('Screen 30: Feedback & complaints submission, filtering, and admin response
       attachments: ['https://example.com/photo1.jpg']
     }
   });
-  assert.equal(ratingRes.status, 201);
+  assert.equal(ratingRes.status, 201, JSON.stringify(ratingRes.data));
   assert.equal(ratingRes.data.review.rating, 5);
   assert.equal(ratingRes.data.review.issueType, 'RATING');
   assert.equal(ratingRes.data.review.status, 'PENDING');
 
+  assert.equal((await request('/api/customer-reviews', { method: 'POST', token: customerAToken, body: { orderId: sampleOrder._id, issueType: 'RATING', rating: 5, content: 'Duplicate' } })).status, 409);
+  assert.equal((await request('/api/customer-reviews', { method: 'POST', token: customerBToken, body: { orderId: sampleOrder._id, issueType: 'RATING', rating: 5, content: 'Not owned' } })).status, 404);
+  assert.equal((await request('/api/customer-reviews/my-orders', { token: customerAToken })).data.length, 0);
+  const complaintOrder = await Order.create({ orderCode: 'ORD-FB-102', customer: customerA._id, totalAmount: 85000, finalAmount: 85000, status: 'COMPLETED', orderType: 'TAKEAWAY' });
   // 5. Customer A submits a Complaint
   const complaintRes = await request('/api/customer-reviews', {
     method: 'POST',
     token: customerAToken,
     body: {
-      orderId: sampleOrder._id,
+      orderId: complaintOrder._id,
       issueType: 'COMPLAINT',
       topic: 'Chất lượng đồ uống',
       content: 'Đá bị tan quá nhiều khiến cà phê bị nhạt.'
@@ -196,6 +200,7 @@ test('Screen 30: Feedback & complaints submission, filtering, and admin response
     403
   );
   const deleteRes = await request(`/api/customer-reviews/${complaintId}`, { method: 'DELETE', token: adminToken });
-  assert.equal(deleteRes.status, 200);
-  assert.equal(await CustomerReview.exists({ _id: complaintId }), null);
+  assert.equal(deleteRes.status, 409);
+  assert.ok(await CustomerReview.exists({ _id: complaintId }));
+  assert.equal((await request(`/api/customer-reviews/${complaintId}/respond`, { method: 'PUT', token: adminToken, body: { adminResponse: 'Reopen', status: 'IN_PROGRESS' } })).status, 409);
 });

@@ -79,9 +79,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
     }
     if (!account?.token) return;
     try {
-      await shopApi('/api/auth/change-password', { method: 'PUT', token: account.token, body: { oldPassword: passwordData.oldPassword, newPassword: passwordData.newPassword } });
+      await shopApi('/api/auth/change-password', { method: 'PUT', token: account.token, body: { oldPassword: passwordData.oldPassword, newPassword: passwordData.newPassword, confirmPassword: passwordData.confirmPassword } });
       setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
-      onShowToast?.('Đổi mật khẩu tài khoản thành công!');
+      useAuthStore.getState().logout();
+      onNavigate('home');
+      onShowToast?.('Đổi mật khẩu thành công. Vui lòng đăng nhập lại.');
     } catch (error) { onShowToast?.((error as Error).message); }
   };
 
@@ -230,7 +232,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
             <div className="p-6 border-b border-stone-100">
               <h2 className="font-bold text-stone-900 text-base">Lịch sử tích & đổi điểm</h2>
               <p className="text-xs text-stone-500 mt-0.5">
-                Mỗi {fmtMoney(getSettingNumber(db, 'points_earn_unit', 1000))} được 1 điểm khi đơn hoàn thành. Đổi điểm theo bậc {pointsStep} điểm ={' '}
+                Mỗi {fmtMoney(getSettingNumber(db, 'points_earn_unit', 1000))} tiền hàng sau giảm giá được 1 điểm khi thanh toán thành công, không tính phí giao hàng. Đổi điểm theo bậc {pointsStep} điểm ={' '}
                 {fmtMoney(pointsToMoney(db, pointsStep))}.
               </p>
             </div>
@@ -247,7 +249,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs font-semibold text-stone-900 truncate">
-                          {plus ? 'Tích điểm' : 'Đổi điểm'} {order ? `đơn ${order.order_code}` : '(điều chỉnh bởi cửa hàng)'}
+                          {{ EARN: 'Tích điểm', REDEEM: 'Đổi điểm', REFUND: 'Hoàn điểm', ADJUST: 'Điều chỉnh điểm' }[item.transaction_type]} {order ? `đơn ${order.order_code}` : '(điều chỉnh bởi cửa hàng)'}
                         </p>
                         <p className="text-[10px] text-stone-400 mt-0.5">{fmtDateTime(item.created_at)}</p>
                       </div>

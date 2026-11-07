@@ -1,10 +1,32 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const LoyaltyTransaction = require('../models/LoyaltyTransaction');
 const { protect, adminOnly, adminOrCashier } = require('../middlewares/authMiddleware');
+const { invalid, objectBody, objectId, text } = require('../utils/adminValidation');
+const { validEmail, normalizeEmail } = require('../utils/accountEmail');
+const PurchaseOrder = require('../models/PurchaseOrder');
+const WorkSchedule = require('../models/WorkSchedule');
+
+function validateCustomer(body, creating) {
+  objectBody(body);
+  if (creating || body.fullName !== undefined) text(body.fullName, 'Họ tên', 100);
+  if (creating || body.phone !== undefined) {
+    if (typeof body.phone !== 'string' || !/^[0-9]{9,15}$/.test(body.phone.trim())) throw invalid('Số điện thoại phải có từ 9 đến 15 chữ số.');
+  }
+  if (body.email && (typeof body.email !== 'string' || !validEmail(normalizeEmail(body.email)))) throw invalid('Email không hợp lệ.');
+  if (body.address !== undefined && (typeof body.address !== 'string' || body.address.length > 500)) throw invalid('Địa chỉ không hợp lệ.');
+  if (body.initialPoints !== undefined && (!Number.isSafeInteger(body.initialPoints) || body.initialPoints < 0)) throw invalid('Điểm khởi tạo phải là số nguyên không âm.');
+  if (body.status !== undefined && !['ACTIVE', 'INACTIVE', 'LOCKED'].includes(body.status)) throw invalid('Trạng thái tài khoản không hợp lệ.');
+  if (body.tierName !== undefined) throw invalid('Hệ thống chỉ quản lý điểm theo số điện thoại, không sử dụng hạng thẻ.');
+  if (body.birthday) {
+    const parsed = new Date(body.birthday);
+    if (typeof body.birthday !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.birthday) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== body.birthday) throw invalid('Ngày sinh không hợp lệ.');
+  }
+}
 
 const router = express.Router();
 router.use(protect);
@@ -17,17 +39,14 @@ router.use(protect);
 // 1. GET ALL CUSTOMERS with aggregated orders & spending
 router.get('/customers', adminOrCashier, async (req, res) => {
   try {
-    const { search, tier, status, page = 1, limit = 50 } = req.query;
+    const { search, status, page = 1, limit = 50 } = req.query;
     const filter = { role: 'CUSTOMER' };
 
-    if (tier && tier !== 'ALL') {
-      filter.tierName = tier;
-    }
     if (status && status !== 'ALL') {
       filter.status = status;
     }
     if (search && search.trim()) {
-      const q = search.trim();
+      const q = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.$or = [
         { fullName: { $regex: q, $options: 'i' } },
         { phone: { $regex: q, $options: 'i' } },
@@ -35,13 +54,15 @@ router.get('/customers', adminOrCashier, async (req, res) => {
       ];
     }
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const pageNumber = Math.max(1, Number.parseInt(page, 10) || 1);
+    const pageLimit = Math.min(200, Math.max(1, Number.parseInt(limit, 10) || 50));
+    const skip = (pageNumber - 1) * pageLimit;
     const [customers, total] = await Promise.all([
       User.find(filter)
         .select('-passwordHash')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(pageLimit),
       User.countDocuments(filter)
     ]);
 
@@ -97,8 +118,8 @@ router.get('/customers', adminOrCashier, async (req, res) => {
     res.json({
       customers: enrichedCustomers,
       total,
-      page: Number(page),
-      limit: Number(limit),
+      page: pageNumber,
+      limit: pageLimit,
       stats: {
         totalCustomers: totalCustomersCount,
         activeCustomers: activeCustomersCount,
@@ -150,6 +171,7 @@ router.get('/customers/:id', adminOrCashier, async (req, res) => {
 // 3. CREATE NEW CUSTOMER
 router.post('/customers', adminOrCashier, async (req, res) => {
   try {
+    validateCustomer(req.body, true);
     const { fullName, phone, email, birthday, address, initialPoints = 0 } = req.body;
 
     if (!fullName || !phone) {
@@ -166,12 +188,6 @@ router.post('/customers', adminOrCashier, async (req, res) => {
 
     const points = Math.max(0, Number(initialPoints) || 0);
 
-    // Tính hạng thành viên dựa trên điểm khởi tạo
-    let tierName = 'BRONZE';
-    if (points >= 300) tierName = 'DIAMOND';
-    else if (points >= 150) tierName = 'GOLD';
-    else if (points >= 50) tierName = 'SILVER';
-
     const customer = await User.create({
       fullName: fullName.trim(),
       phone: phone.trim(),
@@ -181,8 +197,7 @@ router.post('/customers', adminOrCashier, async (req, res) => {
       passwordHash,
       role: 'CUSTOMER',
       status: 'ACTIVE',
-      totalPoints: points,
-      tierName
+      totalPoints: points
     });
 
     if (points > 0) {
@@ -210,7 +225,8 @@ router.post('/customers', adminOrCashier, async (req, res) => {
 // 4. UPDATE CUSTOMER
 router.put('/customers/:id', adminOrCashier, async (req, res) => {
   try {
-    const { fullName, email, birthday, address, status, tierName } = req.body;
+    validateCustomer(req.body, false);
+    const { fullName, email, birthday, address, status } = req.body;
     const customer = await User.findOne({ _id: req.params.id, role: 'CUSTOMER' });
     if (!customer) {
       return res.status(404).json({ message: 'Không tìm thấy khách hàng.' });
@@ -221,7 +237,6 @@ router.put('/customers/:id', adminOrCashier, async (req, res) => {
     if (birthday !== undefined) customer.birthday = birthday ? new Date(birthday) : null;
     if (address !== undefined) customer.address = address ? address.trim() : '';
     if (status && ['ACTIVE', 'INACTIVE', 'LOCKED'].includes(status)) customer.status = status;
-    if (tierName && ['BRONZE', 'SILVER', 'GOLD', 'DIAMOND'].includes(tierName)) customer.tierName = tierName;
 
     await customer.save();
     const customerObj = customer.toObject();
@@ -324,6 +339,8 @@ router.put('/:id', adminOnly, async (req, res) => {
     const { fullName, email, role, position, status, baseSalary, hireDate, birthday, address, totalPoints } = req.body;
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'Không tìm thấy người dùng.' });
+    if (user.role === 'ADMIN' && user.status === 'ACTIVE' && ((role && role !== 'ADMIN') || (status && status !== 'ACTIVE')) && await User.countDocuments({ role: 'ADMIN', status: 'ACTIVE' }) <= 1) return res.status(409).json({ message: 'Không thể vô hiệu hóa quản trị viên đang hoạt động cuối cùng.' });
+    if (totalPoints !== undefined && totalPoints !== user.totalPoints) return res.status(400).json({ message: 'Hãy điều chỉnh điểm qua chức năng Tích điểm theo số điện thoại để lưu lịch sử.' });
 
     if (fullName) user.fullName = fullName;
     if (email !== undefined) user.email = email;
@@ -348,7 +365,14 @@ router.put('/:id', adminOnly, async (req, res) => {
 // 5. ADMIN DELETE USER
 router.delete('/:id', adminOnly, async (req, res) => {
   try {
-    await User.findByIdAndDelete(req.params.id);
+    const id = objectId(req.params.id);
+    if (String(id) === String(req.user._id)) return res.status(409).json({ message: 'Không thể tự xóa tài khoản đang sử dụng.' });
+    const references = await Promise.all([Order.exists({ $or: [{ customer: id }, { cashier: id }, { shipper: id }] }), PurchaseOrder.exists({ creator: id }), WorkSchedule.exists({ user: id }), LoyaltyTransaction.exists({ customer: id })]);
+    if (references.some(Boolean)) return res.status(409).json({ message: 'Tài khoản đã có lịch sử giao dịch hoặc phân ca. Hãy chuyển sang trạng thái ngừng hoạt động.' });
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: 'Không tìm thấy người dùng.' });
+    if (user.role === 'ADMIN' && user.status === 'ACTIVE' && await User.countDocuments({ role: 'ADMIN', status: 'ACTIVE' }) <= 1) return res.status(409).json({ message: 'Không thể xóa quản trị viên đang hoạt động cuối cùng.' });
+    await User.findByIdAndDelete(id);
     res.json({ message: 'Đã xóa người dùng thành công!' });
   } catch (error) {
     res.status(500).json({ message: error.message });

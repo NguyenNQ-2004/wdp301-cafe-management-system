@@ -1,0 +1,50 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
+const { randomBytes } = require('crypto');
+require('dotenv').config();
+const User = require('../models/User');
+const Ingredient = require('../models/Ingredient');
+const Request = require('../models/RestockRequest');
+
+test('SWP restock requests preserve draft, review and rejection history without changing inventory', async t => {
+  const dbName = `aura_restock_requests_test_${randomBytes(5).toString('hex')}`;
+  await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/aura_cafe_erp', { dbName, serverSelectionTimeoutMS: 5000 });
+  const app = require('../server');
+  const server = await new Promise(resolve => { const instance = app.listen(0, '127.0.0.1', () => resolve(instance)); });
+  t.after(async () => {
+    server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
+    assert.match(mongoose.connection.db.databaseName, /^aura_restock_requests_test_[a-f0-9]+$/);
+    await mongoose.connection.dropDatabase(); await mongoose.disconnect();
+  });
+  const admin = await User.create({ fullName: 'Restock Admin', phone: '0900000441', passwordHash: 'test-only', role: 'ADMIN' });
+  const customer = await User.create({ fullName: 'Customer', phone: '0900000442', passwordHash: 'test-only', role: 'CUSTOMER' });
+  const token = user => jwt.sign({ id: user._id }, require('../config/jwtSecret')());
+  const item = await Ingredient.create({ name: 'Beans', unit: 'gram', currentStock: 10, minStockLevel: 100 });
+  const inactive = await Ingredient.create({ name: 'Old Beans', unit: 'gram', isActive: false });
+  const call = async (method, path, body, auth = token(admin)) => {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/restock-requests${path}`, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth}` }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    return { status: response.status, data: await response.json() };
+  };
+  const body = { status: 'DRAFT', reason: 'Low stock', items: [{ ingredient: String(item._id), quantity: 200 }] };
+  assert.equal((await call('POST', '', body, token(customer))).status, 403);
+  assert.equal((await call('POST', '', { ...body, items: [{ ingredient: String(inactive._id), quantity: 1 }] })).status, 409);
+  assert.equal((await call('POST', '', { ...body, items: [{ ingredient: String(item._id), quantity: -1 }] })).status, 400);
+  const created = await call('POST', '', body);
+  assert.equal(created.status, 201);
+  const path = `/${created.data._id}/transition`;
+  assert.equal((await call('POST', path, { action: 'approve' })).status, 409);
+  assert.equal((await call('POST', path, { action: 'submit' })).status, 200);
+  assert.equal((await call('POST', path, { action: 'approve', reviewNote: 'Approved quantity' })).status, 200);
+  assert.equal((await call('POST', path, { action: 'reject' })).status, 409);
+  const approved = await Request.findById(created.data._id);
+  assert.equal(approved.status, 'APPROVED'); assert.equal(approved.reviewNote, 'Approved quantity');
+  assert.equal(String(approved.reviewer), String(admin._id)); assert.ok(approved.reviewedAt);
+  assert.equal((await Ingredient.findById(item._id)).currentStock, 10);
+  const pending = await call('POST', '', { ...body, status: 'PENDING_APPROVAL' });
+  assert.equal((await call('POST', `/${pending.data._id}/transition`, { action: 'reject', reviewNote: 'Not needed' })).status, 200);
+  const list = await call('GET', '?status=APPROVED');
+  assert.equal(list.data.length, 1); assert.equal(list.data[0].requester.fullName, 'Restock Admin');
+  assert.equal(list.data[0].items[0].ingredient.name, 'Beans');
+});

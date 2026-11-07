@@ -4,7 +4,7 @@ import useCartStore from '../store/cartStore';
 import type { CartItem, CatalogProduct } from '../types/shop';
 
 interface CartResponse {
-  items: { product: CatalogProduct | null; quantity: number; size: string; checked: boolean }[];
+  items: { product: CatalogProduct | null; quantity: number; size: string; checked: boolean; customization?: CartItem['customization'] }[];
 }
 
 const retryDelay = () => new Promise<void>((resolve) => window.setTimeout(resolve, 3000));
@@ -13,6 +13,7 @@ export default function useCartSync(user: { _id: string; token: string } | null)
   const userId = user?._id;
   const userToken = user?.token;
   const items = useCartStore((state) => state.items);
+  const refreshKey = useCartStore(state => state.refreshKey);
   const ownerId = useCartStore((state) => state.ownerId);
   const ready = useCartStore((state) => state.ready);
   const [loadAttempt, retryLoad] = useState(0);
@@ -38,8 +39,7 @@ export default function useCartSync(user: { _id: string; token: string } | null)
         if (!active) return;
         const current = useCartStore.getState();
         const remote = response.items.filter((line) => line.product).map((line) => ({
-          ...productToCartItem(line.product!, line.size), quantity: line.quantity, checked: line.checked,
-          customization: current.items.find(item => item.productId === line.product!._id && item.size === line.size)?.customization
+          ...productToCartItem(line.product!, line.size, line.customization), quantity: line.quantity, checked: line.checked
         }));
         const next: CartItem[] = current.ownerId === null ? mergeCartItems(remote, current.items) : remote;
         current.replace(next, userId);
@@ -59,7 +59,7 @@ export default function useCartSync(user: { _id: string; token: string } | null)
     };
     load();
     return () => { active = false; window.clearTimeout(retryTimer); };
-  }, [userId, userToken, loadAttempt]);
+  }, [userId, userToken, loadAttempt, refreshKey]);
 
   useEffect(() => {
     if (!userId || !userToken || !ready || ownerId !== userId) return;

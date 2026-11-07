@@ -28,13 +28,13 @@ Use the exact `updatedAt` from GET `/api/orders` as `expectedUpdatedAt`. The cli
 
 ## Consistency and recovery
 
-The existing development database is standalone MongoDB, so this change uses a shared database mutation lock and compensating writes rather than requiring replica-set transactions. Editing, status/preparation changes and counter payment confirmation acquire the same per-order lock. Other requests receive 409 and may retry after the operation completes. Responses are sent after lock release.
+Business writes require a MongoDB replica set or Atlas. The per-order claim, order/items/payment updates and claim release execute inside the same transaction through `atomicRouter`. Responses are sent only after commit. Concurrent requests are serialized or rejected with 409 when their version is stale; a handled error aborts the entire transaction. No partial snapshots are committed.
 
-If a write fails, restore the order, standalone OrderItem records and payment amount. If rollback fails, retain the lock and report that management must review the order. A process terminated mid-write also leaves its lock in place: there is deliberately no automatic expiry that could allow overlapping writes. During recovery, stop the original writer, inspect the exact affected order and its OrderItem/Payment records, reconcile snapshots and totals, then clear `mutationLock` only on that order. This is not crash-atomic storage; read requests may observe intermediate state during a write. No automatic recovery or broad unlock endpoint is added.
+If a write fails or the process terminates, MongoDB aborts the transaction, including the mutation claim. Standalone MongoDB is rejected with 503 before business writes. Pre-existing locks from the older non-transactional implementation are still respected; reconcile those exact records before any manual recovery. Orders whose inventory has already been deducted are not editable, so item changes cannot invalidate captured stock consumption or costs. New counter orders start PENDING, require payment before preparation, and remain editable while unpaid and unprepared.
 
 ## Verification
 
-- `cd backend; npm run test:counter-order-update`: isolated temporary database; covers permissions, validation, persisted totals/snapshots/payment, stale requests, lock contention, rollback and paid/prepared/closed rejection.
+- `cd backend; npm run test:replica -- tests/counterOrderUpdate.test.js`: isolated replica set; covers permissions, validation, persisted totals/snapshots/payment, stale requests, lock contention, transactional rollback, concurrent edits/payment and paid/prepared/closed/inventory-captured rejection.
 - `cd backend; npm run test:online-ordering`: regression for creation and counter payment.
 - `cd frontend; npm test` and `npm run build`.
 
