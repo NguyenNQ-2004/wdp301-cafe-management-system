@@ -14,6 +14,7 @@ const orderItemSchema = new mongoose.Schema({
 }, { _id: false });
 
 const orderSchema = new mongoose.Schema({
+  mutationLock: { type: String, select: false },
   orderCode: { type: String, required: true, unique: true },
   checkoutFlow: { type: Boolean, default: false },
   checkoutSessionId: String,

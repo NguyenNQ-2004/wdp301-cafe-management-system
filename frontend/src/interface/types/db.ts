@@ -91,6 +91,7 @@ export type OrderStatus =
 export interface Order {
   kitchen_eligible?: boolean;
   payment_status?: 'PENDING' | 'SUCCESS' | 'FAILED';
+  update_token?: string;
   id: number;
   order_code: string;
   customer_id: number | null;

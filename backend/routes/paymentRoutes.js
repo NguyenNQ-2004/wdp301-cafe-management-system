@@ -9,6 +9,7 @@ const { awardOrderPoints } = require('../utils/orderLoyalty');
 const { lockOrder } = require('../utils/orderMutation');
 const gateway = require('../utils/paymentGateway');
 const { clearCheckoutCart } = require('../utils/checkoutCart');
+const { withOrderMutation } = require('../utils/orderMutation');
 
 const { atomicRouter } = require('../utils/atomicRoute');
 const router = atomicRouter(express.Router(), ['POST /order/:orderId/gateway']);
@@ -163,7 +164,7 @@ router.post('/:id/demo-confirm', async (req, res) => {
 });
 
 // UC13: nhân viên thu ngân xác nhận đã nhận tiền tại quầy.
-router.post('/:id/counter-confirm', async (req, res) => {
+router.post('/:id/counter-confirm', withOrderMutation(async (req, res) => {
   let unlock;
   try {
     if (!canManageCounter(req.user)) return res.status(403).json({ message: 'Chỉ thu ngân hoặc quản lý được xác nhận thanh toán tại quầy.' });
@@ -200,6 +201,11 @@ router.post('/:id/counter-confirm', async (req, res) => {
     res.status(error.status || 500).json({ message: error.message });
   }
   finally { unlock?.(); }
-});
+}, async (req) => {
+  if (!mongoose.isValidObjectId(req.params.id)) throw Object.assign(new Error('Mã giao dịch không hợp lệ.'), { status: 400 });
+  const payment = await Payment.findById(req.params.id).select('order');
+  if (!payment) throw Object.assign(new Error('Không tìm thấy giao dịch.'), { status: 404 });
+  return payment.order;
+}));
 
 module.exports = router;
