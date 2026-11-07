@@ -1,3 +1,4 @@
+import { API_BASE } from '../../lib/shopApi';
 import React, { useState, useEffect, useCallback } from 'react';
 import useAuthStore from '../../store/authStore';
 import { AdminLayout, Badge, Field, FormActions, Modal, StatCard, GhostButton, inputCls } from './AdminUi';
@@ -9,7 +10,6 @@ interface ReviewItem {
     fullName: string;
     phone: string;
     email?: string;
-    tierName?: string;
   };
   order?: {
     _id: string;
@@ -104,13 +104,14 @@ export const AdminComplaintsPage: React.FC = () => {
   const fetchStats = useCallback(async () => {
     if (!user?.token) return;
     try {
-      const res = await fetch('http://localhost:5000/api/customer-reviews/stats', {
+      const res = await fetch(`${API_BASE}/api/customer-reviews/stats`, {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       const data = await res.json();
-      if (res.ok) setStats(data);
+      if (!res.ok) throw new Error(data.message || 'Không tải được thống kê phản hồi.');
+      setStats(data);
     } catch (err: any) {
-      console.error(err);
+      showToast(err.message || 'Không tải được thống kê phản hồi.', 'error');
     }
   }, [user?.token]);
 
@@ -124,11 +125,12 @@ export const AdminComplaintsPage: React.FC = () => {
       if (search.trim()) params.append('search', search.trim());
       params.append('limit', '50');
 
-      const res = await fetch(`http://localhost:5000/api/customer-reviews?${params.toString()}`, {
+      const res = await fetch(`${API_BASE}/api/customer-reviews?${params.toString()}`, {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       const data = await res.json();
-      if (res.ok) setReviews(data.reviews || []);
+      if (!res.ok) throw new Error(data.message || 'Không tải được danh sách phản hồi.');
+      setReviews(data.reviews || []);
     } catch (err: any) {
       showToast(err.message || 'Lỗi tải danh sách phản hồi', 'error');
     } finally {
@@ -152,7 +154,7 @@ export const AdminComplaintsPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/customer-reviews/${respondingItem.review._id}/respond`, {
+      const res = await fetch(`${API_BASE}/api/customer-reviews/${respondingItem.review._id}/respond`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -381,6 +383,7 @@ export const AdminComplaintsPage: React.FC = () => {
 
                       <td className="p-3.5 text-right whitespace-nowrap">
                         <button
+                          disabled={['RESOLVED', 'REJECTED'].includes(r.status)}
                           onClick={() =>
                             setRespondingItem({
                               review: r,
@@ -391,7 +394,7 @@ export const AdminComplaintsPage: React.FC = () => {
                           className="px-3 py-1.5 bg-red-50 hover:bg-red-700 text-red-700 hover:text-white font-bold rounded-lg transition-colors inline-flex items-center gap-1 shadow-2xs cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-[14px]">reply</span>
-                          {r.adminResponse ? 'Sửa phản hồi' : 'Xử lý & Phản hồi'}
+                          {['RESOLVED','REJECTED'].includes(r.status) ? 'Đã đóng' : r.adminResponse ? 'Sửa phản hồi' : 'Xử lý & Phản hồi'}
                         </button>
                       </td>
                     </tr>

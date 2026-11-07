@@ -3,13 +3,14 @@ const router = express.Router();
 const { register, login, logout, changePassword } = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
 const { normalizeEmail, validEmail } = require('../utils/accountEmail');
+router.use(require('./passwordRecoveryRoutes'));
 
 router.post('/register', register);
 router.post('/login', login);
 router.post('/logout', logout);
 router.get('/me', protect, (req, res) => {
-  const { _id, fullName, phone, email, birthday, address, role, position, status, baseSalary, hireDate, tierName, totalPoints } = req.user;
-  res.json({ _id, fullName, phone, email, birthday, address, role, position, status, baseSalary, hireDate, tierName, totalPoints });
+  const { _id, fullName, phone, email, birthday, address, role, position, status, baseSalary, hireDate, totalPoints } = req.user;
+  res.json({ _id, fullName, phone, email, birthday, address, role, position, status, baseSalary, hireDate, totalPoints });
 });
 router.put('/profile', protect, async (req, res) => {
   try {
@@ -36,7 +37,7 @@ router.put('/profile', protect, async (req, res) => {
       status: user.status,
       baseSalary: user.baseSalary,
       hireDate: user.hireDate,
-      tierName: user.tierName,
+
       totalPoints: user.totalPoints
     });
   } catch (err) {

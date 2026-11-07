@@ -19,8 +19,8 @@ router.get('/', async (req, res) => {
 router.put('/', async (req, res) => {
   try {
     const normalized = await normalizeCartItems(req.body.items);
-    const items = normalized.map(({ product, quantity, size, checked }) => ({
-      product: product._id, quantity, size, checked
+    const items = normalized.map(({ product, quantity, size, checked, customization }) => ({
+      product: product._id, quantity, size, checked, customization
     }));
     await Cart.findOneAndUpdate(
       { customer: req.user._id },

@@ -4,18 +4,14 @@ const WorkSchedule = require('../models/WorkSchedule');
 const User = require('../models/User');
 const Order = require('../models/Order');
 const Payment = require('../models/Payment');
-const ShopSetting = require('../models/ShopSetting');
+const WorkShift = require('../models/WorkShift');
+const { mondayOf, withWeekLock, resolveShift } = require('../utils/weeklyShifts');
 const { protect, adminOnly, authorize } = require('../middlewares/authMiddleware');
 
-const router = express.Router();
+const { atomicRouter } = require('../utils/atomicRoute');
+const router = atomicRouter(express.Router());
 router.use(protect, authorize('ADMIN', 'STAFF'));
 
-const shifts = ['MORNING', 'AFTERNOON', 'EVENING'];
-const shiftSettings = {
-  MORNING: { key: 'shift_morning', defaultTime: '07:00-12:00' },
-  AFTERNOON: { key: 'shift_afternoon', defaultTime: '12:00-17:00' },
-  EVENING: { key: 'shift_evening', defaultTime: '17:00-22:00' }
-};
 const badRequest = (message) => Object.assign(new Error(message), { status: 400 });
 const parseDay = (value) => {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw badRequest('Ngày làm việc phải có định dạng YYYY-MM-DD.');
@@ -36,11 +32,11 @@ const parseAssignment = (body, creating) => {
   }
   if (body.workDate !== undefined) data.workDate = parseDay(body.workDate);
   if (body.shiftName !== undefined) {
-    if (!shifts.includes(body.shiftName)) throw badRequest('Mã ca làm không hợp lệ.');
-    data.shiftName = body.shiftName;
+    if (typeof body.shiftName !== 'string' || !body.shiftName.trim() || body.shiftName.trim().length > 50) throw badRequest('Tên ca làm không hợp lệ.');
+    data.shiftName = body.shiftName.trim();
   }
   if (body.note !== undefined) {
-    if (typeof body.note !== 'string' || body.note.trim().length > 300) throw badRequest('Ghi chú không được quá 300 ký tự.');
+    if (typeof body.note !== 'string' || body.note.trim().length > 500) throw badRequest('Ghi chú không được quá 500 ký tự.');
     data.note = body.note.trim();
   }
   return data;
@@ -60,13 +56,7 @@ const nextDayKey = (key) => {
   date.setUTCDate(date.getUTCDate() + 1);
   return date.toISOString().slice(0, 10);
 };
-const getShiftTime = async (shiftName) => {
-  const definition = shiftSettings[shiftName];
-  const setting = await ShopSetting.findOne({ settingKey: definition.key });
-  const range = setting?.settingValue || definition.defaultTime;
-  if (!/^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/.test(range)) return definition.defaultTime;
-  return range;
-};
+const getShiftTime = resolveShift;
 
 router.get('/attendance', async (req, res) => {
   try {
@@ -111,7 +101,11 @@ router.post('/', adminOnly, async (req, res) => {
     const data = parseAssignment(req.body, true);
     const employee = await User.findOne({ _id: data.user, role: 'STAFF', status: 'ACTIVE' });
     if (!employee) return res.status(400).json({ message: 'Chỉ phân ca cho nhân viên đang hoạt động.' });
-    const schedule = await WorkSchedule.create(data);
+    const schedule = await withWeekLock(mondayOf(data.workDate), async () => {
+      const shift = await WorkShift.findOne({ weekStart: mondayOf(data.workDate), shiftName: data.shiftName });
+      if (!shift) throw badRequest('Ca làm không tồn tại trong tuần của ngày làm việc.');
+      return WorkSchedule.create({ ...data, shift: shift._id });
+    });
     await schedule.populate('user', 'fullName phone position status');
     res.status(201).json(schedule);
   } catch (error) { handleError(error, res); }
@@ -128,8 +122,13 @@ router.put('/:id', adminOnly, async (req, res) => {
       const employee = await User.findOne({ _id: changes.user, role: 'STAFF', status: 'ACTIVE' });
       if (!employee) return res.status(400).json({ message: 'Chỉ phân ca cho nhân viên đang hoạt động.' });
     }
-    Object.assign(schedule, changes);
-    await schedule.save();
+    const targetDate = changes.workDate || schedule.workDate;
+    await withWeekLock(mondayOf(targetDate), async () => {
+      const shift = await WorkShift.findOne({ weekStart: mondayOf(targetDate), shiftName: changes.shiftName || schedule.shiftName });
+      if (!shift) throw badRequest('Ca làm không tồn tại trong tuần của ngày làm việc.');
+      Object.assign(schedule, changes, { shift: shift._id });
+      await schedule.save();
+    });
     await schedule.populate('user', 'fullName phone position status');
     res.json(schedule);
   } catch (error) { handleError(error, res); }
@@ -178,24 +177,27 @@ router.put('/:id/shift-action', async (req, res) => {
     const today = vietnamDay(now);
     const changes = {};
     if (action === 'REMIT_COD') {
-      if (req.user.position !== 'SHIPPER') return res.status(403).json({ message: 'Chỉ shipper được nộp tiền COD của ca giao hàng.' });
+      if (req.user.role !== 'STAFF' || req.user.position !== 'SHIPPER') return res.status(403).json({ message: 'Chỉ shipper được nộp tiền COD của ca giao hàng.' });
       if (schedule.status !== 'PRESENT' || !schedule.checkInTime || schedule.checkOutTime) return res.status(409).json({ message: 'Ca phải đang mở để nộp COD.' });
       if (cash === undefined) throw badRequest('Cần nhập số tiền mặt thực nộp.');
-      const dayStart = new Date(schedule.workDate.getTime() - 7 * 60 * 60 * 1000);
-      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-      const orders = await Order.find({ shipper: req.user._id, orderType: 'ONLINE', status: 'COMPLETED', createdAt: { $gte: dayStart, $lt: dayEnd } }).select('_id');
-      const payments = await Payment.find({ order: { $in: orders.map(order => order._id) }, paymentMethod: 'CASH', status: 'SUCCESS' }).select('amount');
+      const orders = await Order.find({ shipper: req.user._id, orderType: 'ONLINE', paymentMethod: 'COD', status: 'COMPLETED' }).select('_id');
+      const payments = await Payment.find({ order: { $in: orders.map(order => order._id) }, receivedBy: req.user._id, paidAt: { $gte: schedule.checkInTime, $lte: now }, remittanceId: { $exists: false }, paymentMethod: 'CASH', status: 'SUCCESS' }).select('amount');
       const expectedCash = payments.reduce((sum, payment) => sum + payment.amount, 0);
+      if (!Number.isSafeInteger(expectedCash) || expectedCash < 0) throw badRequest('Tổng tiền COD không hợp lệ.');
+      if (cash !== expectedCash && !note?.trim()) throw badRequest('Cần ghi lý do chênh lệch tiền COD.');
+      const remittanceId = require('crypto').randomUUID();
+      const claim = await Payment.updateMany({ _id: { $in: payments.map(payment => payment._id) }, remittanceId: { $exists: false } }, { $set: { remittanceId, remittanceSchedule: schedule._id, remittedAt: now } });
+      if (claim.modifiedCount !== payments.length) return res.status(409).json({ message: 'Giao dịch COD vừa được đối soát ở yêu cầu khác.' });
       const updated = await WorkSchedule.findOneAndUpdate(
         { _id: schedule._id, user: req.user._id, status: 'PRESENT', checkInTime: { $exists: true }, checkOutTime: { $exists: false } },
-        { $set: { endingCashSystem: expectedCash, endingCashActual: cash, checkOutTime: now, status: 'COMPLETED', note: [schedule.note, `Nộp COD ${cash}`, note?.trim()].filter(Boolean).join(' | ') } },
+        { $set: { remittanceId, codPaymentIds: payments.map(payment => payment._id), endingCashSystem: expectedCash, endingCashActual: cash, checkOutTime: now, status: 'COMPLETED', note: [schedule.note, `Nộp COD ${cash}`, note?.trim()].filter(Boolean).join(' | ') } },
         { returnDocument: 'after' }
       ).populate('user', 'fullName phone position status');
       if (!updated) return res.status(409).json({ message: 'Ca đã được chốt hoặc không còn mở.' });
       return res.json({ message: 'Đã ghi nhận tiền COD và chốt ca giao hàng.', schedule: updated, expectedCash });
     }
     if (action === 'CHECK_IN') {
-      const [start, end] = (await getShiftTime(schedule.shiftName)).split('-');
+      const [start, end] = (await getShiftTime(schedule)).split('-');
       const startMinutes = Number(start.slice(0, 2)) * 60 + Number(start.slice(3));
       const endMinutes = Number(end.slice(0, 2)) * 60 + Number(end.slice(3));
       if (today !== workDay || vietnamMinutes(now) < startMinutes - 60 || vietnamMinutes(now) > endMinutes) {

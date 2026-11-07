@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 const poItemSchema = new mongoose.Schema({
   ingredient: { type: mongoose.Schema.Types.ObjectId, ref: 'Ingredient', required: true },
   quantity: { type: Number, required: true },
-  unitPrice: { type: Number, required: true }
+  unitPrice: { type: Number, required: true },
+  totalCost: { type: Number, min: 0 }
 }, { _id: false });
 
 const purchaseOrderSchema = new mongoose.Schema({

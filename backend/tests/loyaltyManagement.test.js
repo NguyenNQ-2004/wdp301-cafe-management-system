@@ -12,10 +12,9 @@ process.env.JWT_SECRET = 'loyalty-management-isolated-test-secret';
 const User = require('../models/User');
 const Order = require('../models/Order');
 const LoyaltyTransaction = require('../models/LoyaltyTransaction');
-const MembershipTier = require('../models/MembershipTier');
 const ShopSetting = require('../models/ShopSetting');
 
-test('Screen 29: Loyalty rules, phone lookup, point adjust, and tier upgrade flow', async (t) => {
+test('Screen 29: Loyalty rules, phone lookup, point adjustment without membership tiers', async (t) => {
   const dbName = `aura_cafe_loyalty_test_${randomBytes(4).toString('hex')}`;
   await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/aura_cafe_erp', {
     dbName,
@@ -73,24 +72,23 @@ test('Screen 29: Loyalty rules, phone lookup, point adjust, and tier upgrade flo
     passwordHash,
     role: 'CUSTOMER',
     totalPoints: 20,
-    tierName: 'BRONZE'
   });
 
   const adminToken = jwt.sign({ id: admin._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
   const staffToken = jwt.sign({ id: staff._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
   const memberToken = jwt.sign({ id: member._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+  // Historical tier data must neither leak into responses nor affect point balances.
+  await User.collection.updateOne({ _id: member._id }, { $set: { tierName: 'DIAMOND' } });
 
   // 1. Auth check
   assert.equal((await request('/api/loyalty-transactions/rules')).status, 401);
 
-  // 2. GET Rules & Tiers (Auto seeding 4 tiers)
+  // Rules expose only phone-based earning and redemption, without creating tiers.
   const rulesRes = await request('/api/loyalty-transactions/rules', { token: memberToken });
   assert.equal(rulesRes.status, 200);
-  assert.equal(rulesRes.data.tiers.length, 4);
-  const tierCodes = rulesRes.data.tiers.map((t) => t.tierCode);
-  assert.deepEqual(tierCodes, ['BRONZE', 'SILVER', 'GOLD', 'DIAMOND']);
-
-  // 3. Admin updates rules and tiers
+  assert.equal(rulesRes.data.tiers, undefined);
+  assert.equal(await mongoose.connection.db.listCollections({ name: 'membershiptiers' }).hasNext(), false);
+  // 3. Admin updates rules
   assert.equal(
     (
       await request('/api/loyalty-transactions/rules', {
@@ -108,19 +106,12 @@ test('Screen 29: Loyalty rules, phone lookup, point adjust, and tier upgrade flo
     body: {
       points_earn_unit: 1000,
       points_step: 10,
-      points_step_value: 5000,
-      tiers: [
-        { tierCode: 'SILVER', minPoints: 60, minSpent: 600000, discountPercent: 7, pointMultiplier: 1.1 }
-      ]
+      points_step_value: 5000
     }
   });
   assert.equal(updateRulesRes.status, 200);
 
-  // Verify updated tier in DB
-  const silverTier = await MembershipTier.findOne({ tierCode: 'SILVER' });
-  assert.equal(silverTier.minPoints, 60);
-  assert.equal(silverTier.discountPercent, 7);
-
+  assert.equal((await request('/api/loyalty-transactions/rules', { method: 'PUT', token: adminToken, body: { tiers: [] } })).status, 400);
   // 4. Lookup customer by phone number (Screen 29)
   const missingPhone = await request('/api/loyalty-transactions/lookup?phone=', { token: staffToken });
   assert.equal(missingPhone.status, 400);
@@ -131,7 +122,7 @@ test('Screen 29: Loyalty rules, phone lookup, point adjust, and tier upgrade flo
   const lookupRes = await request('/api/loyalty-transactions/lookup?phone=0977123456', { token: staffToken });
   assert.equal(lookupRes.status, 200);
   assert.equal(lookupRes.data.user.phone, '0977123456');
-  assert.equal(lookupRes.data.user.tierName, 'BRONZE');
+  assert.equal(lookupRes.data.user.tierName, undefined);
   assert.equal(lookupRes.data.user.totalPoints, 20);
   assert.equal(lookupRes.data.cashValue, 10000); // 20 / 10 * 5000 = 10000
 
@@ -150,8 +141,7 @@ test('Screen 29: Loyalty rules, phone lookup, point adjust, and tier upgrade flo
   });
   assert.equal(excessiveDeduction.status, 400);
 
-  // 6. Earn points triggering auto tier promotion to SILVER
-  // Member has 20 points. Adding 50 points -> total 70 points (>= 60 points minPoints for SILVER)
+  // 6. Adjusting points updates the phone account balance without a tier promotion.
   const earnRes = await request('/api/loyalty-transactions/adjust', {
     method: 'POST',
     token: staffToken,
@@ -163,10 +153,11 @@ test('Screen 29: Loyalty rules, phone lookup, point adjust, and tier upgrade flo
   });
   assert.equal(earnRes.status, 201);
   assert.equal(earnRes.data.user.totalPoints, 70);
-  assert.equal(earnRes.data.user.tierName, 'SILVER');
-  assert.equal(earnRes.data.tierPromoted, true);
+  assert.equal(earnRes.data.user.tierName, undefined);
+  assert.equal(earnRes.data.tierPromoted, undefined);
+  assert.equal((await User.collection.findOne({ _id: member._id })).tierName, 'DIAMOND');
   assert.equal(earnRes.data.transaction.pointsChange, 50);
-  assert.equal(earnRes.data.transaction.transactionType, 'EARN');
+  assert.equal(earnRes.data.transaction.transactionType, 'ADJUST');
 
   // 7. Redeem points
   const redeemRes = await request('/api/loyalty-transactions/adjust', {
@@ -181,7 +172,7 @@ test('Screen 29: Loyalty rules, phone lookup, point adjust, and tier upgrade flo
   assert.equal(redeemRes.status, 201);
   assert.equal(redeemRes.data.user.totalPoints, 50);
   assert.equal(redeemRes.data.transaction.pointsChange, -20);
-  assert.equal(redeemRes.data.transaction.transactionType, 'REDEEM');
+  assert.equal(redeemRes.data.transaction.transactionType, 'ADJUST');
 
   // 8. Stats & Transaction audit trail
   const statsRes = await request('/api/loyalty-transactions/stats', { token: staffToken });
@@ -189,8 +180,8 @@ test('Screen 29: Loyalty rules, phone lookup, point adjust, and tier upgrade flo
   assert.ok(statsRes.data.totalPoints >= 50);
   assert.ok(statsRes.data.totalTransactions >= 2);
 
-  const txLogsRes = await request('/api/loyalty-transactions?type=EARN', { token: adminToken });
+  const txLogsRes = await request('/api/loyalty-transactions?type=ADJUST', { token: adminToken });
   assert.equal(txLogsRes.status, 200);
   assert.ok(txLogsRes.data.transactions.length >= 1);
-  assert.equal(txLogsRes.data.transactions[0].transactionType, 'EARN');
+  assert.equal(txLogsRes.data.transactions[0].transactionType, 'ADJUST');
 });

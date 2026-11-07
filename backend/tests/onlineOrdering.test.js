@@ -81,12 +81,14 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   const token = login.data.token;
   const item = { productId: String(product._id), quantity: 1, size: 'M' };
   const delivery = {
+    district: 'Hoàn Kiếm',
     items: [item], orderType: 'ONLINE', recipientName: '  Người nhận  ',
     recipientPhone: ' 090 123 4567 ', deliveryAddress: '  28 Tràng Tiền, Hà Nội  ',
     paymentMethod: 'MOMO', expectedTotal: 68000
   };
 
   assert.equal((await request('/api/orders', delivery)).status, 401);
+  await require('../models/DeliveryArea').create({ district: 'Hoàn Kiếm', deliveryFee: 18000 });
   assert.equal((await request('/api/orders', { ...delivery, deliveryAddress: '   ' }, token)).status, 400);
   assert.equal((await request('/api/orders', { ...delivery, recipientPhone: 'abc' }, token)).status, 400);
   assert.equal((await request('/api/orders', { ...delivery, expectedTotal: 1 }, token)).status, 409);
@@ -165,11 +167,38 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   assert.equal((await request(`/api/payments/${demoPayment._id}/demo-confirm`, {}, token)).data.payment.transactionCode, confirmed.data.payment.transactionCode);
   assert.equal((await Payment.findById(demoPayment._id)).amount, demoOrder.data.finalAmount);
   assert.equal((await get(`/api/payments/order/${demoOrder.data._id}`, token)).data.payment.status, 'SUCCESS');
+  assert.equal((await put(`/api/orders/${demoOrder.data._id}/status`, { status: 'CANCELLED', cancelReason: 'Paid online' }, token)).status, 409);
 
   const cashier = await User.create({ fullName: 'UC13 Cashier', phone: '0999000013', email: 'test-0999000013@example.com', passwordHash: await bcrypt.hash('test-password', 4), role: 'STAFF', position: 'CASHIER' });
   const barista = await User.create({ fullName: 'UC13 Barista', phone: '0999000014', email: 'test-0999000014@example.com', passwordHash: await bcrypt.hash('test-password', 4), role: 'STAFF', position: 'BARISTA' });
   const cashierToken = (await request('/api/auth/login', { email: cashier.email, password: 'test-password' })).data.token;
   const baristaToken = (await request('/api/auth/login', { email: barista.email, password: 'test-password' })).data.token;
+  await t.test('customizations, server topping prices and step-based points round trip and refund', async () => {
+    await Product.updateOne({ _id: product._id }, { $set: { variantsConfig: { sizes: { M: 0 }, toppings: [{ name: 'Trân châu', price: 5000 }] } } });
+    const customized = { ...item, customization: { sugar: '50%', ice: 'Ít đá', note: 'Đóng riêng', topping: ['Trân châu'] } };
+    assert.equal((await request('/api/orders', { ...delivery, items: [{ ...customized, customization: { topping: ['Unknown'] } }], expectedTotal: 73000 }, token)).status, 400);
+    const balance = (await User.findById(customer._id)).totalPoints;
+    const result = await request('/api/orders', { ...delivery, items: [customized], pointsToRedeem: 29, expectedTotal: 69000 }, token);
+    assert.equal(result.status, 201, JSON.stringify(result.data));
+    assert.equal(result.data.items[0].unitPrice, 55000);
+    assert.deepEqual(result.data.items[0].customization.topping, ['Trân châu']);
+    assert.equal(result.data.items[0].customization.sugar, '50%');
+    assert.equal(result.data.pointsRedeemed, 20);
+    assert.equal((await User.findById(customer._id)).totalPoints, balance - 20);
+    assert.equal((await put(`/api/orders/${result.data._id}/status`, { status: 'CANCELLED', cancelReason: 'Đổi món' }, token)).status, 200);
+    assert.equal((await User.findById(customer._id)).totalPoints, balance);
+    const pos = await request('/api/orders', { items: [customized], orderType: 'DINE_IN', customerId: String(customer._id), pointsToRedeem: 10 }, cashierToken);
+    assert.equal(pos.status, 201);
+    assert.equal(pos.data.finalAmount, 53000);
+    const payment = await Payment.findOne({ order: pos.data._id });
+    assert.equal((await request(`/api/payments/${payment._id}/counter-confirm`, { paymentMethod: 'CASH' }, cashierToken)).status, 200);
+    assert.equal((await User.findById(customer._id)).totalPoints, balance - 10 + 53);
+    const kitchen = await get('/api/orders', baristaToken);
+    assert.equal(kitchen.data.find(order => order._id === pos.data._id)?.kitchenEligible, true);
+    assert.equal(kitchen.data.some(order => order._id === pickup.data._id), false);
+    assert.equal((await put(`/api/orders/${pos.data._id}/status`, { status: 'CANCELLED', cancelReason: 'Hủy tại quầy' }, cashierToken)).status, 200);
+    assert.equal((await User.findById(customer._id)).totalPoints, balance);
+  });
   const shipper = await User.create({ fullName: 'UC14 Shipper', phone: '0999000015', email: 'test-0999000015@example.com', passwordHash: await bcrypt.hash('test-password', 4), role: 'STAFF', position: 'SHIPPER' });
   const shipperToken = (await request('/api/auth/login', { email: shipper.email, password: 'test-password' })).data.token;
   assert.equal((await get('/api/payments', token)).status, 403);
@@ -213,11 +242,15 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   assert.equal(dineInPayment.status, 'PENDING');
   assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'COMPLETED' }, token)).status, 403);
   assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'DELIVERING' }, cashierToken)).status, 409);
-  assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'READY' }, cashierToken)).status, 403);
+  assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'PREPARING' }, baristaToken)).status, 409);
+  assert.equal((await request(`/api/payments/${dineInPayment._id}/counter-confirm`, { paymentMethod: 'CASH' }, cashierToken)).status, 200);
   assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'PREPARING', shipperId: null }, baristaToken)).status, 403);
+  assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'PREPARING' }, baristaToken)).status, 200);
+  assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'READY' }, cashierToken)).status, 403);
+  assert.equal((await put(`/api/orders/${dineIn.data._id}/items/0/prepared`, { isPrepared: true, autoReady: false }, baristaToken)).status, 200);
   assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'READY' }, baristaToken)).status, 200);
   assert.equal((await put(`/api/orders/${dineIn.data._id}/status`, { status: 'COMPLETED' }, cashierToken)).status, 200);
-  assert.equal((await Payment.findById(dineInPayment._id)).status, 'PENDING');
+  assert.equal((await Payment.findById(dineInPayment._id)).status, 'SUCCESS');
   assert.equal((await request(`/api/payments/${dineInPayment._id}/counter-confirm`, { paymentMethod: 'CASH' }, cashierToken)).status, 200);
   assert.equal((await Payment.findById(dineInPayment._id)).status, 'SUCCESS');
 
@@ -231,6 +264,14 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   assert.equal(returnedOrder.status, 'READY');
   assert.equal(returnedOrder.orderNote, 'Khách hẹn giao lại');
   assert.equal(returnedOrder.shipper, undefined);
+  assert.equal((await put(deliveryPath, { status: 'READY', shipperId: String(shipper._id) }, shipperToken)).status, 200);
+  assert.equal((await put(deliveryPath, { status: 'DELIVERING' }, shipperToken)).status, 200);
+  assert.equal((await put(deliveryPath, { status: 'COMPLETED', collectedAmount: 1 }, shipperToken)).status, 409);
+  assert.equal((await put(deliveryPath, { status: 'COMPLETED', collectedAmount: deliveryOrder.data.finalAmount }, shipperToken)).status, 200);
+  assert.equal((await Payment.findOne({ order: deliveryOrder.data._id })).status, 'SUCCESS');
+  const ownPayments = await get('/api/payments', shipperToken);
+  assert.equal(ownPayments.status, 200);
+  assert.ok(ownPayments.data.every(payment => payment.order._id === deliveryOrder.data._id));
 
   const cancelled = await request('/api/orders', { items: [item], orderType: 'DINE_IN', tableNumber: 'B02' }, cashierToken);
   const cancelledPayment = await Payment.findOne({ order: cancelled.data._id });

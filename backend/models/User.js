@@ -13,6 +13,8 @@ const userSchema = new mongoose.Schema(
     // Separate key lets old records without email remain intact during migration.
     emailKey: { type: String, select: false },
     passwordHash: { type: String, required: true },
+    passwordChangedAt: { type: Date },
+    checkoutRevision: { type: Number, default: 0, select: false },
     birthday: { type: Date },
     address: { type: String },
     role: {
@@ -31,18 +33,16 @@ const userSchema = new mongoose.Schema(
       enum: ['MANAGER', 'BARISTA', 'CASHIER', 'SHIPPER']
     },
     baseSalary: { type: Number, default: 0 },
+    hireDate: { type: Date, default: null },
     // Thuộc tính riêng của Customer (Membership)
-    tierName: {
-      type: String,
-      enum: ['BRONZE', 'SILVER', 'GOLD', 'DIAMOND'],
-      default: 'BRONZE'
-    },
     totalPoints: { type: Number, default: 0 },
   },
   {
     timestamps: true, // Tự động tạo trường createdAt và updatedAt
   }
 );
+
+for (const option of ['toJSON', 'toObject']) userSchema.set(option, { transform: (_doc, result) => { delete result.tierName; return result; } });
 
 userSchema.index({ emailKey: 1 }, { unique: true, partialFilterExpression: { emailKey: { $type: 'string' } } });
 userSchema.pre('validate', async function () {

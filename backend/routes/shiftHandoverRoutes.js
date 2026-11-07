@@ -3,9 +3,11 @@ const mongoose = require('mongoose');
 const Payment = require('../models/Payment');
 const User = require('../models/User');
 const WorkSchedule = require('../models/WorkSchedule');
+const ShiftHandover = require('../models/ShiftHandover');
 const { protect } = require('../middlewares/authMiddleware');
 
-const router = express.Router();
+const { atomicRouter } = require('../utils/atomicRoute');
+const router = atomicRouter(express.Router());
 const isCashier = (user) => user.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user.position);
 router.use(protect, (req, res, next) => {
   if (req.user.role !== 'ADMIN' && !isCashier(req.user)) return res.status(403).json({ message: 'Chỉ thu ngân, quản lý hoặc Admin được xem bàn giao ca.' });
@@ -19,36 +21,68 @@ const parseDay = (value) => {
   if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw badRequest('Ngày không hợp lệ.');
   return date;
 };
-const handleError = (error, res) => res.status(error.status || (error.name === 'ValidationError' ? 400 : 500)).json({ message: error.message });
-const canClose = (schedule) => schedule.status === 'COMPLETED' && !!schedule.checkInTime && !!schedule.checkOutTime && !schedule.handoverAt;
+const handleError = (error, res) => res.status(error.status || (error.name === 'VersionError' || error.code === 11000 || error.hasErrorLabel?.('TransientTransactionError') ? 409 : error.name === 'ValidationError' ? 400 : 500)).json({ message: error.message });
+const canClose = (schedule) => !!schedule.checkInTime && !schedule.handoverAt && ((schedule.status === 'PRESENT' && !schedule.checkOutTime) || (schedule.status === 'COMPLETED' && !!schedule.checkOutTime));
 
 const cashLedger = async (schedule) => {
+  const endTime = schedule.checkOutTime || new Date();
+  const startTime = schedule.checkInTime || schedule.workDate;
   const payments = await Payment.find({
-    status: 'SUCCESS', paymentMethod: 'CASH',
-    paidAt: { $gte: schedule.checkInTime, $lte: schedule.checkOutTime }
-  }).select('order amount receivedBy').populate('order', 'orderType');
-  const result = { cashRevenue: 0, paymentCount: 0, unattributedCash: 0, unattributedCount: 0 };
+    status: 'SUCCESS',
+    paidAt: { $gte: startTime, $lte: endTime }
+  }).select('order amount paymentMethod receivedBy').populate('order', 'orderType cashier');
+
+  const methods = {
+    CASH: { count: 0, sales: 0 },
+    BANK_TRANSFER: { count: 0, sales: 0 },
+    VNPAY: { count: 0, sales: 0 },
+    MOMO: { count: 0, sales: 0 }
+  };
+  const result = {
+    cashRevenue: 0,
+    paymentCount: 0,
+    unattributedCash: 0,
+    unattributedCount: 0,
+    nonCashSales: 0,
+    totalSales: 0,
+    orderCount: 0,
+    methods
+  };
+  const orderIds = new Set();
   for (const payment of payments) {
     if (!payment.order || !['TAKEAWAY', 'DINE_IN'].includes(payment.order.orderType)) continue;
     if (!Number.isSafeInteger(payment.amount) || payment.amount < 0) throw Object.assign(new Error('Có giao dịch tiền mặt không hợp lệ; cần kiểm tra trước khi bàn giao.'), { status: 409 });
-    if (String(payment.receivedBy) === String(schedule.user)) {
-      result.cashRevenue += payment.amount;
-      result.paymentCount += 1;
-    } else if (!payment.receivedBy) {
+    const isShiftUser = String(payment.receivedBy) === String(schedule.user);
+    if (isShiftUser) {
+      orderIds.add(String(payment.order._id || payment.order));
+      const methodKey = ['CASH', 'BANK_TRANSFER', 'VNPAY', 'MOMO'].includes(payment.paymentMethod) ? payment.paymentMethod : 'CASH';
+      methods[methodKey].count += 1;
+      methods[methodKey].sales += payment.amount;
+      result.totalSales += payment.amount;
+      if (payment.paymentMethod === 'CASH') {
+        result.cashRevenue += payment.amount;
+        result.paymentCount += 1;
+      } else {
+        result.nonCashSales += payment.amount;
+      }
+    } else if (!payment.receivedBy && payment.paymentMethod === 'CASH') {
       result.unattributedCash += payment.amount;
       result.unattributedCount += 1;
     }
-    if (!Number.isSafeInteger(result.cashRevenue) || !Number.isSafeInteger(result.unattributedCash)) throw Object.assign(new Error('Tổng giao dịch tiền mặt vượt giới hạn cho phép.'), { status: 409 });
   }
+  result.orderCount = orderIds.size;
+  if (!Number.isSafeInteger(result.cashRevenue) || !Number.isSafeInteger(result.unattributedCash)) throw Object.assign(new Error('Tổng giao dịch tiền mặt vượt giới hạn cho phép.'), { status: 409 });
   return result;
 };
 
-const detail = (schedule, ledger) => {
+const detail = (schedule, ledger, handover = null) => {
   const saved = !!schedule.handoverAt;
   const openingCash = Number.isSafeInteger(schedule.startingCash) && schedule.startingCash >= 0 ? schedule.startingCash : null;
   const cashRevenue = saved ? schedule.handoverCashSales : ledger?.cashRevenue ?? 0;
   const expectedCash = saved ? schedule.endingCashSystem : openingCash === null ? null : openingCash + cashRevenue;
   const actualCash = saved ? schedule.endingCashActual : null;
+  const status = handover?.status || (saved ? 'SUBMITTED' : null);
+
   return {
     schedule: {
       _id: schedule._id, user: schedule.user, workDate: schedule.workDate, shiftName: schedule.shiftName,
@@ -57,6 +91,14 @@ const detail = (schedule, ledger) => {
     ready: canClose(schedule),
     handedOver: saved,
     handoverAt: schedule.handoverAt || null,
+    status,
+    handoverId: handover?._id || null,
+    reviewedBy: handover?.reviewedBy || null,
+    reviewedAt: handover?.reviewedAt || null,
+    reviewerNote: handover?.reviewerNote || null,
+    resubmittedAt: handover?.resubmittedAt || null,
+    revision: handover?.revision || 0,
+    history: handover?.history || [],
     openingCash,
     cashRevenue,
     paymentCount: saved ? schedule.handoverPaymentCount : ledger?.paymentCount ?? 0,
@@ -65,7 +107,20 @@ const detail = (schedule, ledger) => {
     expectedCash,
     actualCash,
     difference: saved ? actualCash - expectedCash : null,
-    note: saved ? schedule.handoverNote || '' : ''
+    note: saved ? (handover?.note ?? schedule.handoverNote ?? '') : '',
+    summary: {
+      cashSales: cashRevenue,
+      paymentCount: saved ? schedule.handoverPaymentCount : ledger?.paymentCount ?? 0,
+      nonCashSales: ledger?.nonCashSales ?? 0,
+      totalSales: (saved ? schedule.handoverCashSales : (ledger?.cashRevenue ?? 0)) + (ledger?.nonCashSales ?? 0),
+      successfulOrderCount: ledger?.orderCount ?? (saved ? schedule.handoverPaymentCount : 0),
+      methods: ledger?.methods ?? {
+        CASH: { count: saved ? schedule.handoverPaymentCount : 0, sales: cashRevenue },
+        BANK_TRANSFER: { count: 0, sales: 0 },
+        VNPAY: { count: 0, sales: 0 },
+        MOMO: { count: 0, sales: 0 }
+      }
+    }
   };
 };
 
@@ -97,10 +152,28 @@ router.get('/', async (req, res) => {
       }
     }
     const schedules = await WorkSchedule.find(filter)
-      .select('user workDate shiftName status checkInTime checkOutTime handoverAt')
+      .select('user workDate shiftName status checkInTime checkOutTime handoverAt startingCash endingCashSystem endingCashActual handoverCashSales handoverPaymentCount handoverNote')
       .populate('user', 'fullName phone position')
       .sort({ workDate: -1, shiftName: 1 });
-    res.json(schedules);
+
+    const scheduleIds = schedules.map(s => s._id);
+    const handovers = await ShiftHandover.find({ schedule: { $in: scheduleIds } })
+      .populate('reviewedBy', 'fullName phone');
+    const handoverMap = new Map(handovers.map(h => [String(h.schedule), h]));
+
+    const response = schedules.map(s => {
+      const obj = s.toObject();
+      const h = handoverMap.get(String(s._id));
+      obj.handoverStatus = h?.status || (s.handoverAt ? 'SUBMITTED' : null);
+      obj.handoverDoc = h || null;
+      obj.reviewerNote = h?.reviewerNote || null;
+      obj.reviewedBy = h?.reviewedBy || null;
+      obj.reviewedAt = h?.reviewedAt || null;
+      obj.resubmittedAt = h?.resubmittedAt || null;
+      return obj;
+    });
+
+    res.json(response);
   } catch (error) { handleError(error, res); }
 });
 
@@ -109,8 +182,9 @@ router.get('/:id', async (req, res) => {
     const schedule = await findSchedule(req.params.id, req.user);
     if (schedule === null) return res.status(404).json({ message: 'Không tìm thấy ca làm.' });
     if (schedule === false) return res.status(403).json({ message: 'Không được xem bàn giao ca này.' });
-    const ledger = canClose(schedule) ? await cashLedger({ ...schedule.toObject(), user: schedule.user._id }) : null;
-    res.json(detail(schedule, ledger));
+    const ledger = (canClose(schedule) || schedule.status === 'PRESENT' || !!schedule.handoverAt) ? await cashLedger({ ...schedule.toObject(), user: schedule.user._id }) : null;
+    const handover = await ShiftHandover.findOne({ schedule: schedule._id }).populate('reviewedBy', 'fullName phone');
+    res.json(detail(schedule, ledger, handover));
   } catch (error) { handleError(error, res); }
 });
 
@@ -120,7 +194,7 @@ router.post('/:id/confirm', async (req, res) => {
     const schedule = await findSchedule(req.params.id, req.user);
     if (schedule === null) return res.status(404).json({ message: 'Không tìm thấy ca làm.' });
     if (schedule === false) return res.status(403).json({ message: 'Chỉ được bàn giao ca của mình.' });
-    if (!canClose(schedule)) return res.status(409).json({ message: 'Cần check-in và check-out trước khi bàn giao; ca đã bàn giao không thể sửa.' });
+    if (!canClose(schedule)) return res.status(409).json({ message: 'Cần ca đã check-in và chưa bàn giao. Ca đã bàn giao không thể sửa.' });
     const body = req.body;
     if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((key) => !['actualCash', 'openingCash', 'note'].includes(key))) throw badRequest('Dữ liệu bàn giao không hợp lệ.');
     if (!Number.isSafeInteger(body.actualCash) || body.actualCash < 0) throw badRequest('Tiền thực tế phải là số nguyên không âm.');
@@ -134,8 +208,9 @@ router.post('/:id/confirm', async (req, res) => {
     if (!Number.isSafeInteger(expectedCash)) throw badRequest('Tổng tiền hệ thống không hợp lệ.');
     if (body.actualCash !== expectedCash && !body.note?.trim()) throw badRequest('Cần ghi lý do khi tiền thực tế chênh lệch với hệ thống.');
     const updated = await WorkSchedule.findOneAndUpdate(
-      { _id: schedule._id, user: req.user._id, status: 'COMPLETED', handoverAt: { $exists: false }, checkInTime: { $exists: true }, checkOutTime: { $exists: true } },
+      { _id: schedule._id, user: req.user._id, status: schedule.status, handoverAt: { $exists: false }, checkInTime: { $exists: true }, ...(schedule.status === 'PRESENT' ? { checkOutTime: { $exists: false } } : { checkOutTime: schedule.checkOutTime }) },
       { $set: {
+        status: 'COMPLETED', checkOutTime: schedule.checkOutTime || new Date(),
         startingCash: openingCash, endingCashSystem: expectedCash, endingCashActual: body.actualCash,
         handoverCashSales: ledger.cashRevenue, handoverPaymentCount: ledger.paymentCount,
         handoverUnattributedCash: ledger.unattributedCash, handoverUnattributedCount: ledger.unattributedCount,
@@ -143,7 +218,119 @@ router.post('/:id/confirm', async (req, res) => {
       } }, { returnDocument: 'after', runValidators: true }
     ).populate('user', 'fullName phone position role');
     if (!updated) return res.status(409).json({ message: 'Ca đã được bàn giao. Vui lòng tải lại.' });
-    res.json(detail(updated));
+
+    const handover = await ShiftHandover.findOneAndUpdate(
+      { schedule: updated._id },
+      {
+        $set: {
+          cashier: req.user._id,
+          workDate: updated.workDate,
+          shiftName: updated.shiftName,
+          checkInTime: updated.checkInTime,
+          checkOutTime: updated.checkOutTime,
+          openingCash,
+          cashSales: ledger.cashRevenue,
+          expectedCash,
+          actualCash: body.actualCash,
+          difference: body.actualCash - expectedCash,
+          note: body.note?.trim() || '',
+          status: 'SUBMITTED'
+        },
+        $push: { history: { action: 'SUBMIT', actor: req.user._id, at: new Date(), toStatus: 'SUBMITTED', note: body.note?.trim() || '', actualCash: body.actualCash, expectedCash } }
+      },
+      { upsert: true, returnDocument: 'after', runValidators: true }
+    );
+
+    res.json(detail(updated, ledger, handover));
+  } catch (error) { handleError(error, res); }
+});
+
+// Admin review: CONFIRM or REJECT
+router.post('/:id/review', async (req, res) => {
+  try {
+    if (req.user.role !== 'ADMIN') {
+      return res.status(403).json({ message: 'Chỉ Admin mới có quyền duyệt hoặc từ chối biên bản bàn giao.' });
+    }
+    if (!mongoose.isValidObjectId(req.params.id)) throw badRequest('Mã biên bản/ca làm không hợp lệ.');
+    let handover = await ShiftHandover.findOne({
+      $or: [{ _id: req.params.id }, { schedule: req.params.id }]
+    }).populate('cashier', 'fullName phone position');
+    if (!handover) return res.status(404).json({ message: 'Không tìm thấy biên bản bàn giao.' });
+    if (handover.status !== 'SUBMITTED') {
+      return res.status(409).json({ message: 'Chỉ có thể duyệt hoặc từ chối biên bản đang ở trạng thái chờ duyệt (SUBMITTED).' });
+    }
+    const { action, reviewerNote } = req.body || {};
+    if (reviewerNote !== undefined && (typeof reviewerNote !== 'string' || reviewerNote.trim().length > 500)) throw badRequest('Ghi chú duyệt tối đa 500 ký tự.');
+    if (!['CONFIRM', 'REJECT'].includes(action)) {
+      throw badRequest('Hành động không hợp lệ (CONFIRM hoặc REJECT).');
+    }
+    if (action === 'REJECT') {
+      if (!reviewerNote || typeof reviewerNote !== 'string' || !reviewerNote.trim()) {
+        throw badRequest('Cần nhập lý do từ chối biên bản bàn giao.');
+      }
+      if (reviewerNote.trim().length > 500) {
+        throw badRequest('Lý do từ chối không được vượt quá 500 ký tự.');
+      }
+      handover.status = 'REJECTED';
+      handover.reviewerNote = reviewerNote.trim();
+    } else {
+      handover.status = 'CONFIRMED';
+      if (reviewerNote && typeof reviewerNote === 'string') {
+        handover.reviewerNote = reviewerNote.trim();
+      }
+    }
+    handover.reviewedBy = req.user._id;
+    handover.reviewedAt = new Date();
+    handover.history.push({ action, actor: req.user._id, at: handover.reviewedAt, fromStatus: 'SUBMITTED', toStatus: handover.status, note: handover.reviewerNote || '', actualCash: handover.actualCash, expectedCash: handover.expectedCash });
+    handover.revision += 1;
+    await handover.save();
+    await handover.populate('reviewedBy', 'fullName phone');
+    res.json(handover);
+  } catch (error) { handleError(error, res); }
+});
+
+// Cashier resubmit after REJECTED
+router.post('/:id/resubmit', async (req, res) => {
+  try {
+    if (!isCashier(req.user)) {
+      return res.status(403).json({ message: 'Chỉ nhân viên thu ngân hoặc quản lý được gửi lại giải trình biên bản.' });
+    }
+    if (!mongoose.isValidObjectId(req.params.id)) throw badRequest('Mã biên bản/ca làm không hợp lệ.');
+    let handover = await ShiftHandover.findOne({
+      $or: [{ _id: req.params.id }, { schedule: req.params.id }]
+    });
+    if (!handover) return res.status(404).json({ message: 'Không tìm thấy biên bản bàn giao.' });
+    if (String(handover.cashier) !== String(req.user._id)) {
+      return res.status(403).json({ message: 'Chỉ chủ ca mới có quyền gửi lại giải trình biên bản của mình.' });
+    }
+    if (handover.status !== 'REJECTED') {
+      return res.status(409).json({ message: 'Chỉ có thể gửi lại biên bản đang bị từ chối (REJECTED).' });
+    }
+    const { note, actualCash } = req.body || {};
+    if (!note || typeof note !== 'string' || !note.trim()) {
+      throw badRequest('Cần nhập nội dung giải trình bổ sung khi gửi lại biên bản.');
+    }
+    if (note.trim().length > 500) {
+      throw badRequest('Nội dung giải trình không được vượt quá 500 ký tự.');
+    }
+    if (actualCash !== undefined) {
+      if (!Number.isSafeInteger(actualCash) || actualCash < 0) {
+        throw badRequest('Tiền thực tế phải là số nguyên không âm.');
+      }
+      handover.actualCash = actualCash;
+      handover.difference = actualCash - handover.expectedCash;
+      await WorkSchedule.updateOne({ _id: handover.schedule }, { $set: { endingCashActual: actualCash, handoverNote: note.trim() } });
+    } else {
+      await WorkSchedule.updateOne({ _id: handover.schedule }, { $set: { handoverNote: note.trim() } });
+    }
+    handover.note = note.trim();
+    handover.status = 'SUBMITTED';
+    handover.resubmittedAt = new Date();
+    handover.history.push({ action: 'RESUBMIT', actor: req.user._id, at: handover.resubmittedAt, fromStatus: 'REJECTED', toStatus: 'SUBMITTED', note: note.trim(), actualCash: handover.actualCash, expectedCash: handover.expectedCash });
+    handover.revision += 1;
+    await handover.save();
+    await handover.populate('cashier', 'fullName phone position');
+    res.json(handover);
   } catch (error) { handleError(error, res); }
 });
 

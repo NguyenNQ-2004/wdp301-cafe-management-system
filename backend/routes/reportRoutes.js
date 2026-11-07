@@ -99,7 +99,7 @@ router.get('/', async (req, res) => {
       }
     ]);
     const paymentReport = await Payment.aggregate([
-      { $match: { status: 'SUCCESS' } },
+      { $match: { status: 'SUCCESS', paidAt: { $gte: startDate, $lt: endExclusive } } },
       {
         $lookup: {
           from: Order.collection.name,
@@ -111,7 +111,8 @@ router.get('/', async (req, res) => {
       { $unwind: '$order' },
       {
         $match: {
-          'order.createdAt': { $gte: startDate, $lt: endExclusive }
+          'order.status': { $ne: 'CANCELLED' },
+          $expr: { $eq: ['$amount', '$order.finalAmount'] }
         }
       },
       {
@@ -127,7 +128,6 @@ router.get('/', async (req, res) => {
             { $sort: { revenue: -1 } }
           ],
           completedRevenue: [
-            { $match: { 'order.status': 'COMPLETED' } },
             {
               $group: {
                 _id: null,
@@ -137,13 +137,12 @@ router.get('/', async (req, res) => {
             }
           ],
           completedRevenueByPeriod: [
-            { $match: { 'order.status': 'COMPLETED' } },
             {
               $group: {
                 _id: {
                   $dateToString: {
                     format: periodFormat,
-                    date: '$order.createdAt',
+                    date: '$paidAt',
                     timezone: TIME_ZONE
                   }
                 },
@@ -199,8 +198,9 @@ router.get('/', async (req, res) => {
         orderCount: overview.orderCount || 0,
         completedOrderCount,
         inProgressCount: overview.inProgressCount || 0,
+        paidOrderCount: completedPaymentOverview.paidOrderCount || 0,
         revenue,
-        averageOrderValue: completedOrderCount ? revenue / completedOrderCount : 0
+        averageOrderValue: completedPaymentOverview.paidOrderCount ? revenue / completedPaymentOverview.paidOrderCount : 0
       },
       revenue: (payments.completedRevenueByPeriod || []).map(({ _id, ...period }) => ({ period: _id, ...period })),
       paymentMethods: (payments.paymentMethods || []).map(({ _id, ...method }) => ({

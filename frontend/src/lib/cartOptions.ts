@@ -8,11 +8,12 @@ export function hasDifferentOptions(existing: CartItem, customization?: CartItem
   return key(existing.customization) !== key(customization);
 }
 
-export function groupOrderItems(items: { productId: string; size: string; quantity: number }[]) {
-  const grouped = new Map<string, { productId: string; size: string; quantity: number }>();
+export function groupOrderItems(items: { productId: string; size: string; quantity: number; customization?: CartItem['customization'] }[]) {
+  const grouped = new Map<string, typeof items[number]>();
   for (const item of items) {
     if (!Number.isInteger(item.quantity) || item.quantity < 1) throw new Error('Số lượng món không hợp lệ.');
-    const key = `${item.productId}:${item.size}`;
+    const options = item.customization;
+    const key = JSON.stringify([item.productId, item.size, options?.sugar || '', options?.ice || '', options?.note?.trim() || '', [...(options?.topping || [])].sort()]);
     const quantity = (grouped.get(key)?.quantity || 0) + item.quantity;
     if (quantity > 99) throw new Error('Mỗi món và size chỉ được đặt tối đa 99 ly.');
     grouped.set(key, { ...item, quantity });

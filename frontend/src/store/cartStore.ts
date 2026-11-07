@@ -7,9 +7,13 @@ interface CartState {
   items: CartItem[];
   ownerId: string | null;
   rewardId: string | null;
+  pointsToUse: number;
+  refreshKey: number;
+  requestRefresh: () => void;
+  setPointsToUse: (points: number) => void;
   ready: boolean;
   syncError: string | null;
-  addProduct: (product: CatalogProduct, size?: string) => void;
+  addProduct: (product: CatalogProduct, size?: string, customization?: CartItem['customization']) => void;
   updateQuantity: (cartId: string, delta: number) => void;
   removeItem: (cartId: string) => void;
   removeSelected: () => void;
@@ -26,10 +30,14 @@ const useCartStore = create<CartState>()(persist((set) => ({
   items: [],
   ownerId: null,
   rewardId: null,
+  pointsToUse: 0,
+  refreshKey: 0,
+  requestRefresh: () => set(state => ({ refreshKey: state.refreshKey + 1, ready: false })),
+  setPointsToUse: points => set({ pointsToUse: Number.isSafeInteger(points) && points >= 0 ? points : 0 }),
   ready: false,
   syncError: null,
-  addProduct: (product, size = 'M') => set((state) => {
-    const line = productToCartItem(product, size);
+  addProduct: (product, size = 'M', customization) => set((state) => {
+    const line = productToCartItem(product, size, customization);
     const existing = state.items.find((item) => item.cartId === line.cartId);
     return {
       items: existing
@@ -48,15 +56,15 @@ const useCartStore = create<CartState>()(persist((set) => ({
   })),
   toggleAll: (checked) => set((state) => ({ items: state.items.map((item) => ({ ...item, checked })) })),
   replace: (items, ownerId) => set((state) => ({
-    items, ownerId, rewardId: state.ownerId === ownerId ? state.rewardId : null
+    items, ownerId, rewardId: state.ownerId === ownerId ? state.rewardId : null, pointsToUse: state.ownerId === ownerId ? state.pointsToUse : 0
   })),
-  clear: () => set({ items: [], ownerId: null, rewardId: null, syncError: null }),
+  clear: () => set({ items: [], ownerId: null, rewardId: null, pointsToUse: 0, syncError: null }),
   setReady: (ready) => set({ ready }),
   setSyncError: (syncError) => set({ syncError }),
   setRewardId: (rewardId) => set({ rewardId })
 }), {
   name: 'aura-cart',
-  partialize: (state) => ({ items: state.items, ownerId: state.ownerId, rewardId: state.rewardId })
+  partialize: (state) => ({ items: state.items, ownerId: state.ownerId, rewardId: state.rewardId, pointsToUse: state.pointsToUse })
 }));
 
 export default useCartStore;

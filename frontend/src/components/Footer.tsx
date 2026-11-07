@@ -8,7 +8,7 @@ interface FooterProps {
 export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
   return (
     <footer className="w-full bg-surface-container-lowest border-t border-surface-container-highest">
-      <div className="w-full px-margin-lg py-space-xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter-lg">
+      <div className="mx-auto w-full max-w-[960px] px-3 py-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Col 1: Brand Info */}
         <div className="flex flex-col gap-space-sm">
           <div className="flex items-center gap-space-sm">

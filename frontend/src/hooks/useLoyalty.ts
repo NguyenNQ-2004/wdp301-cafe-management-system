@@ -13,8 +13,8 @@ export default function useLoyalty(token?: string) {
     setSummary(null);
     setLoading(true);
     setError('');
-    shopApi<LoyaltySummary>('/api/loyalty', { token })
-      .then((data) => { if (active) setSummary(data); })
+    Promise.all([shopApi<LoyaltySummary>('/api/rewards', { token }), shopApi<NonNullable<LoyaltySummary['rules']>>('/api/loyalty-transactions/rules', { token })])
+      .then(([data, rules]) => { if (active) setSummary({ ...data, rules }); })
       .catch((err: Error) => { if (active) setError(err.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };

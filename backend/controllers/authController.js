@@ -2,7 +2,7 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const getJwtSecret = require('../config/jwtSecret');
-const { normalizeEmail, validEmail, emailFilter } = require('../utils/accountEmail');
+const { normalizeEmail, validEmail, emailFilter, validLogin, loginFilter } = require('../utils/EmailUtil');
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -15,7 +15,8 @@ const register = async (req, res) => {
     if (typeof fullName !== 'string' || !fullName.trim() || fullName.trim().length > 100) return res.status(400).json({ message: 'Họ tên phải có từ 1 đến 100 ký tự.' });
     if (!validEmail(loginEmail)) return res.status(400).json({ message: 'Vui lòng nhập địa chỉ Gmail/email hợp lệ để đăng nhập.' });
     if (!/^\+?[0-9]{9,15}$/.test(contactPhone)) return res.status(400).json({ message: 'Số điện thoại liên hệ phải có từ 9 đến 15 chữ số.' });
-    if (typeof password !== 'string' || password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) return res.status(400).json({ message: 'Mật khẩu phải có ít nhất 8 ký tự và tối đa 72 byte.' });
+    if (typeof password !== 'string' || password.length < 6 || Buffer.byteLength(password, 'utf8') > 72) return res.status(400).json({ message: 'Mật khẩu phải có ít nhất 6 ký tự và tối đa 72 byte.' });
+    if (req.body.confirmPassword !== undefined && req.body.confirmPassword !== password) return res.status(400).json({ message: 'Mật khẩu xác nhận không khớp.' });
     await User.init(); // Ensure the unique identity index is ready before accepting registrations.
     if (await User.exists(emailFilter(loginEmail))) return res.status(409).json({ message: 'Email này đã được đăng ký. Vui lòng đăng nhập hoặc dùng email khác.' });
 
@@ -36,8 +37,8 @@ const register = async (req, res) => {
       try {
         const token = authHeader.split(' ')[1];
         const decoded = jwt.verify(token, getJwtSecret());
-        const requestingUser = await User.findById(decoded.id).select('role');
-        if (requestingUser && requestingUser.role === 'ADMIN') {
+        const requestingUser = await User.findById(decoded.id).select('role status passwordChangedAt');
+        if (requestingUser && requestingUser.role === 'ADMIN' && requestingUser.status === 'ACTIVE' && (decoded.passwordVersion || 0) === (requestingUser.passwordChangedAt?.getTime() || 0)) {
           // Chỉ ADMIN mới được gán role và position tùy chọn
           assignedRole = ['ADMIN', 'STAFF', 'CUSTOMER'].includes(role) ? role : 'CUSTOMER';
           assignedPosition = ['MANAGER', 'BARISTA', 'CASHIER', 'SHIPPER'].includes(position) ? position : undefined;
@@ -74,9 +75,9 @@ const register = async (req, res) => {
         status: user.status,
         baseSalary: user.baseSalary,
         hireDate: user.hireDate,
-        tierName: user.tierName,
+
         totalPoints: user.totalPoints,
-        token: generateToken(user._id),
+        token: generateToken(user),
       });
     } else {
       res.status(400).json({ message: 'Dữ liệu không hợp lệ' });
@@ -92,19 +93,20 @@ const register = async (req, res) => {
 // @access  Public
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = req.body.identifier ?? req.body.email;
     const loginEmail = normalizeEmail(email);
-    if (!validEmail(loginEmail) || typeof password !== 'string' || !password) {
-      return res.status(400).json({ message: 'Vui lòng nhập Gmail/email hợp lệ và mật khẩu.' });
+    if (!validLogin(loginEmail) || typeof password !== 'string' || !password) {
+      return res.status(400).json({ message: 'Vui lòng nhập số điện thoại, email hoặc tên email và mật khẩu.' });
     }
 
-    const matches = await User.find(emailFilter(loginEmail)).limit(2);
+    const matches = await User.find(loginFilter(loginEmail)).limit(2);
     if (matches.length > 1) return res.status(409).json({ message: 'Email đang gắn với nhiều tài khoản cũ. Vui lòng liên hệ quản trị viên để cập nhật email riêng.' });
     const user = matches[0];
 
     if (user && (await bcrypt.compare(password, user.passwordHash))) {
       if (user.status !== 'ACTIVE') {
-        return res.status(403).json({ message: 'Tài khoản đã bị vô hiệu hóa hoặc khóa.' });
+        return res.status(403).json({ message: 'Tên đăng nhập hoặc mật khẩu không đúng.' });
       }
       res.json({
         _id: user._id,
@@ -118,12 +120,12 @@ const login = async (req, res) => {
         status: user.status,
         baseSalary: user.baseSalary,
         hireDate: user.hireDate,
-        tierName: user.tierName,
+
         totalPoints: user.totalPoints,
-        token: generateToken(user._id),
+        token: generateToken(user),
       });
     } else {
-      res.status(401).json({ message: 'Gmail/email hoặc mật khẩu không đúng.' });
+      res.status(401).json({ message: 'Tên đăng nhập hoặc mật khẩu không đúng.' });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -145,6 +147,8 @@ const logout = (req, res) => {
 const changePassword = async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
+    if (typeof oldPassword !== 'string' || !oldPassword || typeof newPassword !== 'string' || newPassword.length < 6 || Buffer.byteLength(newPassword, 'utf8') > 72) return res.status(400).json({ message: 'Mật khẩu mới phải có ít nhất 6 ký tự và tối đa 72 byte.' });
+    if (req.body.confirmPassword !== undefined && newPassword !== req.body.confirmPassword) return res.status(400).json({ message: 'Mật khẩu xác nhận không khớp.' });
     
     // We assume the user ID is in req.user from an auth middleware
     const user = await User.findById(req.user._id);
@@ -152,6 +156,7 @@ const changePassword = async (req, res) => {
     if (user && (await bcrypt.compare(oldPassword, user.passwordHash))) {
       const salt = await bcrypt.genSalt(10);
       user.passwordHash = await bcrypt.hash(newPassword, salt);
+      user.passwordChangedAt = new Date(Math.max(Date.now(), (user.passwordChangedAt?.getTime() || 0) + 1));
       await user.save();
       res.json({ message: 'Password changed successfully' });
     } else {
@@ -163,8 +168,8 @@ const changePassword = async (req, res) => {
 };
 
 // Generate JWT
-const generateToken = (id) => {
-  return jwt.sign({ id }, getJwtSecret(), {
+const generateToken = (user) => {
+  return jwt.sign({ id: user._id, passwordVersion: user.passwordChangedAt?.getTime() || 0 }, getJwtSecret(), {
     expiresIn: '30d',
   });
 };

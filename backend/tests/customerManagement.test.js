@@ -88,7 +88,7 @@ test('Screen 28: Customer CRM management flow and access control', async (t) => 
   });
   assert.equal(missingFields.status, 400);
 
-  // Create new customer with initial points (e.g., 160 points -> GOLD tier)
+  // Create new customer with initial points linked to phone
   const createdRes = await request('/api/users/customers', {
     method: 'POST',
     token: cashierToken,
@@ -105,7 +105,7 @@ test('Screen 28: Customer CRM management flow and access control', async (t) => 
   assert.equal(createdRes.data.customer.fullName, 'Trần Khách VIP');
   assert.equal(createdRes.data.customer.phone, '0988111222');
   assert.equal(createdRes.data.customer.totalPoints, 160);
-  assert.equal(createdRes.data.customer.tierName, 'GOLD');
+  assert.equal(createdRes.data.customer.tierName, undefined);
   assert.equal(createdRes.data.customer.passwordHash, undefined);
 
   // Initial points must generate a LoyaltyTransaction
@@ -136,8 +136,8 @@ test('Screen 28: Customer CRM management flow and access control', async (t) => 
     orderType: 'DINE_IN'
   });
 
-  // 3. List customers with search, tier filter & order aggregation
-  const listRes = await request('/api/users/customers?search=Trần&tier=GOLD', { token: adminToken });
+  // 3. List customers with search & order aggregation
+  const listRes = await request('/api/users/customers?search=Trần', { token: adminToken });
   assert.equal(listRes.status, 200);
   assert.ok(listRes.data.customers.length >= 1);
   const foundCustomer = listRes.data.customers.find((c) => c._id === newCustomerId);
@@ -162,15 +162,15 @@ test('Screen 28: Customer CRM management flow and access control', async (t) => 
     token: adminToken,
     body: {
       fullName: 'Trần Khách VIP Updated',
-      address: '456 Phố Trà Sữa',
-      tierName: 'DIAMOND'
+      address: '456 Phố Trà Sữa'
     }
   });
   assert.equal(updateRes.status, 200);
   assert.equal(updateRes.data.customer.fullName, 'Trần Khách VIP Updated');
   assert.equal(updateRes.data.customer.address, '456 Phố Trà Sữa');
-  assert.equal(updateRes.data.customer.tierName, 'DIAMOND');
+  assert.equal(updateRes.data.customer.tierName, undefined);
 
+  assert.equal((await request(`/api/users/customers/${newCustomerId}`, { method: 'PUT', token: adminToken, body: { tierName: 'GOLD' } })).status, 400);
   // 6. Toggle lock / unlock customer status
   const lockRes = await request(`/api/users/customers/${newCustomerId}/toggle-lock`, {
     method: 'PATCH',

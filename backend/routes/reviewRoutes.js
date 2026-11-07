@@ -1,4 +1,5 @@
 const express = require('express');
+const { objectBody, objectId, text, invalid, sendError } = require('../utils/adminValidation');
 const CustomerReview = require('../models/CustomerReview');
 const Order = require('../models/Order');
 const User = require('../models/User');
@@ -6,6 +7,10 @@ const { protect, adminOnly } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 router.use(protect);
+router.use((req, res, next) => {
+  if (!['ADMIN', 'CUSTOMER'].includes(req.user.role)) return res.status(403).json({ message: 'Chỉ khách hàng và Admin được truy cập phản hồi.' });
+  next();
+});
 
 // ==========================================
 // SCREEN 30: FEEDBACK & COMPLAINTS APIS
@@ -50,7 +55,9 @@ router.get('/stats', adminOnly, async (req, res) => {
 // 2. KHÁCH HÀNG: LẤY DANH SÁCH ĐƠN HÀNG CỦA MÌNH ĐỂ CHỌN KHI GỬI ĐÁNH GIÁ / KHIẾU NẠI
 router.get('/my-orders', async (req, res) => {
   try {
-    const orders = await Order.find({ customer: req.user._id, status: { $ne: 'CANCELLED' } })
+    if (req.user.role !== 'CUSTOMER') return res.status(403).json({ message: 'Chỉ khách hàng được gửi phản hồi.' });
+    const reviewed = await CustomerReview.distinct('order', { customer: req.user._id });
+    const orders = await Order.find({ customer: req.user._id, status: { $ne: 'CANCELLED' }, _id: { $nin: reviewed.filter(Boolean) } })
       .select('orderCode finalAmount status orderType items createdAt')
       .sort({ createdAt: -1 })
       .limit(30);
@@ -113,7 +120,7 @@ router.get('/', async (req, res) => {
 
     const [reviews, total] = await Promise.all([
       CustomerReview.find(filter)
-        .populate('customer', 'fullName phone email tierName')
+        .populate('customer', 'fullName phone email')
         .populate('order', 'orderCode finalAmount createdAt items')
         .populate('respondedBy', 'fullName position')
         .sort({ createdAt: -1 })
@@ -136,29 +143,34 @@ router.get('/', async (req, res) => {
 // 4. KHÁCH HÀNG: GỬI ĐÁNH GIÁ SAO HOẶC KHIẾU NẠI SỰ CỐ
 router.post('/', async (req, res) => {
   try {
+    if (req.user.role !== 'CUSTOMER') throw invalid('Chỉ khách hàng được gửi phản hồi.', 403);
+    objectBody(req.body);
     const { orderId, issueType, rating, topic, content, attachments = [] } = req.body;
+    if (!['RATING','COMPLAINT'].includes(issueType)) throw invalid('Loại phản hồi không hợp lệ.');
+    text(content, 'Nội dung phản hồi', 2000);
+    if (topic !== undefined && typeof topic !== 'string') throw invalid('Chủ đề không hợp lệ.');
+    if (!Array.isArray(attachments) || attachments.some(item => typeof item !== 'string')) throw invalid('Ảnh đính kèm không hợp lệ.');
 
-    if (!issueType || !content?.trim()) {
-      return res.status(400).json({ message: 'Vui lòng cung cấp nội dung phản hồi chi tiết.' });
-    }
-
-    if (issueType === 'RATING' && (!rating || rating < 1 || rating > 5)) {
+    if (issueType === 'RATING' && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
       return res.status(400).json({ message: 'Số sao đánh giá phải từ 1 đến 5 sao.' });
     }
 
     let order = null;
-    if (orderId) {
-      order = await Order.findById(orderId);
+    {
+      order = await Order.findOne({ _id: objectId(orderId), customer: req.user._id, status: { $ne: 'CANCELLED' } });
       if (!order) {
         return res.status(404).json({ message: 'Không tìm thấy đơn hàng tương ứng.' });
       }
     }
+    if (await CustomerReview.exists({ customer: req.user._id, order: order._id })) throw invalid('Đơn hàng đã được gửi phản hồi.', 409);
+    await CustomerReview.init();
 
     const formattedContent =
       issueType === 'COMPLAINT' && topic ? `[${topic}] ${content.trim()}` : content.trim();
 
     const review = await CustomerReview.create({
       customer: req.user._id,
+      submissionKey: `${req.user._id}:${order._id}`,
       order: order?._id || undefined,
       issueType,
       rating: issueType === 'RATING' ? Number(rating) : undefined,
@@ -179,53 +191,51 @@ router.post('/', async (req, res) => {
           : 'Chúng tôi đã tiếp nhận khiếu nại của bạn và sẽ phản hồi trong thời gian sớm nhất.',
       review: populatedReview
     });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  } catch (error) { sendError(res, error); }
 });
 
 // 5. ADMIN: PHẢN HỒI KHIẾU NẠI & CẬP NHẬT TRẠNG THÁI XỬ LÝ
 router.put('/:id/respond', adminOnly, async (req, res) => {
   try {
+    objectBody(req.body);
     const { adminResponse, status } = req.body;
-    const review = await CustomerReview.findById(req.params.id);
+    text(adminResponse, 'Nội dung phản hồi', 2000);
+    if (status !== undefined && !['PENDING', 'IN_PROGRESS', 'RESOLVED', 'REJECTED'].includes(status)) throw invalid('Trạng thái xử lý không hợp lệ.');
+    const review = await CustomerReview.findById(objectId(req.params.id));
     if (!review) {
       return res.status(404).json({ message: 'Không tìm thấy phiếu phản hồi của khách.' });
     }
 
-    if (adminResponse !== undefined) {
-      review.adminResponse = adminResponse.trim();
-      review.respondedAt = new Date();
-      review.respondedBy = req.user._id;
-    }
-
-    if (status && ['PENDING', 'IN_PROGRESS', 'RESOLVED', 'REJECTED'].includes(status)) {
-      review.status = status;
-    }
-
-    await review.save();
-
-    const updated = await CustomerReview.findById(review._id)
+    const updated = await CustomerReview.findOneAndUpdate(
+      { _id: review._id, status: { $in: ['PENDING', 'IN_PROGRESS'] } },
+      { $set: { adminResponse: adminResponse.trim(), respondedAt: new Date(), respondedBy: req.user._id, status: status || 'IN_PROGRESS' } },
+      { returnDocument: 'after', runValidators: true }
+    )
       .populate('customer', 'fullName phone')
       .populate('order', 'orderCode finalAmount')
       .populate('respondedBy', 'fullName position');
+    if (!updated) throw invalid('Phiếu đã đóng; không thể sửa hoặc mở lại.', 409);
 
     res.json({
       message: `Đã phản hồi phiếu #${String(review._id).slice(-6).toUpperCase()} thành công!`,
       review: updated
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    sendError(res, error);
   }
 });
 
 // 6. ADMIN: XÓA PHIẾU PHẢN HỒI
 router.delete('/:id', adminOnly, async (req, res) => {
   try {
-    await CustomerReview.findByIdAndDelete(req.params.id);
+    const review = await CustomerReview.findById(objectId(req.params.id));
+    if (!review) throw invalid('Không tìm thấy phản hồi.',404);
+    if (['RESOLVED','REJECTED'].includes(review.status)) throw invalid('Phiếu đã đóng được giữ lại để tra cứu.',409);
+    const removed = await CustomerReview.findOneAndDelete({ _id: review._id, status: { $in: ['PENDING','IN_PROGRESS'] } });
+    if (!removed) throw invalid('Phiếu vừa đóng; không thể xóa.',409);
     res.json({ message: 'Đã xóa phiếu đánh giá/khiếu nại thành công.' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    sendError(res, error);
   }
 });
 

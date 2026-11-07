@@ -6,11 +6,20 @@ const orderItemSchema = new mongoose.Schema({
   customization: { type: Object },
   quantity: { type: Number, required: true },
   subtotal: { type: Number, required: true },
-  isPrepared: { type: Boolean, default: false }
+  isPrepared: { type: Boolean, default: false },
+  costTotal: { type: Number, default: null },
+  costPerItem: { type: Number, default: null },
+  costAllocations: [{ ingredient: { type: mongoose.Schema.Types.ObjectId, ref: 'Ingredient' }, ingredientName: String, unit: String,
+    lotId: { type: mongoose.Schema.Types.ObjectId }, quantity: Number, unitCost: { type: Number, default: null } }]
 }, { _id: false });
 
 const orderSchema = new mongoose.Schema({
   orderCode: { type: String, required: true, unique: true },
+  checkoutFlow: { type: Boolean, default: false },
+  checkoutSessionId: String,
+  idempotencyKey: String,
+  requestHash: String,
+  cartClearedAt: Date,
   customer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   cashier: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   voucher: { type: mongoose.Schema.Types.ObjectId, ref: 'Voucher' },
@@ -32,9 +41,18 @@ const orderSchema = new mongoose.Schema({
   recipientName: { type: String },
   recipientPhone: { type: String },
   deliveryAddress: { type: String },
+  district: { type: String },
+  ward: { type: String },
+  addressDetail: { type: String },
   shipper: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   tableNumber: { type: String },
   orderNote: { type: String },
-  cancelReason: { type: String }
-}, { timestamps: true });
+  cancelReason: { type: String },
+  inventoryDeductedAt: { type: Date },
+  inventoryProcessing: { type: Boolean, default: false },
+  costTotal: { type: Number, default: null },
+  costCapturedAt: { type: Date },
+  costStatus: { type: String, enum: ['PENDING', 'COMPLETE', 'MISSING_PRICE', 'LEGACY'], default: 'PENDING' }
+}, { timestamps: true, optimisticConcurrency: true });
+orderSchema.index({ customer: 1, idempotencyKey: 1 }, { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } });
 module.exports = mongoose.model('Order', orderSchema);

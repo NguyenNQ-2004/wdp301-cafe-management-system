@@ -140,6 +140,7 @@ export const FeedbackPage: React.FC = () => {
       showToast('Vui lòng nhập nội dung đánh giá hoặc phản ánh chi tiết.', 'error');
       return;
     }
+    if (!selectedOrderId) { showToast('Vui lòng chọn đơn hàng chưa gửi phản hồi.', 'error'); return; }
 
     setSubmitting(true);
     try {
@@ -165,6 +166,8 @@ export const FeedbackPage: React.FC = () => {
       showToast(data.message || 'Gửi phản hồi thành công!');
       setContent('');
       setSelectedTopic('');
+      setSelectedOrderId('');
+      fetchMyOrders();
       fetchMyReviews();
     } catch (err: any) {
       showToast(err.message, 'error');

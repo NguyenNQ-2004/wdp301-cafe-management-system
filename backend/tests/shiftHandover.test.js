@@ -86,7 +86,7 @@ test('UC27 reconciles only cashier cash payments and saves one printable snapsho
   assert.equal((await request('GET', listPath, null, adminToken)).data.length, 3);
   assert.equal((await request('GET', `/api/shift-handovers/${shiftA._id}`, null, bToken)).status, 403);
   assert.equal((await request('POST', `/api/shift-handovers/${shiftA._id}/confirm`, { actualCash: 149000 }, adminToken)).status, 403);
-  assert.equal((await request('POST', `/api/shift-handovers/${unfinished._id}/confirm`, { actualCash: 0 }, aToken)).status, 409);
+  assert.equal((await request('POST', `/api/shift-handovers/${unfinished._id}/confirm`, { actualCash: 0 }, aToken)).status, 400, 'legacy shift without opening cash must supply it');
   const preview = await request('GET', `/api/shift-handovers/${shiftA._id}`, null, aToken);
   assert.equal(preview.status, 200);
   assert.equal(preview.data.ready, true);

@@ -174,98 +174,90 @@ export const fmtNumber = (value: number | undefined | null): string => {
   return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 }).format(value || 0);
 };
 
-export const lastPurchasePrice = (db: any, ingredientId: any): number | null => {
+const refId = (value: any): string => String(value?._id ?? value?.id ?? value ?? '');
+
+const latestPurchaseLine = (db: any, ingredientId: any, statuses: string[]): any | null => {
   if (!db) return null;
-  if (db.purchase_order_items && Array.isArray(db.purchase_order_items)) {
-    const items = db.purchase_order_items.filter(
-      (it: any) =>
-        it.ingredient_id === ingredientId ||
-        it.ingredient === ingredientId ||
-        it.ingredient?._id === ingredientId ||
-        String(it.ingredient_id) === String(ingredientId) ||
-        String(it.ingredient?._id) === String(ingredientId)
-    );
-    if (items.length > 0) {
-      const latest = items[items.length - 1];
-      return latest.unit_price ?? latest.unitPrice ?? null;
-    }
-  }
-  if (db.purchase_orders && Array.isArray(db.purchase_orders)) {
-    for (let i = db.purchase_orders.length - 1; i >= 0; i--) {
-      const po = db.purchase_orders[i];
-      if (po.items && Array.isArray(po.items)) {
-        const found = po.items.find(
-          (it: any) =>
-            it.ingredient === ingredientId ||
-            it.ingredient?._id === ingredientId ||
-            it.ingredient_id === ingredientId ||
-            String(it.ingredient) === String(ingredientId) ||
-            String(it.ingredient?._id) === String(ingredientId)
-        );
-        if (found) return found.unitPrice ?? found.unit_price ?? null;
-      }
-    }
-  }
-  if (db.ingredients && Array.isArray(db.ingredients)) {
-    const ing = db.ingredients.find(
-      (i: any) => i.id === ingredientId || i._id === ingredientId || String(i.id) === String(ingredientId)
-    );
-    if (ing && (ing.latestUnitPrice || ing.cost_per_unit || ing.costPrice)) {
-      return ing.latestUnitPrice ?? ing.cost_per_unit ?? ing.costPrice;
-    }
-  }
-  return null;
+  const orders = db.purchase_orders ?? [];
+  const rows = orders.length
+    ? orders.filter((order: any) => statuses.includes(order.status)).flatMap((order: any) => {
+      const items = order.items ?? (db.purchase_order_items ?? []).filter((item: any) => refId(item.po_id ?? item.order_id ?? item.purchaseOrder) === refId(order));
+      return items.map((item: any) => ({ ...item, status: order.status, purchasedAt: order.createdAt ?? order.created_at, orderId: order._id ?? order.id }));
+    })
+    : (db.purchase_order_items ?? []).filter((item: any) => statuses.includes(item.status) || (statuses.includes('RECEIVED') && !item.status));
+  const latest = rows.filter((item: any) => refId(item.ingredient_id ?? item.ingredient) === refId(ingredientId))
+    .sort((a: any, b: any) => {
+      const time = (row: any) => Date.parse(row.purchasedAt ?? row.createdAt ?? row.created_at ?? '') || 0;
+      return time(b) - time(a) || refId(b.orderId ?? b._id).localeCompare(refId(a.orderId ?? a._id));
+    }).find((item: any) => typeof (item.unitPrice ?? item.unit_price) === 'number' && Number.isFinite(item.unitPrice ?? item.unit_price));
+  return latest ?? null;
 };
 
-export const productCost = (db: any, productId: any): number | null => {
-  if (!db) return null;
-  const pis = db.product_ingredients?.filter(
-    (pi: any) =>
-      pi.product_id === productId ||
-      pi.productId === productId ||
-      String(pi.product_id) === String(productId)
-  );
-  if (pis && pis.length > 0) {
-    let total = 0;
-    for (const item of pis) {
-      const ing = db.ingredients?.find(
-        (i: any) =>
-          i.id === item.ingredient_id ||
-          i._id === item.ingredient_id ||
-          String(i.id) === String(item.ingredient_id)
-      );
-      const unitCost =
-        lastPurchasePrice(db, item.ingredient_id) ||
-        ing?.cost_per_unit ||
-        ing?.price ||
-        ing?.latestUnitPrice ||
-        5000;
-      const qty = Number(
-        item.quantity_required ?? item.quantityRequired ?? item.quantity ?? item.amount ?? 1
-      );
-      total += qty * unitCost;
-    }
-    return total > 0 ? total : null;
-  }
-  const prod = db.products?.find(
-    (p: any) => p.id === productId || p._id === productId || String(p.id) === String(productId)
-  );
-  if (prod?.recipe && Array.isArray(prod.recipe) && prod.recipe.length > 0) {
-    let total = 0;
-    for (const r of prod.recipe) {
-      const ingId = r.ingredient?._id || r.ingredient;
-      const ingCost =
-        lastPurchasePrice(db, ingId) ||
-        r.ingredient?.costPrice ||
-        r.ingredient?.cost_per_unit ||
-        5000;
-      const qty = Number(r.quantity_required ?? r.quantityRequired ?? r.quantity ?? 1);
-      total += qty * ingCost;
-    }
-    return total > 0 ? total : null;
-  }
-  return null;
+export const lastOrderedPrice = (db: any, ingredientId: any): number | null => {
+  const line = latestPurchaseLine(db, ingredientId, ['ORDERED']);
+  return line ? line.unitPrice ?? line.unit_price : null;
 };
+
+export const lastPurchasePrice = (db: any, ingredientId: any): number | null => {
+  if (!db) return null;
+  const received = latestPurchaseLine(db, ingredientId, ['RECEIVED']);
+  if (received) return received.unitPrice ?? received.unit_price;
+  const ingredient = db.ingredients?.find((item: any) => refId(item) === refId(ingredientId));
+  const price = ingredient?.latestUnitPrice ?? ingredient?.cost_per_unit ?? ingredient?.costPrice;
+  return typeof price === 'number' && Number.isFinite(price) ? price : null;
+};
+
+export const recipeUnitPrice = (db: any, ingredientId: any): { price: number | null; estimated: boolean } => {
+  const line = latestPurchaseLine(db, ingredientId, ['DRAFT', 'ORDERED', 'RECEIVED']);
+  if (line) return { price: line.unitPrice ?? line.unit_price, estimated: line.status === 'DRAFT' || line.status === 'ORDERED' };
+  return { price: lastPurchasePrice(db, ingredientId), estimated: false };
+};
+
+export const recipeLineCost = (db: any, ingredientId: any, amount: number): { cost: number | null; estimated: boolean } => {
+  if (!Number.isFinite(amount) || amount < 0) return { cost: null, estimated: false };
+  const ingredient = db?.ingredients?.find((row: any) => refId(row) === refId(ingredientId));
+  const lots = ingredient?.stockLots ?? ingredient?.stock_lots;
+  const quote = recipeUnitPrice(db, ingredientId);
+  if (!Array.isArray(lots)) return { cost: quote.price === null ? null : amount * quote.price, estimated: quote.estimated || (quote.price !== null && Number(ingredient?.currentStock ?? ingredient?.current_stock ?? 0) > 0) };
+  let remaining = amount, total = 0, estimated = false;
+  for (const lot of [...lots].sort((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt) || refId(a).localeCompare(refId(b)))) {
+    const used = Math.min(remaining, lot.remainingQuantity);
+    if (used <= 0) continue;
+    // Existing stock without a price must be valued explicitly by the admin.
+    if (lot.unitCost == null) return { cost: null, estimated: false };
+    total += used * lot.unitCost;
+    remaining -= used;
+    if (remaining < 1e-8) break;
+  }
+  const tracked = lots.reduce((sum: number, lot: any) => sum + lot.remainingQuantity, 0);
+  if (remaining > 1e-8 && Number(ingredient.currentStock ?? ingredient.current_stock ?? 0) > tracked + 1e-8) return { cost: null, estimated: false };
+  if (remaining > 1e-8) {
+    if (quote.price === null) return { cost: null, estimated: false };
+    total += remaining * quote.price;
+    estimated = true;
+  }
+  return { cost: total, estimated };
+};
+
+export const productCostDetails = (db: any, productId: any): { cost: number | null; estimated: boolean } => {
+  if (!db) return { cost: null, estimated: false };
+  const links = db.product_ingredients?.filter((line: any) => refId(line.product_id ?? line.productId ?? line.product) === refId(productId)) ?? [];
+  const product = db.products?.find((item: any) => refId(item) === refId(productId));
+  const recipe = links.length ? links : product?.recipe ?? [];
+  if (!recipe.length) return { cost: null, estimated: false };
+  let total = 0;
+  let estimated = false;
+  for (const line of recipe) {
+    const quantity = line.quantity_required ?? line.quantityRequired;
+    const quote = recipeLineCost(db, line.ingredient_id ?? line.ingredientId ?? line.ingredient, quantity);
+    if (quote.cost === null) return { cost: null, estimated: false };
+    total += quote.cost;
+    estimated ||= quote.estimated;
+  }
+  return { cost: total, estimated };
+};
+
+export const productCost = (db: any, productId: any): number | null => productCostDetails(db, productId).cost;
 
 export const isLowStock = (i: any): boolean => {
   if (!i) return false;

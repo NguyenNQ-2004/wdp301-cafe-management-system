@@ -1,24 +1,13 @@
+import { API_BASE } from '../../lib/shopApi';
 import React, { useState, useEffect, useCallback } from 'react';
 import useAuthStore from '../../store/authStore';
 import { AdminLayout, Badge, Field, FormActions, Modal, StatCard, PrimaryButton, inputCls } from './AdminUi';
-
-interface TierConfig {
-  _id?: string;
-  tierCode: 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND';
-  tierName: string;
-  minPoints: number;
-  minSpent: number;
-  discountPercent: number;
-  pointMultiplier: number;
-  description?: string;
-  color?: string;
-}
 
 interface LoyaltyRules {
   points_earn_unit: number;
   points_step: number;
   points_step_value: number;
-  tiers: TierConfig[];
+
 }
 
 interface CustomerLookup {
@@ -27,7 +16,7 @@ interface CustomerLookup {
     fullName: string;
     phone: string;
     email?: string;
-    tierName: 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND';
+
     totalPoints: number;
   };
   totalSpent: number;
@@ -47,7 +36,7 @@ interface LoyaltyLogItem {
     _id: string;
     fullName: string;
     phone: string;
-    tierName: string;
+
     totalPoints: number;
   };
   order?: {
@@ -57,7 +46,7 @@ interface LoyaltyLogItem {
   };
   pointsChange: number;
   balanceAfter?: number;
-  transactionType: 'EARN' | 'REDEEM';
+  transactionType: 'EARN' | 'REDEEM' | 'REFUND' | 'ADJUST';
   reason?: string;
   performedBy?: {
     fullName: string;
@@ -72,13 +61,6 @@ interface LoyaltyStats {
   totalPointsValue: number;
   totalTransactions: number;
 }
-
-const TIER_BADGES: Record<string, { label: string; cls: string; icon: string }> = {
-  BRONZE: { label: 'Đồng', cls: 'bg-amber-100 text-amber-900 border border-amber-300', icon: 'military_tech' },
-  SILVER: { label: 'Bạc', cls: 'bg-slate-200 text-slate-800 border border-slate-300', icon: 'workspace_premium' },
-  GOLD: { label: 'Vàng', cls: 'bg-yellow-100 text-yellow-800 border border-yellow-300', icon: 'stars' },
-  DIAMOND: { label: 'Kim Cương', cls: 'bg-cyan-100 text-cyan-900 border border-cyan-300 font-bold', icon: 'diamond' }
-};
 
 const fmtMoney = (n: number = 0) => `${new Intl.NumberFormat('vi-VN').format(Math.round(n))}₫`;
 const fmtNumber = (n: number = 0) => new Intl.NumberFormat('vi-VN').format(n);
@@ -96,7 +78,7 @@ export const AdminMembershipsPage: React.FC = () => {
     points_earn_unit: 1000,
     points_step: 10,
     points_step_value: 2000,
-    tiers: []
+
   });
 
   const [stats, setStats] = useState<LoyaltyStats>({
@@ -108,7 +90,7 @@ export const AdminMembershipsPage: React.FC = () => {
 
   const [logs, setLogs] = useState<LoyaltyLogItem[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
-  const [filterType, setFilterType] = useState<'ALL' | 'EARN' | 'REDEEM'>('ALL');
+  const [filterType, setFilterType] = useState<'ALL' | 'EARN' | 'REDEEM' | 'REFUND' | 'ADJUST'>('ALL');
 
   // Customer Lookup
   const [searchPhone, setSearchPhone] = useState('');
@@ -131,24 +113,25 @@ export const AdminMembershipsPage: React.FC = () => {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // 1. Fetch Rules & Tiers
+  // 1. Fetch Rules
   const fetchRules = useCallback(async () => {
     if (!user?.token) return;
     try {
-      const res = await fetch('http://localhost:5000/api/loyalty-transactions/rules', {
+      const res = await fetch(`${API_BASE}/api/loyalty-transactions/rules`, {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Không tải được cấu hình tích điểm.');
       if (res.ok) {
         setRules({
           points_earn_unit: data.points_earn_unit || 1000,
           points_step: data.points_step || 10,
-          points_step_value: data.points_step_value || 2000,
-          tiers: data.tiers || []
+          points_step_value: data.points_step_value ?? 2000,
+
         });
       }
     } catch (err: any) {
-      console.error(err);
+      showToast(err.message || 'Không tải được cấu hình tích điểm.', 'error');
     }
   }, [user?.token]);
 
@@ -156,13 +139,14 @@ export const AdminMembershipsPage: React.FC = () => {
   const fetchStats = useCallback(async () => {
     if (!user?.token) return;
     try {
-      const res = await fetch('http://localhost:5000/api/loyalty-transactions/stats', {
+      const res = await fetch(`${API_BASE}/api/loyalty-transactions/stats`, {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       const data = await res.json();
-      if (res.ok) setStats(data);
+      if (!res.ok) throw new Error(data.message || 'Không tải được thống kê hội viên.');
+      setStats(data);
     } catch (err: any) {
-      console.error(err);
+      showToast(err.message || 'Không tải được thống kê hội viên.', 'error');
     }
   }, [user?.token]);
 
@@ -175,13 +159,14 @@ export const AdminMembershipsPage: React.FC = () => {
       if (filterType !== 'ALL') params.append('type', filterType);
       params.append('limit', '50');
 
-      const res = await fetch(`http://localhost:5000/api/loyalty-transactions?${params.toString()}`, {
+      const res = await fetch(`${API_BASE}/api/loyalty-transactions?${params.toString()}`, {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       const data = await res.json();
-      if (res.ok) setLogs(data.transactions || []);
+      if (!res.ok) throw new Error(data.message || 'Không tải được lịch sử tích điểm.');
+      setLogs(data.transactions || []);
     } catch (err: any) {
-      console.error(err);
+      showToast(err.message || 'Không tải được lịch sử tích điểm.', 'error');
     } finally {
       setLogsLoading(false);
     }
@@ -203,7 +188,7 @@ export const AdminMembershipsPage: React.FC = () => {
     setLookupLoading(true);
     try {
       const res = await fetch(
-        `http://localhost:5000/api/loyalty-transactions/lookup?phone=${encodeURIComponent(searchPhone.trim())}`,
+        `${API_BASE}/api/loyalty-transactions/lookup?phone=${encodeURIComponent(searchPhone.trim())}`,
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
       const data = await res.json();
@@ -218,7 +203,7 @@ export const AdminMembershipsPage: React.FC = () => {
     }
   };
 
-  // Handle Save Rules & Tiers
+  // Handle Save Rules
   const handleSaveRules = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.token) return;
@@ -228,7 +213,7 @@ export const AdminMembershipsPage: React.FC = () => {
     }
     setSavingRules(true);
     try {
-      const res = await fetch('http://localhost:5000/api/loyalty-transactions/rules', {
+      const res = await fetch(`${API_BASE}/api/loyalty-transactions/rules`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -246,13 +231,6 @@ export const AdminMembershipsPage: React.FC = () => {
     } finally {
       setSavingRules(false);
     }
-  };
-
-  // Handle Tier threshold change in form
-  const handleTierChange = (index: number, field: keyof TierConfig, value: any) => {
-    const updatedTiers = [...rules.tiers];
-    updatedTiers[index] = { ...updatedTiers[index], [field]: value };
-    setRules({ ...rules, tiers: updatedTiers });
   };
 
   // Handle Adjust Points (Earn / Redeem)
@@ -273,7 +251,7 @@ export const AdminMembershipsPage: React.FC = () => {
 
     setSubmittingAdjust(true);
     try {
-      const res = await fetch('http://localhost:5000/api/loyalty-transactions/adjust', {
+      const res = await fetch(`${API_BASE}/api/loyalty-transactions/adjust`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -307,9 +285,9 @@ export const AdminMembershipsPage: React.FC = () => {
   return (
     <AdminLayout
       activePath="/admin/memberships"
-      table="loyalty_transactions, users.total_points, shop_settings, membership_tiers"
-      title="Quản lý tích điểm theo Số điện thoại (Loyalty & Tiers)"
-      subtitle="Chương trình khách hàng thân thiết Aura: Quản lý tỷ lệ tích/đổi điểm, điều kiện nâng hạng thẻ (Đồng, Bạc, Vàng, Kim Cương) và lịch sử biến động điểm."
+      table="loyalty_transactions, users.total_points, shop_settings"
+      title="Quản lý tích điểm theo Số điện thoại"
+      subtitle="Tra cứu khách hàng theo số điện thoại, quản lý tỷ lệ tích/đổi điểm và lịch sử biến động điểm."
       stats={
         <>
           <StatCard label="Khách hàng có điểm" value={fmtNumber(stats.customersWithPoints)} />
@@ -342,7 +320,7 @@ export const AdminMembershipsPage: React.FC = () => {
 
       {/* Top 2 Columns: Rules & Tra cứu theo SĐT */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Rules & Tiers Configuration Form */}
+        {/* Left Column: Rules Configuration Form */}
         <form
           onSubmit={handleSaveRules}
           className="lg:col-span-7 bg-white p-5 sm:p-6 rounded-2xl border border-stone-200 shadow-2xs space-y-4 text-xs"
@@ -351,10 +329,10 @@ export const AdminMembershipsPage: React.FC = () => {
             <div>
               <h2 className="text-sm font-bold text-stone-900 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-amber-600 text-[20px]">tune</span>
-                Cấu hình tỷ lệ tích điểm & Hạng thẻ
+                Cấu hình tỷ lệ tích điểm theo số điện thoại
               </h2>
               <p className="text-[11px] text-stone-400 mt-0.5">
-                Thiết lập công thức tích/đổi điểm và điều kiện ngưỡng thăng hạng thành viên.
+                Thiết lập tỷ lệ tích điểm và mức giảm giá khi đổi điểm, áp dụng chung cho mọi khách hàng.
               </p>
             </div>
             <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 font-mono text-[10px] font-bold">
@@ -406,68 +384,9 @@ export const AdminMembershipsPage: React.FC = () => {
             <strong className="text-emerald-700 font-mono">{fmtMoney(rules.points_step_value)}</strong> trên hóa đơn.
           </div>
 
-          {/* Membership Tiers Settings */}
-          <div>
-            <h3 className="text-xs font-bold text-stone-800 mb-2 uppercase tracking-wider">
-              Ngưỡng điều kiện & Quyền lợi 4 hạng thẻ:
-            </h3>
-            <div className="space-y-2">
-              {rules.tiers.map((tier, idx) => {
-                const badge = TIER_BADGES[tier.tierCode] || TIER_BADGES.BRONZE;
-                return (
-                  <div
-                    key={tier.tierCode}
-                    className="p-3 bg-stone-50/70 border border-stone-200 rounded-xl grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center"
-                  >
-                    <div className="sm:col-span-3 flex items-center gap-1.5">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] ${badge.cls} inline-flex items-center gap-1`}>
-                        <span className="material-symbols-outlined text-[12px]">{badge.icon}</span>
-                        {tier.tierName}
-                      </span>
-                    </div>
-
-                    <div className="sm:col-span-3">
-                      <label className="text-[10px] text-stone-400 block font-semibold">Ngưỡng điểm</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={tier.minPoints}
-                        onChange={(e) => handleTierChange(idx, 'minPoints', Number(e.target.value))}
-                        className="w-full px-2 py-1 bg-white border border-stone-200 rounded-lg text-xs font-mono font-bold"
-                      />
-                    </div>
-
-                    <div className="sm:col-span-3">
-                      <label className="text-[10px] text-stone-400 block font-semibold">Ngưỡng chi tiêu (VNĐ)</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={tier.minSpent}
-                        onChange={(e) => handleTierChange(idx, 'minSpent', Number(e.target.value))}
-                        className="w-full px-2 py-1 bg-white border border-stone-200 rounded-lg text-xs font-mono"
-                      />
-                    </div>
-
-                    <div className="sm:col-span-3">
-                      <label className="text-[10px] text-stone-400 block font-semibold">Giảm giá (%)</label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={tier.discountPercent}
-                        onChange={(e) => handleTierChange(idx, 'discountPercent', Number(e.target.value))}
-                        className="w-full px-2 py-1 bg-white border border-stone-200 rounded-lg text-xs font-mono"
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
           <div className="flex justify-end pt-2">
             <PrimaryButton icon="save" type="submit" disabled={savingRules}>
-              {savingRules ? 'Đang lưu quy tắc...' : 'Lưu quy tắc & Hạng thẻ'}
+              {savingRules ? 'Đang lưu quy tắc...' : 'Lưu quy tắc tích điểm'}
             </PrimaryButton>
           </div>
         </form>
@@ -517,16 +436,6 @@ export const AdminMembershipsPage: React.FC = () => {
                     {lookupResult.user.phone} {lookupResult.user.email && `• ${lookupResult.user.email}`}
                   </p>
                 </div>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] ${
-                    TIER_BADGES[lookupResult.user.tierName]?.cls || TIER_BADGES.BRONZE.cls
-                  } inline-flex items-center gap-1`}
-                >
-                  <span className="material-symbols-outlined text-[12px]">
-                    {TIER_BADGES[lookupResult.user.tierName]?.icon}
-                  </span>
-                  {TIER_BADGES[lookupResult.user.tierName]?.label || lookupResult.user.tierName}
-                </span>
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">
@@ -628,6 +537,7 @@ export const AdminMembershipsPage: React.FC = () => {
             >
               Đổi điểm (-REDEEM)
             </button>
+            {(['REFUND', 'ADJUST'] as const).map(type => <button key={type} onClick={() => setFilterType(type)} className={`px-3 py-1 rounded-lg font-semibold ${filterType === type ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-600'}`}>{type === 'REFUND' ? 'Hoàn điểm' : 'Điều chỉnh'}</button>)}
           </div>
         </div>
 
@@ -638,7 +548,6 @@ export const AdminMembershipsPage: React.FC = () => {
                 <th className="p-3.5">Mã GD</th>
                 <th className="p-3.5">Thời gian</th>
                 <th className="p-3.5">Khách hàng</th>
-                <th className="p-3.5 text-center">Hạng thẻ</th>
                 <th className="p-3.5">Loại</th>
                 <th className="p-3.5 text-right">Biến động điểm</th>
                 <th className="p-3.5 text-right">Số dư sau GD</th>
@@ -650,7 +559,7 @@ export const AdminMembershipsPage: React.FC = () => {
             <tbody className="divide-y divide-stone-100">
               {logsLoading ? (
                 <tr>
-                  <td colSpan={10} className="p-8 text-center text-stone-400">
+                  <td colSpan={9} className="p-8 text-center text-stone-400">
                     <div className="flex items-center justify-center gap-2">
                       <span className="w-4 h-4 border-2 border-red-700 border-t-transparent rounded-full animate-spin"></span>
                       <span>Đang tải nhật ký điểm...</span>
@@ -659,14 +568,14 @@ export const AdminMembershipsPage: React.FC = () => {
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="p-8 text-center text-stone-400">
+                  <td colSpan={9} className="p-8 text-center text-stone-400">
                     Chưa có giao dịch biến động điểm nào được ghi nhận.
                   </td>
                 </tr>
               ) : (
                 logs.map((l) => {
                   const isEarn = l.transactionType === 'EARN';
-                  const tier = TIER_BADGES[l.customer?.tierName || ''] || TIER_BADGES.BRONZE;
+
                   return (
                     <tr key={l._id} className="hover:bg-stone-50/70 transition-colors">
                       <td className="p-3.5 font-mono font-bold text-stone-400">#{l._id.slice(-6).toUpperCase()}</td>
@@ -677,18 +586,13 @@ export const AdminMembershipsPage: React.FC = () => {
                         </strong>
                         <span className="font-mono text-stone-400 text-[11px]">{l.customer?.phone}</span>
                       </td>
-                      <td className="p-3.5 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] ${tier.cls}`}>
-                          {tier.label}
-                        </span>
-                      </td>
                       <td className="p-3.5">
                         <Badge
                           className={
                             isEarn ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                           }
                         >
-                          {isEarn ? 'Tích điểm (EARN)' : 'Đổi điểm (REDEEM)'}
+                          {{ EARN: 'Tích điểm (EARN)', REDEEM: 'Đổi điểm (REDEEM)', REFUND: 'Hoàn điểm (REFUND)', ADJUST: 'Điều chỉnh (ADJUST)' }[l.transactionType]}
                         </Badge>
                       </td>
                       <td
@@ -749,17 +653,12 @@ export const AdminMembershipsPage: React.FC = () => {
                   {fmtNumber(lookupResult.user.totalPoints)} điểm
                 </strong>
               </div>
-              <div className="flex justify-between">
-                <span className="text-stone-500">Hạng thẻ hiện tại:</span>
-                <strong className="text-amber-800 font-bold">
-                  {TIER_BADGES[lookupResult.user.tierName]?.label || lookupResult.user.tierName}
-                </strong>
-              </div>
+
             </div>
 
             <Field
               label={adjustModal.type === 'add' ? 'Số điểm cộng thêm *' : 'Số điểm trừ/quy đổi *'}
-              column={adjustModal.type === 'add' ? 'points_change > 0 (EARN)' : 'points_change < 0 (REDEEM)'}
+              column="Điều chỉnh điểm (ADJUST)"
             >
               <input
                 type="number"

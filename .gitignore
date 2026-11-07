@@ -1,0 +1,27 @@
+# Installed dependencies and generated output
+node_modules/
+dist/
+dist-ssr/
+coverage/
+.nyc_output/
+.vite/
+*.tsbuildinfo
+
+# Local credentials and environment configuration
+.env
+.env.*
+!.env.example
+!.env.*.example
+.jwt-secret
+
+# Temporary document work, logs and caches
+/tmp/
+/tools/final_document_revision/
+__pycache__/
+*.py[cod]
+**/.npm-cache/
+*.log
+~$*
+*.tmp
+.DS_Store
+Thumbs.db

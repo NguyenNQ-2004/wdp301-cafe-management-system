@@ -21,6 +21,7 @@ interface OrderPerson {
 }
 
 interface OrderItem {
+  costTotal?: number | null;
   productNameAtTime?: string;
   name?: string;
   quantity: number;
@@ -30,6 +31,8 @@ interface OrderItem {
 }
 
 interface Order {
+  costTotal?: number | null;
+  costStatus?: string;
   _id: string;
   orderCode?: string;
   createdAt?: string;
@@ -136,6 +139,22 @@ const customizationText = (value?: OrderItem['customization']) => {
   return value ? Object.entries(value).map(([key, item]) => `${key}: ${item}`).join(', ') : '';
 };
 
+const availableStatuses = (order: Order): OrderStatus[] => {
+  const next: Record<OrderStatus, OrderStatus[]> = {
+    PENDING: ['CONFIRMED', 'PREPARING', 'CANCELLED'],
+    CONFIRMED: ['PREPARING', 'CANCELLED'],
+    PREPARING: ['READY', 'CANCELLED'],
+    READY: ['PREPARING', 'DELIVERING', 'COMPLETED', 'CANCELLED'],
+    DELIVERING: ['READY', 'COMPLETED', 'CANCELLED'],
+    COMPLETED: [], CANCELLED: []
+  };
+  return [order.status, ...next[order.status].filter(status => {
+    if (status === 'DELIVERING') return order.orderType === 'ONLINE';
+    if (status === 'COMPLETED' && order.orderType === 'ONLINE') return order.status === 'DELIVERING';
+    return true;
+  })];
+};
+
 const fetchOrdersPaymentsAndEmployees = async (token: string) => Promise.all([
   shopApi<Order[]>('/api/orders', { token }),
   shopApi<Payment[]>('/api/payments', { token }),
@@ -232,15 +251,16 @@ export const AdminOrdersPage: React.FC<AdminOrdersPageProps> = ({
   const detail = orders.find((order) => order._id === detailId) || null;
   const shippers = employees.filter((employee) => employee.position === 'SHIPPER' && employee.status === 'ACTIVE');
   const completedOrders = orders.filter((order) => order.status === 'COMPLETED');
-  const revenue = completedOrders.reduce((sum, order) => sum + (order.finalAmount || 0), 0);
+  const revenue = completedOrders.filter(order => paymentByOrder.get(order._id)?.status === 'SUCCESS').reduce((sum, order) => sum + (order.finalAmount || 0), 0);
   const activeOrders = orders.filter((order) => !['COMPLETED', 'CANCELLED'].includes(order.status)).length;
 
   const persistOrderUpdate = async (
     order: Order,
-    changes: { status?: OrderStatus; cancelReason?: string; shipperId?: string }
+    changes: { status?: OrderStatus; cancelReason?: string; shipperId?: string | null }
   ) => {
+    if (updatingOrderId || !token) return;
     const status = changes.status || order.status;
-    if (status === order.status && !changes.shipperId) return;
+    if (status === order.status && changes.shipperId === undefined) return;
     let cancelReason: string | undefined;
     if (changes.status === 'CANCELLED') {
       const reason = window.prompt('Nhập lý do hủy đơn:');
@@ -267,11 +287,11 @@ export const AdminOrdersPage: React.FC<AdminOrdersPageProps> = ({
           ...item,
           status,
           ...(cancelReason ? { cancelReason } : {}),
-          ...(changes.shipperId ? { shipper: shippers.find((shipper) => shipper._id === changes.shipperId) || item.shipper } : {})
+          ...(changes.shipperId !== undefined ? { shipper: shippers.find((shipper) => shipper._id === changes.shipperId) || null } : {})
         }
         : item));
-      const message = changes.shipperId
-        ? `Đã gán shipper cho đơn ${order.orderCode || ''}.`
+      const message = changes.shipperId !== undefined
+        ? `${changes.shipperId ? 'Đã gán' : 'Đã bỏ gán'} shipper cho đơn ${order.orderCode || ''}.`
         : `Đã cập nhật đơn ${order.orderCode || ''} thành "${STATUS_LABEL[status]}".`;
       setNotice(message);
       if (onShowToast) onShowToast(message);
@@ -288,7 +308,7 @@ export const AdminOrdersPage: React.FC<AdminOrdersPageProps> = ({
   };
 
   const updateStatus = (order: Order, status: OrderStatus) => persistOrderUpdate(order, { status });
-  const updateShipper = (order: Order, shipperId: string) => persistOrderUpdate(order, { shipperId });
+  const updateShipper = (order: Order, shipperId: string | null) => persistOrderUpdate(order, { shipperId });
 
   const openBill = (order: Order) => {
     if (onOpenBill) {
@@ -463,6 +483,7 @@ export const AdminOrdersPage: React.FC<AdminOrdersPageProps> = ({
             </div>
 
             <div className="flex flex-col gap-4 border-t border-stone-100 pt-4 sm:flex-row sm:items-end sm:justify-between">
+              <div className="text-xs text-stone-600">Giá vốn đã chốt: <b>{detail.costTotal != null ? formatMoney(detail.costTotal) : detail.costStatus === 'MISSING_PRICE' ? 'Thiếu giá nguyên liệu khi xuất kho' : 'Chưa có dữ liệu giá vốn'}</b><p className="mt-1">Giá vốn được lưu theo lô khi bắt đầu pha chế.</p></div>
               <div className="space-y-2">
                 <label htmlFor="order-status" className="block text-xs font-bold text-stone-700">Cập nhật trạng thái</label>
                 <select
@@ -472,7 +493,7 @@ export const AdminOrdersPage: React.FC<AdminOrdersPageProps> = ({
                   disabled={updatingOrderId === detail._id}
                   onChange={(event) => void updateStatus(detail, event.target.value as OrderStatus)}
                 >
-                  {STATUSES.map((status) => <option key={status} value={status}>{STATUS_LABEL[status]}</option>)}
+                  {availableStatuses(detail).map((status) => <option key={status} value={status}>{STATUS_LABEL[status]}</option>)}
                 </select>
                 {detail.orderType === 'ONLINE' && (
                   <div className="space-y-2">
@@ -481,9 +502,9 @@ export const AdminOrdersPage: React.FC<AdminOrdersPageProps> = ({
                       id="order-shipper"
                       className={`${inputCls} min-w-48`}
                       value={detail.shipper?._id || ''}
-                      disabled={updatingOrderId === detail._id || shippers.length === 0}
+                      disabled={updatingOrderId === detail._id || ['COMPLETED', 'CANCELLED', 'DELIVERING'].includes(detail.status)}
                       onChange={(event) => {
-                        if (event.target.value) void updateShipper(detail, event.target.value);
+                        void updateShipper(detail, event.target.value || null);
                       }}
                     >
                       <option value="">{shippers.length ? 'Chưa phân công' : 'Không có shipper đang hoạt động'}</option>

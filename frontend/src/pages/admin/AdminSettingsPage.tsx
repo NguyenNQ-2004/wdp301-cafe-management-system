@@ -107,19 +107,7 @@ async function getSettings(token: string) {
 
 async function getSettingsWithDefaults(token: string) {
   const current = await getSettings(token);
-  const currentValues = current.settings || {};
-  const missingDefaults = Object.fromEntries(
-    Object.entries(DEFAULT_SETTINGS).filter(([key]) => !(key in currentValues))
-  );
-
-  if (Object.keys(missingDefaults).length === 0) return current;
-
-  await shopApi<SettingsResponse>('/api/shop-settings', {
-    method: 'PUT',
-    token,
-    body: missingDefaults
-  });
-  return getSettings(token);
+  return { ...current, settings: { ...DEFAULT_SETTINGS, ...current.settings } };
 }
 
 function validateSetting(definition: SettingDefinition | undefined, key: string, rawValue: string): string | null {
@@ -172,7 +160,7 @@ export const AdminSettingsPage: React.FC = () => {
 
   const loadSettings = useCallback(async () => {
     if (!token) throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-    const data = await getSettings(token);
+    const data = await getSettingsWithDefaults(token);
     const loaded = normalizeSettings(data);
     setSettings(loaded.values);
     setSavedSettings(loaded.values);

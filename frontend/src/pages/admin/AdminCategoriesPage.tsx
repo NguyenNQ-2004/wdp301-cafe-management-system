@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
+import ImageInput from '../../components/ImageInput';
 import type { PageRoute, Category, ActiveStatus } from '../../types';
 import { useDb } from '../../data/DbContext';
+import { shopApi } from '../../lib/shopApi';
+import useAuthStore from '../../store/authStore';
 import { AdminLayout, Badge, Field, PrimaryButton, StatCard, inputCls } from './AdminUi';
 
 interface AdminCategoriesPageProps {
@@ -24,7 +27,9 @@ const ICONS = [
 ];
 
 export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavigate = () => {}, onShowToast }) => {
-  const { db, transact } = useDb();
+  const { db, refresh } = useDb();
+  const token = useAuthStore(state => state.user?.token);
+  const [saving, setSaving] = useState(false);
   const [selectedId, setSelectedId] = useState<any>(null);
   const [form, setForm] = useState<CategoryForm>(EMPTY);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -71,9 +76,11 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
     setIsFormOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving || !token) return;
     const name = form.name.trim();
+    if (!name) { showToast('Vui lòng nhập tên danh mục.'); return; }
     if (
       db.categories.some(
         c =>
@@ -92,35 +99,46 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
       image_url: form.image_url?.trim() || null,
       status: form.status
     };
-    if (selectedId) {
-      transact(tx => tx.update('categories', selectedId, row));
-      showToast(`Đã cập nhật danh mục "${name}".`);
-    } else {
-      const created = transact(tx => tx.insert('categories', row));
-      setSelectedId(created.id);
-      showToast(`Đã tạo danh mục "${name}".`);
-    }
-    setIsFormOpen(false);
+    setSaving(true);
+    try {
+      await shopApi(selectedId ? `/api/categories/${selectedId}` : '/api/categories', { token, method: selectedId ? 'PUT' : 'POST', body: row });
+      await refresh();
+      showToast(selectedId ? `Đã cập nhật danh mục "${name}".` : `Đã tạo danh mục "${name}".`);
+      setIsFormOpen(false);
+    } catch (error) { showToast((error as Error).message); }
+    finally { setSaving(false); }
   };
 
-  const handleDelete = (c: Category) => {
+  const handleDelete = async (c: Category) => {
+    if (saving || !token) return;
     if (productCount(c.id) > 0) {
       showToast('Không thể xóa: danh mục đang có sản phẩm (ràng buộc fk_product_category).');
       return;
     }
     if (!confirm(`Xóa danh mục "${c.name}"?`)) return;
-    transact(tx => tx.remove('categories', c.id));
-    if (selectedId === c.id) select(null);
-    showToast('Đã xóa danh mục.');
+    setSaving(true);
+    try {
+      await shopApi(`/api/categories/${c.id}`, { token, method: 'DELETE' });
+      await refresh();
+      if (selectedId === c.id) select(null);
+      showToast('Đã xóa danh mục.');
+    } catch (error) { showToast((error as Error).message); }
+    finally { setSaving(false); }
   };
 
-  const toggleStatus = (c: Category) => {
+  const toggleStatus = async (c: Category) => {
+    if (saving || !token) return;
     const status: ActiveStatus = c.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-    transact(tx => tx.update('categories', c.id, { status }));
-    if (String(c.id) === String(selectedId) || String(c._id) === String(selectedId)) {
-      setForm(f => ({ ...f, status }));
-    }
-    showToast(`Đã chuyển trạng thái sang "${status}".`);
+    setSaving(true);
+    try {
+      await shopApi(`/api/categories/${c.id}`, { token, method: 'PUT', body: { status } });
+      await refresh();
+      if (String(c.id) === String(selectedId) || String(c._id) === String(selectedId)) {
+        setForm(f => ({ ...f, status }));
+      }
+      showToast(`Đã chuyển trạng thái sang "${status}".`);
+    } catch (error) { showToast((error as Error).message); }
+    finally { setSaving(false); }
   };
 
   // Filter categories by search and status
@@ -378,14 +396,8 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
                 />
               </Field>
 
-              <Field label="Ảnh đại diện (URL)" column="image_url">
-                <input
-                  maxLength={500}
-                  value={form.image_url ?? ''}
-                  onChange={e => setForm({ ...form, image_url: e.target.value })}
-                  className={inputCls}
-                  placeholder="https://example.com/image.jpg"
-                />
+              <Field label="Ảnh đại diện" column="image_url">
+                <ImageInput value={form.image_url ?? ''} onChange={image_url => setForm({ ...form, image_url })} className={inputCls} />
               </Field>
 
               <Field label="Trạng thái" column="status">
@@ -409,6 +421,7 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
                 </button>
                 <button
                   type="submit"
+                  disabled={saving}
                   className="px-5 py-2.5 bg-[#800020] hover:bg-[#68001a] text-white font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[16px]">check</span>

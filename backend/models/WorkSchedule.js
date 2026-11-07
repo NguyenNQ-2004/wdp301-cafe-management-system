@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 const workScheduleSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   workDate: { type: Date, required: true },
-  shiftName: { type: String, enum: ['MORNING', 'AFTERNOON', 'EVENING'], required: true },
+  shiftName: { type: String, trim: true, maxlength: 50, required: true },
+  shift: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkShift' },
   checkInTime: { type: Date },
   checkOutTime: { type: Date },
   startingCash: { type: Number },
@@ -13,6 +14,8 @@ const workScheduleSchema = new mongoose.Schema({
   handoverUnattributedCash: { type: Number, min: 0 },
   handoverUnattributedCount: { type: Number, min: 0 },
   handoverAt: { type: Date },
+  remittanceId: String,
+  codPaymentIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Payment' }],
   handoverNote: { type: String, maxlength: 500 },
   status: { type: String, enum: ['SCHEDULED', 'PRESENT', 'ABSENT', 'COMPLETED'], default: 'SCHEDULED' },
   note: { type: String }

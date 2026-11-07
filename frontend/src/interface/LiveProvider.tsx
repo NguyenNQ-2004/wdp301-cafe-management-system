@@ -3,6 +3,9 @@ import type { ReactNode } from 'react';
 import useAuthStore from '../store/authStore';
 import { shopApi, ShopApiError } from '../lib/shopApi';
 import { groupOrderItems } from '../lib/cartOptions';
+import { normalizeProductBadge } from '../lib/productBadge';
+import { executeKitchenCommand } from '../lib/kitchenWorkflow';
+import type { KitchenCommand } from '../lib/kitchenWorkflow';
 import type { DbState, IdTable, Row, Order, OrderStatus, OrderType, OrderCustomization } from './types';
 
 type RecordData = Record<string, any>;
@@ -30,14 +33,15 @@ interface Session { customerId: number; cashierId: number; baristaId: number; sh
 interface Value {
   db: DbState; session: Session; loading: boolean; busy: boolean; revision: number;
   error: string; notice: string; unavailable: string[];
-  refresh: () => Promise<void>; notify: (message: string) => void;
+  refresh: (options?: { silent?: boolean }) => Promise<void>; notify: (message: string) => void;
+  updatePreparation: (command: KitchenCommand) => Promise<boolean>;
   rawId: (id: number) => string; idFor: (table: string, value: unknown) => number;
   setSession: (patch: Partial<Session>) => void;
   transact: <R>(fn: (tx: Tx) => R) => R;
   placeOrder: (input: PlaceOrderInput) => Promise<Order>;
   setOrderStatus: (id: number, status: OrderStatus, patch?: Partial<Order>) => void;
   cancelOrder: (id: number, reason: string) => Promise<boolean>;
-  saveDeliveryOrder: (id: number, body: { status: OrderStatus; shipperId?: number | null; cancelReason?: string; orderNote?: string }) => Promise<boolean>;
+  saveDeliveryOrder: (id: number, body: { status: OrderStatus; shipperId?: number | null; cancelReason?: string; orderNote?: string; collectedAmount?: number }) => Promise<boolean>;
   remitCod: (scheduleId: number, cash: number, note: string) => Promise<boolean>;
   adjustPoints: (id: number, delta: number) => void;
 }
@@ -84,7 +88,7 @@ export function DbProvider({ children }: { children: ReactNode }) {
     for (const key of ['created_at', 'updated_at', 'paid_at', 'check_in_time', 'check_out_time']) row[key] = sqlDate(row[key]);
     if (table === 'users') Object.assign(row, { full_name: raw.fullName || raw.full_name || '', phone: raw.phone || '', email: raw.email || null, birthday: raw.birthday?.slice(0, 10) || null, address: raw.address || null, password_hash: '', role: raw.role || 'CUSTOMER', status: raw.status || 'ACTIVE', position: raw.position || null, base_salary: raw.baseSalary || 0, hire_date: raw.hireDate?.slice(0, 10) || null, total_points: raw.totalPoints || 0 });
     if (table === 'categories') Object.assign(row, { status: raw.status || 'ACTIVE', image_url: raw.image_url || raw.imageUrl || null, description: raw.description || null, icon: raw.icon || null });
-    if (table === 'products') Object.assign(row, { category_id: idFor('categories', raw.category), base_price: raw.basePrice || 0, image_url: raw.imageUrl || null, is_available: raw.isAvailable !== false, variants_config: { sizes: raw.variantsConfig?.sizes || { M: 0 }, toppings: raw.variantsConfig?.toppings || [] }, description: raw.description || null });
+    if (table === 'products') Object.assign(row, { category_id: idFor('categories', raw.category), base_price: raw.basePrice || 0, image_url: raw.imageUrl || null, is_available: raw.isAvailable !== false, badge: normalizeProductBadge(raw.badge), total_sold: raw.totalSold ?? 0, variants_config: { sizes: raw.variantsConfig?.sizes || { M: 0 }, toppings: raw.variantsConfig?.toppings || [] }, description: raw.description || null });
     if (table === 'orders') Object.assign(row, { customer_id: idFor('users', raw.customer) || null, cashier_id: idFor('users', raw.cashier) || null, shipper_id: idFor('users', raw.shipper) || null, recipient_name: raw.recipientName || '', recipient_phone: raw.recipientPhone || '', delivery_address: raw.deliveryAddress || '', order_note: raw.orderNote || null, table_number: raw.tableNumber || null, cancel_reason: raw.cancelReason || null });
     if (table === 'payments' || table === 'customer_reviews' || table === 'loyalty_transactions') row.order_id = idFor('orders', raw.order) || null;
     if (table === 'customer_reviews' || table === 'loyalty_transactions') row.customer_id = idFor('users', raw.customer);
@@ -96,16 +100,16 @@ export function DbProvider({ children }: { children: ReactNode }) {
     return row;
   }, [idFor]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (options?: { silent?: boolean }) => {
     const version = ++generation.current;
-    setLoading(true);
+    if (!options?.silent) setLoading(true);
     const requests: [keyof DbState | 'self', string][] = [['categories', '/api/categories'], ['products', '/api/products'], ['shop_settings', '/api/shop-settings']];
     if (user?.token) {
       requests.push(['self', '/api/auth/me'], ['orders', '/api/orders'], ['loyalty_transactions', '/api/loyalty-transactions']);
       if (user.role === 'ADMIN') {
         requests.push(['users', '/api/users'], ['ingredients', '/api/ingredients'], ['suppliers', '/api/suppliers'], ['product_ingredients', '/api/product-ingredients'], ['purchase_orders', '/api/purchase-orders'], ['inventory_transactions', '/api/inventory-transactions']);
       } else if (user.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user.position || '')) requests.push(['users', '/api/users/customers']);
-      if (user.role === 'ADMIN' || ['CASHIER', 'MANAGER'].includes(user.position || '')) requests.push(['payments', '/api/payments']);
+      if (user.role === 'ADMIN' || ['CASHIER', 'MANAGER', 'SHIPPER'].includes(user.position || '')) requests.push(['payments', '/api/payments']);
       if (user.role !== 'CUSTOMER') {
         const day = new Date(); day.setDate(day.getDate() - (day.getDay() + 6) % 7);
         const monday = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
@@ -125,10 +129,16 @@ export function DbProvider({ children }: { children: ReactNode }) {
         next.shop_settings = (body.list || Object.entries(body.settings || {}).map(([key, value]) => ({ settingKey: key, settingValue: value }))).map((s: RecordData) => ({ setting_key: s.settingKey, setting_value: String(s.settingValue), updated_at: sqlDate(s.updatedAt) || '' }));
         continue;
       }
-      const rows: RecordData[] = Array.isArray(body) ? body : body.customers || body.list || [];
+      const rows: RecordData[] = Array.isArray(body) ? body : body.customers || body.transactions || body.list || [];
       const records = rows.filter(row => table !== 'orders' || user?.role !== 'CUSTOMER' || String(typeof row.customer === 'object' ? row.customer?._id : row.customer) === user._id);
       (next[table] as any[]) = records.map(row => normalize(table, row));
       if (table === 'users') for (const person of next.users) users.set(person.id, person);
+      if (table === 'purchase_orders') records.forEach(order => {
+        (order.items || []).forEach((item: RecordData, index: number) => next.purchase_order_items.push({
+          id: idFor('purchase_order_items', `${order._id}:${index}`), po_id: idFor('purchase_orders', order),
+          ingredient_id: idFor('ingredients', item.ingredient), quantity: item.quantity, unit_price: item.unitPrice
+        }));
+      });
       if (table === 'orders') records.forEach(order => {
         for (const key of ['customer', 'cashier', 'shipper']) if (order[key] && typeof order[key] === 'object') { const person = normalize('users', order[key]); if (!users.has(person.id)) users.set(person.id, person); }
         (order.items || []).forEach((item: RecordData, index: number) => {
@@ -164,7 +174,7 @@ export function DbProvider({ children }: { children: ReactNode }) {
       if (Object.keys(data).some(key => key !== 'is_prepared')) throw new Error('Chức năng sửa món của đơn hàng chưa có API hỗ trợ.');
       const location = items.current.get(id!);
       if (!location || action !== 'PUT') throw new Error('Không tìm thấy món trong đơn hàng.');
-      await shopApi(`/api/orders/${location.order}/items/${location.index}/prepared`, { method: 'PUT', token: user.token, body: { isPrepared: data.is_prepared } }); return;
+      await shopApi(`/api/orders/${location.order}/items/${location.index}/prepared`, { method: 'PUT', token: user.token, body: { isPrepared: data.is_prepared, autoReady: false } }); return;
     }
     let endpoint = PATHS[table];
     const body: RecordData = Object.fromEntries(Object.entries(data).filter(([key]) => !['id', 'password_hash', 'created_at', 'updated_at'].includes(key)).map(([key, value]) => [camel(key), value]));
@@ -205,13 +215,12 @@ export function DbProvider({ children }: { children: ReactNode }) {
   const placeOrder = async (input: PlaceOrderInput): Promise<Order> => {
     if (!user?.token) throw new Error('Vui lòng đăng nhập để tạo đơn.');
     if (inFlight.current) throw new Error('Vui lòng chờ thao tác hiện tại hoàn tất.');
-    if (input.points_to_redeem) throw new Error('Đổi điểm tại quầy hiện chưa khả dụng.');
-    if (input.items.some(item => item.customization?.topping?.length)) throw new Error('Đặt thêm topping hiện chưa khả dụng. Vui lòng bỏ topping để tiếp tục.');
-    const orderItems = groupOrderItems(input.items.map(item => ({ productId: rawId(item.product_id), quantity: item.quantity, size: item.customization?.size || 'M' })));
+    const orderItems = groupOrderItems(input.items.map(item => ({ productId: rawId(item.product_id), quantity: item.quantity, size: item.customization?.size || 'M', customization: item.customization || undefined })));
     inFlight.current++; setPending(inFlight.current); setError('');
     try {
     const result = await shopApi<RecordData>('/api/orders', { method: 'POST', token: user.token, body: {
       items: orderItems,
+      pointsToRedeem: input.points_to_redeem,
       orderType: input.order_type, customerId: input.customer_id ? rawId(input.customer_id) : undefined,
       recipientName: input.recipient_name, recipientPhone: input.recipient_phone, deliveryAddress: input.delivery_address,
       tableNumber: input.table_number, orderNote: [input.order_note, ...input.items.filter(item => item.customization).map(item => `${item.quantity} x ${dbRef.current.products.find(product => product.id === item.product_id)?.name || ''} (${item.customization?.size || 'M'}): ${[item.customization?.sugar && `đường ${item.customization.sugar}`, item.customization?.ice, item.customization?.note].filter(Boolean).join(', ')}`)].filter(Boolean).join('; '), paymentMethod: input.order_type === 'ONLINE' ? 'COD' : 'PAY_AT_COUNTER',
@@ -242,7 +251,7 @@ export function DbProvider({ children }: { children: ReactNode }) {
       inFlight.current--; setPending(inFlight.current);
     }
   };
-  const saveDeliveryOrder = async (id: number, body: { status: OrderStatus; shipperId?: number | null; cancelReason?: string; orderNote?: string }): Promise<boolean> => {
+  const saveDeliveryOrder = async (id: number, body: { status: OrderStatus; shipperId?: number | null; cancelReason?: string; orderNote?: string; collectedAmount?: number }): Promise<boolean> => {
     if (!user?.token || !dbRef.current.orders.some(item => item.id === id)) return false;
     inFlight.current++; setPending(inFlight.current); setError(''); setNotice('');
     try {
@@ -267,11 +276,32 @@ export function DbProvider({ children }: { children: ReactNode }) {
     } finally { inFlight.current--; setPending(inFlight.current); }
   };
   const sessionId = user ? idFor('users', user._id) : 0;
+  const updatePreparation = async (command: KitchenCommand): Promise<boolean> => {
+    if (!user?.token || inFlight.current) return false;
+    const token = user.token;
+    inFlight.current++; setPending(inFlight.current); setError(''); setNotice('');
+    try {
+      const message = await executeKitchenCommand(command, {
+        orders: dbRef.current.orders, items: dbRef.current.order_items, rawId,
+        location: id => items.current.get(id),
+        send: (path, body) => {
+          if (useAuthStore.getState().user?.token !== token) throw new Error('Phiên đăng nhập đã thay đổi.');
+          return shopApi(path, { method: 'PUT', token, body });
+        }
+      });
+      await refresh({ silent: true }); setNotice(message); return true;
+    } catch (failure) {
+      // A batch can have saved earlier items: reload their real server state.
+      await refresh({ silent: true });
+      setError(failure instanceof Error ? failure.message : 'Không cập nhật được pha chế. Vui lòng thử lại.');
+      return false;
+    } finally { inFlight.current--; setPending(inFlight.current); }
+  };
   const session = useMemo(() => ({ customerId: sessionId, cashierId: sessionId, baristaId: sessionId, shipperId: sessionId, adminId: sessionId }), [sessionId]);
   return <Context.Provider value={{ db, session, loading, busy: pending > 0, revision, error, notice, unavailable, refresh, notify, rawId, idFor, setSession: () => {}, transact, placeOrder,
     setOrderStatus: (id, status, patch = {}) => { transact(tx => tx.update('orders', id, { ...patch, status })); },
-    cancelOrder, saveDeliveryOrder, remitCod,
-    adjustPoints: (id, delta) => { perform(async () => { await shopApi('/api/loyalty-transactions/adjust', { method: 'POST', token: user?.token, body: { customerId: rawId(id), points: delta, reason: 'Điều chỉnh điểm tại quầy' } }); }); },
+    cancelOrder, saveDeliveryOrder, remitCod, updatePreparation,
+    adjustPoints: (id, delta) => { perform(async () => { await shopApi('/api/loyalty-transactions/adjust', { method: 'POST', token: user?.token, body: { customerId: rawId(id), pointsChange: delta, reason: 'Điều chỉnh điểm tại quầy' } }); }); },
   }}>{children}</Context.Provider>;
 }
 

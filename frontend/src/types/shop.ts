@@ -8,7 +8,7 @@ export interface CatalogProduct {
   imageUrl?: string;
   isAvailable?: boolean;
   category?: { _id: string; name: string };
-  variantsConfig?: { sizes?: Record<string, number> };
+  variantsConfig?: { sizes?: Record<string, number>; toppings?: { name: string; price: number }[] };
 }
 
 export interface CartItem {
@@ -34,6 +34,7 @@ export interface RewardOffer {
 }
 
 export interface LoyaltySummary {
+  rules?: { points_step: number; points_step_value: number; points_earn_unit: number };
   totalPoints: number;
   canRedeem: boolean;
   rewards: RewardOffer[];

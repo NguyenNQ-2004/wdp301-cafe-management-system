@@ -23,16 +23,13 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentRoute, activePath, onNavigate }) => {
+export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentRoute, activePath }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
 
-  const handleNav = (pageRoute: PageRoute, path: string) => {
+  const handleNav = (path: string) => {
     navigate(path);
-    if (onNavigate) {
-      onNavigate(pageRoute);
-    }
   };
 
   const navGroups: NavGroup[] = [
@@ -57,7 +54,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentRoute, active
       items: [
         { route: 'admin-ingredients', path: '/admin/ingredients', pageRoute: 'admin-ingredients', label: 'Nguyên liệu', icon: 'inventory_2', table: 'ingredients' },
         { route: 'admin-inventory', path: '/admin/inventory', pageRoute: 'admin-inventory', label: 'Tồn kho & Xuất nhập', icon: 'warehouse', table: 'inventory_transactions' },
-        { route: 'admin-restock', path: '/admin/restock', pageRoute: 'admin-restock', label: 'Đề xuất nhập hàng', icon: 'assignment', table: 'purchase_orders' },
+        { route: 'admin-restock', path: '/admin/restock-requests', pageRoute: 'admin-restock', label: 'Đề xuất nhập hàng', icon: 'assignment' },
         { route: 'admin-suppliers', path: '/admin/suppliers', pageRoute: 'admin-suppliers', label: 'Nhà cung cấp', icon: 'store', table: 'suppliers' },
         { route: 'admin-purchases', path: '/admin/purchases', pageRoute: 'admin-purchases', label: 'Phiếu nhập hàng', icon: 'receipt', table: 'purchase_orders' },
       ]
@@ -69,19 +66,21 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentRoute, active
         { route: 'admin-shifts', path: '/admin/shifts', pageRoute: 'admin-shifts', label: 'Khung giờ ca', icon: 'schedule', table: 'work_shifts' },
         { route: 'admin-schedules', path: '/admin/schedules', pageRoute: 'admin-schedules', label: 'Lịch phân ca', icon: 'calendar_month', table: 'work_schedules' },
         { route: 'admin-attendance', path: '/admin/attendance', pageRoute: 'admin-attendance', label: 'Chấm công', icon: 'how_to_reg', table: 'attendance' },
+        { route: 'admin-handover', path: '/admin/handovers', pageRoute: 'admin-handover', label: 'Lịch sử bàn giao ca', icon: 'assignment_turned_in' },
       ]
     },
     {
       title: 'KHÁCH HÀNG & HỘI VIÊN',
       items: [
         { route: 'admin-customers', path: '/admin/customers', pageRoute: 'admin-customers', label: 'Khách hàng (CRM)', icon: 'group', table: 'users (role=CUSTOMER)' },
-        { route: 'admin-loyalty', path: '/admin/memberships', pageRoute: 'admin-loyalty', label: 'Tích điểm & Hạng thẻ', icon: 'loyalty', table: 'loyalty_transactions' },
+        { route: 'admin-loyalty', path: '/admin/memberships', pageRoute: 'admin-loyalty', label: 'Tích điểm theo SĐT', icon: 'loyalty', table: 'loyalty_transactions' },
         { route: 'admin-complaints', path: '/admin/complaints', pageRoute: 'admin-complaints', label: 'Đánh giá & Khiếu nại', icon: 'feedback', table: 'customer_reviews' },
       ]
     },
     {
       title: 'HỆ THỐNG',
       items: [
+        { route: 'admin-delivery-areas', path: '/admin/delivery-areas', pageRoute: 'admin-delivery-areas' as any, label: 'Khu vực & Phí giao (UC71)', icon: 'local_shipping', table: 'delivery_areas' },
         { route: 'admin-settings', path: '/admin/settings', pageRoute: 'admin-settings', label: 'Cài đặt cửa hàng', icon: 'settings', table: 'shop_settings' },
       ]
     }
@@ -126,7 +125,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentRoute, active
                     <button
                       key={item.route}
                       type="button"
-                      onClick={() => handleNav(item.pageRoute, item.path)}
+                      onClick={() => handleNav(item.path)}
                       title={item.table ? `Thao tác với bảng: ${item.table}` : item.label}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left font-medium transition-colors cursor-pointer text-xs ${
                         isActive

@@ -1,14 +1,17 @@
 import type { CartItem, CatalogProduct } from '../types/shop';
+import { repairDisplayData, repairDisplayText } from './displayText';
 
-const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+export const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
 
 export class ShopApiError extends Error {
   readonly status: number;
+  readonly data?: Record<string, unknown>;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, data?: Record<string, unknown>) {
     super(message);
     this.name = 'ShopApiError';
     this.status = status;
+    this.data = data;
   }
 }
 
@@ -21,31 +24,35 @@ export async function shopApi<T>(path: string, options: { method?: string; token
     },
     body: options.body ? JSON.stringify(options.body) : undefined
   });
-  const data = await response.json().catch(() => null);
-  if (!response.ok) throw new ShopApiError(data?.message || (response.status === 404 ? 'API cho chức năng này chưa được kết nối (404).' : 'Không kết nối được với máy chủ.'), response.status);
+  const data = repairDisplayData(await response.json().catch(() => null));
+  if (!response.ok) throw new ShopApiError(data?.message || (response.status === 404 ? 'API cho chức năng này chưa được kết nối (404).' : 'Không kết nối được với máy chủ.'), response.status, data);
   return data as T;
 }
 
 export const formatVnd = (amount: number) => `${new Intl.NumberFormat('vi-VN').format(amount)}đ`;
 
-export const cartIdFor = (productId: string, size: string) => `${productId}:${size}`;
+export const cartIdFor = (productId: string, size: string, options?: CartItem['customization']) => {
+  const suffix = options ? JSON.stringify([options.sugar || '', options.ice || '', options.note?.trim() || '', (options.topping || []).map(repairDisplayText).sort()]) : '';
+  return `${productId}:${size}${suffix && suffix !== '["","","",[]]' ? ':' + suffix : ''}`;
+};
 
-export function productToCartItem(product: CatalogProduct, size = 'M'): CartItem {
+export function productToCartItem(product: CatalogProduct, size = 'M', customization?: CartItem['customization']): CartItem {
   return {
-    cartId: cartIdFor(product._id, size),
+    cartId: cartIdFor(product._id, size, customization),
     productId: product._id,
     name: product.name,
     image: product.imageUrl || '',
     categoryTitle: product.category?.name || 'Aura Café',
     size,
-    unitPrice: product.basePrice + (product.variantsConfig?.sizes?.[size] || 0),
+    unitPrice: product.basePrice + (product.variantsConfig?.sizes?.[size] || 0) + (customization?.topping || []).reduce((sum, name) => sum + (product.variantsConfig?.toppings?.find(item => item.name === name || repairDisplayText(item.name) === repairDisplayText(name))?.price || 0), 0),
+    ...(customization ? { customization } : {}),
     quantity: 1,
     checked: true
   };
 }
 
-export const cartPayload = (items: CartItem[]) => items.map(({ productId, quantity, size, checked }) => ({
-  productId, quantity, size, checked
+export const cartPayload = (items: CartItem[]) => items.map(({ productId, quantity, size, checked, customization }) => ({
+  productId, quantity, size, checked, ...(customization ? { customization } : {})
 }));
 
 export function mergeCartItems(first: CartItem[], second: CartItem[]): CartItem[] {
