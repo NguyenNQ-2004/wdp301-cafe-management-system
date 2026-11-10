@@ -73,12 +73,15 @@ cd backend
 # Cài đặt thư viện (nếu chưa cài)
 npm install
 
+# Bật MongoDB replica set local trước khi chạy API (cần cài MongoDB Server)
+npm run db:local-replica
+
 # Khởi chạy server ở chế độ Development (tự động reload khi code thay đổi)
 npm run dev
 ```
 > 👉 Server Backend sẽ khởi chạy tại: **http://localhost:5000**
 > 
-> **Lưu ý quan trọng**: Ở lần đầu tiên khởi chạy, hãy mở trình duyệt và truy cập vào đường link [http://localhost:5000/api/seed](http://localhost:5000/api/seed). Hệ thống sẽ tự động tạo cơ sở dữ liệu `aura_cafe_erp` và tài khoản Admin mẫu để hiển thị trên MongoDB Compass.
+> **Khởi tạo dữ liệu mẫu (tùy chọn)**: `seed.js` sẽ xóa dữ liệu hiện có. Nếu cần dữ liệu mẫu, hãy xem mục “Tài khoản mẫu cho môi trường local” bên dưới và chạy script thủ công.
 
 ### Bước 2: Khởi chạy Frontend (Giao diện React)
 Mở Terminal 2 (đứng ở thư mục gốc dự án) và chạy các lệnh sau:
@@ -97,11 +100,10 @@ npm run dev
 
 ---
 
-## 👤 Tài khoản mặc định (Dữ liệu mẫu)
-Sau khi chạy lệnh `/api/seed` ở Backend, bạn có thể đăng nhập bằng tài khoản Quản trị viên sau:
-- **Tài khoản (SĐT)**: `0900000001`
-- **Mật khẩu**: `123456`
-- **Vai trò (Role)**: ADMIN
+## 👤 Tài khoản mẫu cho môi trường local
+`backend/seed.js` chỉ chạy ở local sau khi bật xác nhận phá hủy dữ liệu; script xóa dữ liệu hiện có trước khi tạo dữ liệu mẫu. Trong PowerShell, vào thư mục `backend`, đặt `$env:ALLOW_DESTRUCTIVE_SEED = "true"`, rồi chạy `node seed.js`. Mật khẩu mặc định của sáu tài khoản mẫu là `123456`. Có thể thay bằng `$env:SEED_USER_PASSWORD = "<mat-khau-rieng>"` (ít nhất 6 ký tự) trước khi chạy.
+
+Tài khoản Admin mẫu dùng Gmail `auracafe.admin.demo@gmail.com` hoặc số điện thoại `0900000001`. Các Gmail mẫu trong `seed.js` chỉ là tên đăng nhập, không phải hộp thư đã được xác minh để nhận email. Không dùng mật khẩu mẫu trên môi trường triển khai.
 
 Giỏ hàng được lưu trong MongoDB khi đăng nhập. Khách chưa đăng nhập có thể thêm món vào giỏ trên trình duyệt, sau đó đăng nhập để đồng bộ và đặt hàng. Đơn giao tận nơi thanh toán khi nhận hàng; đơn mang đi thanh toán tại quầy.
 

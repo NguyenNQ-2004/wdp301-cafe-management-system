@@ -2,7 +2,10 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const bcrypt = require('bcryptjs');
 
-dotenv.config();
+dotenv.config();
+
+// Sample accounts use a local-only default unless a custom seed password is supplied.
+const seedPassword = process.env.SEED_USER_PASSWORD || '123456';
 
 // K├⌐o to├án bß╗Ö 16 Model v├áo
 const User = require('./models/User');
@@ -59,8 +62,7 @@ const importData = async () => {
     ]);
 
     const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash('123456', salt);
-
+    const passwordHash = await bcrypt.hash(seedPassword, salt);
     // ==========================================
     // 1. USERS (6 Users)
     // ==========================================
@@ -69,7 +71,7 @@ const importData = async () => {
       {
         fullName: 'Aura Admin',
         phone: '0900000001',
-        email: 'admin@auracafe.vn',
+        email: 'auracafe.admin.demo@gmail.com',
         passwordHash,
         role: 'ADMIN',
         status: 'ACTIVE',
@@ -82,7 +84,7 @@ const importData = async () => {
       {
         fullName: 'Nguyen Van An',
         phone: '0900000002',
-        email: 'an@auracafe.vn',
+        email: 'auracafe.an.demo@gmail.com',
         passwordHash,
         role: 'STAFF',
         status: 'ACTIVE',
@@ -95,7 +97,7 @@ const importData = async () => {
       {
         fullName: 'Tran Thi Binh',
         phone: '0900000003',
-        email: 'binh@auracafe.vn',
+        email: 'auracafe.binh.demo@gmail.com',
         passwordHash,
         role: 'STAFF',
         status: 'ACTIVE',
@@ -108,7 +110,7 @@ const importData = async () => {
       {
         fullName: 'Le Minh Anh',
         phone: '0900000004',
-        email: 'anh@gmail.com',
+        email: 'auracafe.anh.demo@gmail.com',
         passwordHash,
         role: 'CUSTOMER',
         status: 'ACTIVE',
@@ -118,7 +120,7 @@ const importData = async () => {
       {
         fullName: 'Pham Quang Huy',
         phone: '0900000005',
-        email: 'huy@gmail.com',
+        email: 'auracafe.huy.demo@gmail.com',
         passwordHash,
         role: 'CUSTOMER',
         status: 'ACTIVE',
@@ -128,7 +130,7 @@ const importData = async () => {
       {
         fullName: 'Hoang Van Nam',
         phone: '0900000006',
-        email: 'nam@auracafe.vn',
+        email: 'auracafe.nam.demo@gmail.com',
         passwordHash,
         role: 'STAFF',
         status: 'ACTIVE',
@@ -874,4 +876,13 @@ const importData = async () => {
   }
 };
 
-connectDB().then(importData);
+if (process.env.NODE_ENV === 'production' || process.env.ALLOW_DESTRUCTIVE_SEED !== 'true') {
+  console.error('Local seed requires ALLOW_DESTRUCTIVE_SEED=true and deletes existing data.');
+  process.exit(1);
+}
+if (seedPassword.length < 6 || Buffer.byteLength(seedPassword, 'utf8') > 72) {
+  console.error('SEED_USER_PASSWORD must be 6 to 72 bytes long.');
+  process.exit(1);
+}
+
+connectDB().then(importData);
