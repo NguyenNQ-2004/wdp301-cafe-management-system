@@ -11,6 +11,7 @@ process.env.JWT_SECRET = 'uc26-isolated-test-secret';
 const User = require('../models/User');
 const WorkSchedule = require('../models/WorkSchedule');
 const ShopSetting = require('../models/ShopSetting');
+const Order = require('../models/Order');
 
 test('UC26 records own attendance once and lets admin review and mark absence', async (t) => {
   const dbName = `aura_cafe_uc26_test_${randomBytes(4).toString('hex')}`;
@@ -79,6 +80,10 @@ test('UC26 records own attendance once and lets admin review and mark absence', 
   assert.equal((await request('GET', `/api/work-schedules/attendance${query}&userId=${staffB._id}`, null, aToken)).data.length, 3);
   assert.equal((await request('PUT', `/api/work-schedules/${own._id}/shift-action`, { action: 'CHECK_OUT' }, aToken)).status, 409);
   const shipperSchedule = await WorkSchedule.create({ user: shipper._id, workDate: new Date(today), shiftName: 'MORNING', status: 'PRESENT', checkInTime: new Date() });
+  const activeDelivery = await Order.create({ orderCode: 'ACTIVE-DELIVERY-UC26', orderType: 'ONLINE', paymentMethod: 'COD', status: 'DELIVERING', shipper: shipper._id, totalAmount: 50000, finalAmount: 50000 });
+  assert.equal((await request('PUT', `/api/work-schedules/${shipperSchedule._id}/shift-action`, { action: 'CHECK_OUT' }, shipperToken)).status, 409);
+  assert.equal((await request('PUT', `/api/work-schedules/${shipperSchedule._id}/shift-action`, { action: 'REMIT_COD', cash: 0 }, shipperToken)).status, 409);
+  await Order.updateOne({ _id: activeDelivery._id }, { $set: { status: 'READY' } });
   assert.equal((await request('PUT', `/api/work-schedules/${shipperSchedule._id}/shift-action`, { action: 'REMIT_COD', cash: 100 }, aToken)).status, 403);
   assert.equal((await request('PUT', `/api/work-schedules/${shipperSchedule._id}/shift-action`, { action: 'REMIT_COD', cash: 100.5 }, shipperToken)).status, 400);
   const remitted = await request('PUT', `/api/work-schedules/${shipperSchedule._id}/shift-action`, { action: 'REMIT_COD', cash: 100000, note: 'Đã nộp quỹ' }, shipperToken);

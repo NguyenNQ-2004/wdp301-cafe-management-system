@@ -10,6 +10,7 @@ const RewardItem = require('../models/RewardItem');
 const ShopSetting = require('../models/ShopSetting');
 const DeliveryArea = require('../models/DeliveryArea');
 const WorkSchedule = require('../models/WorkSchedule');
+const { hasShipperOnShift } = require('../utils/shipperAvailability');
 const { protect } = require('../middlewares/authMiddleware');
 const { normalizeCartItems } = require('../utils/cartItems');
 const { demoPaymentsEnabled } = require('../utils/paymentMode');
@@ -39,18 +40,6 @@ router.use(async (req, res, next) => {
 });
 const orderError = (message, status = 400) => Object.assign(new Error(message), { status });
 const { lockOrder } = require('../utils/orderMutation');
-const hasShipperOnShift = async (shipperId) => {
-  const now = new Date();
-  const shipperFilter = { role: 'STAFF', position: 'SHIPPER', status: 'ACTIVE' };
-  if (shipperId) shipperFilter._id = shipperId;
-  const shipperIds = await User.distinct('_id', shipperFilter);
-  if (!shipperIds.length) return false;
-  return !!await WorkSchedule.exists({
-    user: { $in: shipperIds }, status: 'PRESENT',
-    checkInTime: { $gte: new Date(now.getTime() - 24 * 60 * 60 * 1000), $lte: now },
-    checkOutTime: { $exists: false }, handoverAt: { $exists: false }
-  });
-};
 const validPhone = (value) => typeof value === 'string'
   && value.trim().length <= 30
   && /^\+?[0-9 .()-]+$/.test(value.trim())
@@ -190,7 +179,7 @@ router.post('/', async (req, res) => {
       : (checkoutFlow ? 'BANK_TRANSFER' : orderType === 'ONLINE' ? (['DEMO_ONLINE', 'BANK_TRANSFER'].includes(paymentMethod) ? paymentMethod : 'COD') : 'PAY_AT_COUNTER');
     if (!['COD', 'PAY_AT_COUNTER', 'CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER', 'DEMO_ONLINE'].includes(finalPaymentMethod)) throw orderError('Phương thức thanh toán không hợp lệ.');
     if (isStaffOrAdmin && ['VNPAY', 'MOMO'].includes(finalPaymentMethod)) throw orderError('MoMo/VNPay tại quầy chưa kết nối cổng đối soát, vui lòng chọn tiền mặt hoặc chuyển khoản.', 503);
-    if (isStaffOrAdmin && finalPaymentMethod === 'BANK_TRANSFER' && !paymentGateway.enabled()) throw orderError('Chuyển khoản tại quầy chưa cấu hình cổng đối soát.', 503);
+    if (isStaffOrAdmin && finalPaymentMethod === 'BANK_TRANSFER' && !paymentGateway.enabled() && !demoPaymentsEnabled()) throw orderError('Chuyển khoản tại quầy chưa cấu hình cổng đối soát.', 503);
     if (finalPaymentMethod === 'DEMO_ONLINE' && (orderType !== 'ONLINE' || req.user.role !== 'CUSTOMER' || !demoPaymentsEnabled())) throw orderError('Thanh toán mô phỏng hiện không khả dụng.', 403);
     if (!checkoutFlow && orderType === 'ONLINE' && finalPaymentMethod === 'BANK_TRANSFER' && !paymentGateway.enabled()) throw orderError('Thanh toán chuyển khoản chưa được cấu hình.', 503);
     if (demoProvider != null && (finalPaymentMethod !== 'DEMO_ONLINE' || !['MOMO', 'VNPAY', 'BANK_TRANSFER'].includes(demoProvider))) throw orderError('Kênh thanh toán mô phỏng không hợp lệ.');

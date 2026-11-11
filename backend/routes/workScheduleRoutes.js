@@ -215,6 +215,10 @@ router.put('/:id/shift-action', async (req, res) => {
     const workDay = schedule.workDate.toISOString().slice(0, 10);
     const today = vietnamDay(now);
     const changes = {};
+    if (req.user.position === 'SHIPPER' && ['CHECK_OUT', 'REMIT_COD'].includes(action)
+      && await Order.exists({ shipper: req.user._id, orderType: 'ONLINE', status: 'DELIVERING' })) {
+      return res.status(409).json({ message: 'Còn đơn đang giao. Hãy hoàn tất đơn hoặc báo quản lý chuyển giao trước khi kết ca.' });
+    }
     if (action === 'REMIT_COD') {
       if (req.user.role !== 'STAFF' || req.user.position !== 'SHIPPER') return res.status(403).json({ message: 'Chỉ shipper được nộp tiền COD của ca giao hàng.' });
       if (schedule.status !== 'PRESENT' || !schedule.checkInTime || schedule.checkOutTime) return res.status(409).json({ message: 'Ca phải đang mở để nộp COD.' });

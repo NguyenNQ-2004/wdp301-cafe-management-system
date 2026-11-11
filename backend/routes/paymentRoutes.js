@@ -197,6 +197,36 @@ router.post('/:id/demo-confirm', async (req, res) => {
 });
 
 // UC13: nhân viên thu ngân xác nhận đã nhận tiền tại quầy.
+router.post('/:id/counter-demo-confirm', withOrderMutation(async (req, res) => {
+  try {
+    if (!demoPaymentsEnabled()) return res.status(403).json({ message: 'Thanh toán QR mô phỏng không khả dụng.' });
+    if (!canManageCounter(req.user)) return res.status(403).json({ message: 'Chỉ thu ngân hoặc quản lý được xác nhận thanh toán tại quầy.' });
+    if (Object.keys(req.body || {}).length) return res.status(400).json({ message: 'Thao tác này không nhận dữ liệu bổ sung.' });
+    if (req.user.role === 'STAFF') {
+      const now = new Date();
+      const active = await WorkSchedule.exists({ user: req.user._id, status: 'PRESENT', checkInTime: { $gte: new Date(now.getTime() - 24 * 3600000), $lte: now }, checkOutTime: { $exists: false }, handoverAt: { $exists: false } });
+      if (!active) return res.status(409).json({ message: 'Thu ngân cần check-in ca trước khi xác nhận thanh toán.' });
+    }
+    const payment = await Payment.findById(req.params.id);
+    if (!payment) return res.status(404).json({ message: 'Không tìm thấy giao dịch.' });
+    const order = await Order.findById(payment.order);
+    if (!order || !['DINE_IN', 'TAKEAWAY'].includes(order.orderType)) return res.status(400).json({ message: 'Đây không phải đơn tại quầy.' });
+    if (order.status === 'CANCELLED' || payment.paymentMethod !== 'BANK_TRANSFER' || order.paymentMethod !== 'BANK_TRANSFER' || payment.amount !== order.finalAmount) return res.status(409).json({ message: 'Đơn chuyển khoản không còn hợp lệ.' });
+    if (payment.status === 'SUCCESS') return res.json({ payment });
+    if (payment.status !== 'PENDING') return res.status(409).json({ message: 'Giao dịch không còn chờ thanh toán.' });
+    const updated = await Payment.findOneAndUpdate({ _id: payment._id, status: 'PENDING' }, { $set: { status: 'SUCCESS', paidAt: new Date(), receivedBy: req.user._id, paymentNote: 'Chuyển khoản QR mô phỏng tại quầy; không phát sinh giao dịch thật' } }, { returnDocument: 'after' });
+    if (!updated) return res.status(409).json({ message: 'Giao dịch đã được xử lý.' });
+    await Order.updateOne({ _id: order._id, status: 'PENDING' }, { $set: { status: 'CONFIRMED' } });
+    await awardOrderPoints(order._id);
+    res.json({ payment: updated });
+  } catch (error) { res.status(error.status || 500).json({ message: error.message }); }
+}, async (req) => {
+  if (!mongoose.isValidObjectId(req.params.id)) throw Object.assign(new Error('Mã giao dịch không hợp lệ.'), { status: 400 });
+  const payment = await Payment.findById(req.params.id).select('order');
+  if (!payment) throw Object.assign(new Error('Không tìm thấy giao dịch.'), { status: 404 });
+  return payment.order;
+}));
+
 router.post('/:id/counter-confirm', withOrderMutation(async (req, res) => {
   let unlock;
   try {

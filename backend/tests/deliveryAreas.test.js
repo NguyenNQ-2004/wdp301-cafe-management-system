@@ -46,12 +46,14 @@ test('UC71 DeliveryArea: CRUD, district fee calculation, freeship override and i
 
   await ShopSetting.create([
     { settingKey: 'delivery_fee', settingValue: '18000', settingGroup: 'DELIVERY' },
-    { settingKey: 'freeship_threshold', settingValue: '150000', settingGroup: 'DELIVERY' }
+    { settingKey: 'freeship_threshold', settingValue: '150000', settingGroup: 'DELIVERY' },
+    { settingKey: 'shift_morning', settingValue: '00:00-23:59' }
   ]);
 
   const customer = await User.create({ fullName: 'Khách Test Khu Vực', phone: '0901112233', role: 'CUSTOMER', passwordHash: 'pwd' });
   const shipper = await User.create({ fullName: 'Delivery Shipper', phone: '0901112244', role: 'STAFF', position: 'SHIPPER', passwordHash: 'pwd' });
-  await WorkSchedule.create({ user: shipper._id, workDate: new Date(), shiftName: 'DELIVERY', status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) });
+  await WorkSchedule.create({ user: shipper._id, workDate: new Date(), shiftName: 'MORNING', status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) });
+  assert.deepEqual((await request('GET', '/api/delivery-areas/availability')).data, { available: true });
   const admin = await User.create({ fullName: 'Admin Cấu Hình', phone: '0904445566', role: 'ADMIN', passwordHash: 'pwd' });
   const custToken = jwt.sign({ id: customer._id }, jwtSecret);
   const adminToken = jwt.sign({ id: admin._id }, jwtSecret);

@@ -24,10 +24,10 @@ test('legacy topping names round trip through cart and checkout without dropping
   });
   const customer = await User.create({ fullName: 'Topping Customer', phone: '0900000771', passwordHash: 'test-only', role: 'CUSTOMER', totalPoints: 120 });
   const shipper = await User.create({ fullName: 'Topping Shipper', phone: '0900000772', passwordHash: 'test-only', role: 'STAFF', position: 'SHIPPER' });
-  await WorkSchedule.create({ user: shipper._id, workDate: new Date(), shiftName: 'DELIVERY', status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) });
+  await WorkSchedule.create({ user: shipper._id, workDate: new Date(), shiftName: 'MORNING', status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) });
   const category = await Category.create({ name: 'Coffee' });
   const product = await Product.create({ category: category._id, name: 'Cà Phê Muối', basePrice: 45000, variantsConfig: { sizes: { M: 0 }, toppings: [{ name: 'Extra kem muß╗æi', price: 8000 }] } });
-  await ShopSetting.create([{ settingKey: 'points_step', settingValue: '10' }, { settingKey: 'points_step_value', settingValue: '2000' }]);
+  await ShopSetting.create([{ settingKey: 'points_step', settingValue: '10' }, { settingKey: 'points_step_value', settingValue: '2000' }, { settingKey: 'shift_morning', settingValue: '00:00-23:59' }]);
   const token = jwt.sign({ id: customer._id }, require('../config/jwtSecret')());
   const call = async (method, path, body) => {
     const response = await fetch(`http://127.0.0.1:${server.address().port}${path}`, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, ...(body ? { body: JSON.stringify(body) } : {}) });

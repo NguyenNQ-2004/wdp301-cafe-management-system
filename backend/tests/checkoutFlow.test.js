@@ -58,7 +58,8 @@ test('checkoutFlow comprehensive integration: address validation, stock check, c
     { settingKey: 'freeship_threshold', settingValue: '150000', settingGroup: 'DELIVERY' },
     { settingKey: 'points_step', settingValue: '10', settingGroup: 'LOYALTY' },
     { settingKey: 'points_step_value', settingValue: '2000', settingGroup: 'LOYALTY' },
-    { settingKey: 'points_earn_unit', settingValue: '1000', settingGroup: 'LOYALTY' }
+    { settingKey: 'points_earn_unit', settingValue: '1000', settingGroup: 'LOYALTY' },
+    { settingKey: 'shift_morning', settingValue: '00:00-23:59' }
   ]);
 
   // Seed accounts
@@ -66,7 +67,7 @@ test('checkoutFlow comprehensive integration: address validation, stock check, c
   const barista = await User.create({ fullName: 'Staff Barista', phone: '0902222222', email: 'barista@aura.vn', passwordHash: 'pwd', role: 'STAFF', position: 'BARISTA' });
   const shipper = await User.create({ fullName: 'Staff Shipper', phone: '0903333333', email: 'shipper@aura.vn', passwordHash: 'pwd', role: 'STAFF', position: 'SHIPPER' });
   const admin = await User.create({ fullName: 'Admin Aura', phone: '0904444444', email: 'admin@aura.vn', passwordHash: 'pwd', role: 'ADMIN' });
-  await WorkSchedule.create([barista, shipper].map((user, index) => ({ user: user._id, workDate: new Date(), shiftName: `TEST-${index}`, status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) })));
+  await WorkSchedule.create([barista, shipper].map((user, index) => ({ user: user._id, workDate: new Date(), shiftName: index === 1 ? 'MORNING' : `TEST-${index}`, status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) })));
 
   const custToken = jwt.sign({ id: customer._id }, jwtSecret);
   const baristaToken = jwt.sign({ id: barista._id }, jwtSecret);

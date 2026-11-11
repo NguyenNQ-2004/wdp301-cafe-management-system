@@ -25,6 +25,7 @@ export interface Tx {
 }
 export interface PlaceOrderInput {
   customer_id: number | null; cashier_id: number | null; order_type: OrderType; status: OrderStatus;
+  payment_method?: 'CASH' | 'BANK_TRANSFER';
   table_number?: string | null; recipient_name?: string | null; recipient_phone?: string | null;
   delivery_address?: string | null; order_note?: string | null; delivery_fee: number; points_to_redeem: number;
   items: { product_id: number; quantity: number; unit_price: number; customization: OrderCustomization | null }[];
@@ -224,7 +225,7 @@ export function DbProvider({ children }: { children: ReactNode }) {
       pointsToRedeem: input.points_to_redeem,
       orderType: input.order_type, customerId: input.customer_id ? rawId(input.customer_id) : undefined,
       recipientName: input.recipient_name, recipientPhone: input.recipient_phone, deliveryAddress: input.delivery_address,
-      tableNumber: input.table_number, orderNote: [input.order_note, ...input.items.filter(item => item.customization).map(item => `${item.quantity} x ${dbRef.current.products.find(product => product.id === item.product_id)?.name || ''} (${item.customization?.size || 'M'}): ${[item.customization?.sugar && `đường ${item.customization.sugar}`, item.customization?.ice, item.customization?.note].filter(Boolean).join(', ')}`)].filter(Boolean).join('; '), paymentMethod: input.order_type === 'ONLINE' ? 'COD' : 'PAY_AT_COUNTER',
+      tableNumber: input.table_number, orderNote: [input.order_note, ...input.items.filter(item => item.customization).map(item => `${item.quantity} x ${dbRef.current.products.find(product => product.id === item.product_id)?.name || ''} (${item.customization?.size || 'M'}): ${[item.customization?.sugar && `đường ${item.customization.sugar}`, item.customization?.ice, item.customization?.note].filter(Boolean).join(', ')}`)].filter(Boolean).join('; '), paymentMethod: input.order_type === 'ONLINE' ? 'COD' : input.payment_method || 'CASH',
     } });
     await refresh(); return normalize('orders', result) as Order;
     } catch (failure) {

@@ -32,6 +32,7 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   app.use('/api/auth', require('../routes/authRoutes'));
   app.use('/api/orders', require('../routes/orderRoutes'));
   app.use('/api/payments', require('../routes/paymentRoutes'));
+  app.use('/api/shift-handovers', require('../routes/shiftHandoverRoutes'));
   const server = await new Promise((resolve) => {
     const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
   });
@@ -99,7 +100,8 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   assert.match(unavailable.data.message, /shipper đã check-in/);
   assert.equal(await Order.countDocuments(), 0);
   const availableShipper = await User.create({ fullName: 'Available Shipper', phone: '0999000017', email: 'test-0999000017@example.com', passwordHash: 'test-only', role: 'STAFF', position: 'SHIPPER' });
-  const availableShift = await WorkSchedule.create({ user: availableShipper._id, workDate: new Date(), shiftName: 'AVAILABLE', status: 'SCHEDULED' });
+  await require('../models/ShopSetting').create({ settingKey: 'shift_morning', settingValue: '00:00-23:59' });
+  const availableShift = await WorkSchedule.create({ user: availableShipper._id, workDate: new Date(), shiftName: 'MORNING', status: 'SCHEDULED' });
   assert.equal((await request('/api/orders', delivery, token)).status, 409, 'scheduled shipper has not checked in');
   await WorkSchedule.updateOne({ _id: availableShift._id }, { $set: { status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) } });
 
@@ -220,7 +222,7 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
     assert.equal((await request(refundPath, { amount: pos.data.finalAmount, refundMethod: 'CASH', cancelReason: 'Lặp lại' }, adminToken)).status, 409);
   });
   const shipper = await User.create({ fullName: 'UC14 Shipper', phone: '0999000015', email: 'test-0999000015@example.com', passwordHash: await bcrypt.hash('test-password', 4), role: 'STAFF', position: 'SHIPPER' });
-  await WorkSchedule.create({ user: shipper._id, workDate: new Date(), shiftName: 'TEST', status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) });
+  await WorkSchedule.create({ user: shipper._id, workDate: new Date(), shiftName: 'MORNING', status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) });
   const shipperToken = (await request('/api/auth/login', { email: shipper.email, password: 'test-password' })).data.token;
   assert.equal((await get('/api/payments', token)).status, 403);
   assert.equal((await get('/api/payments', baristaToken)).status, 403);
@@ -241,6 +243,25 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   assert.equal(paidPickup.data.payment.changeAmount, 10000);
   assert.equal((await request(pickupPath, { paymentMethod: 'CASH' }, cashierToken)).status, 200);
   assert.equal((await Order.findById(pickup.data._id)).paymentMethod, 'CASH');
+
+  const qrOrder = await request('/api/orders', { items: [item], orderType: 'DINE_IN', tableNumber: 'A01', paymentMethod: 'BANK_TRANSFER' }, cashierToken);
+  assert.equal(qrOrder.status, 201);
+  const qrPayment = await Payment.findOne({ order: qrOrder.data._id });
+  assert.equal(qrPayment.paymentMethod, 'BANK_TRANSFER');
+  assert.equal(qrPayment.status, 'PENDING');
+  assert.equal((await request(`/api/payments/${qrPayment._id}/counter-demo-confirm`, {}, token)).status, 403);
+  assert.equal((await request(`/api/payments/${qrPayment._id}/counter-demo-confirm`, {}, cashierToken)).status, 200);
+  assert.equal((await request(`/api/payments/${qrPayment._id}/counter-demo-confirm`, {}, cashierToken)).status, 200, 'repeat confirmation is idempotent');
+  const settledQr = await Payment.findById(qrPayment._id);
+  assert.equal(settledQr.status, 'SUCCESS');
+  assert.equal(String(settledQr.receivedBy), String(cashier._id));
+  assert.equal(settledQr.receivedAmount, undefined);
+  assert.equal((await Order.findById(qrOrder.data._id)).status, 'CONFIRMED');
+  const cashierSchedule = await WorkSchedule.findOne({ user: cashier._id, status: 'PRESENT' });
+  const ledger = await get(`/api/shift-handovers/${cashierSchedule._id}`, cashierToken);
+  assert.equal(ledger.status, 200);
+  assert.equal(ledger.data.summary.methods.BANK_TRANSFER.sales, qrPayment.amount);
+  assert.ok(ledger.data.summary.nonCashSales >= qrPayment.amount);
 
   for (const method of ['MOMO', 'VNPAY']) {
     const counterOrder = await request('/api/orders', {
@@ -303,4 +324,10 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   assert.equal((await request(`/api/payments/${cancelledPayment._id}/counter-confirm`, { paymentMethod: 'CASH' }, cashierToken)).status, 409);
   await Order.updateOne({ _id: cancelled.data._id }, { $set: { status: 'PENDING', finalAmount: 1 } });
   assert.equal((await request(`/api/payments/${cancelledPayment._id}/counter-confirm`, { paymentMethod: 'CASH' }, cashierToken)).status, 409);
+  const { hasShipperOnShift } = require('../utils/shipperAvailability');
+  const vnDate = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
+  await WorkSchedule.updateOne({ _id: availableShift._id }, { $set: { workDate: new Date(`${vnDate}T00:00:00Z`), status: 'PRESENT', checkInTime: new Date(`${vnDate}T01:00:00Z`) } });
+  await require('../models/ShopSetting').updateOne({ settingKey: 'shift_morning' }, { $set: { settingValue: '07:00-12:00' } });
+  assert.equal(await hasShipperOnShift(availableShipper._id, new Date(`${vnDate}T04:00:00Z`)), true, 'shipper is available at 11:00 VN');
+  assert.equal(await hasShipperOnShift(availableShipper._id, new Date(`${vnDate}T06:00:00Z`)), false, 'forgotten checkout does not extend the 12:00 shift');
 });

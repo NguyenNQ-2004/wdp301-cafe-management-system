@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { formatVnd, shopApi } from '../../lib/shopApi';
 import useAuthStore from '../../store/authStore';
 import type { PaymentRecord } from '../../types/shop';
+import QRCode from 'qrcode';
 
 interface CounterPayment extends Omit<PaymentRecord, 'order'> {
   order: {
@@ -31,6 +32,8 @@ export default function CounterPaymentsPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [gatewayInfo, setGatewayInfo] = useState<Record<string, GatewayInfo>>({});
+  const [demoEnabled, setDemoEnabled] = useState<boolean | null>(null);
+  const [demoQr, setDemoQr] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [cashReceived, setCashReceived] = useState<Record<string, string>>({});
 
@@ -38,7 +41,11 @@ export default function CounterPaymentsPage() {
     if (!user) return;
     setLoading(true);
     try {
-      const result = await shopApi<CounterPayment[]>('/api/payments', { token: user.token });
+      const [result, config] = await Promise.all([
+        shopApi<CounterPayment[]>('/api/payments', { token: user.token }),
+        shopApi<{ demoEnabled: boolean }>('/api/payments/config')
+      ]);
+      setDemoEnabled(config.demoEnabled);
       setPayments(result.filter((payment) => payment.order && ['TAKEAWAY', 'DINE_IN'].includes(payment.order.orderType)));
       setError('');
     } catch (err) {
@@ -64,9 +71,15 @@ export default function CounterPaymentsPage() {
     try {
       if (selected === 'BANK_TRANSFER') {
         if (!payment.order || payment.paymentMethod !== 'BANK_TRANSFER') throw new Error('Đơn này chưa được tạo với phương thức chuyển khoản.');
-        const info = await shopApi<GatewayInfo>(`/api/payments/order/${payment.order._id}/gateway`, { method: 'POST', token: user.token });
-        setGatewayInfo((current) => ({ ...current, [payment._id]: info }));
-        setNotice(`Đã tạo mã chuyển khoản cho đơn #${payment.order.orderCode}. Vui lòng chờ cổng thanh toán xác nhận rồi làm mới danh sách.`);
+        if (demoEnabled) {
+          const qr = await QRCode.toDataURL(`AURA-DEMO|${payment.order.orderCode}|${payment.amount}|${payment.transactionCode || payment._id}`);
+          setDemoQr(current => ({ ...current, [payment._id]: qr }));
+          setNotice('Đây là mã QR mô phỏng. Quét mã không chuyển tiền thật; thu ngân xác nhận demo sau khi khách quét.');
+        } else {
+          const info = await shopApi<GatewayInfo>(`/api/payments/order/${payment.order._id}/gateway`, { method: 'POST', token: user.token });
+          setGatewayInfo((current) => ({ ...current, [payment._id]: info }));
+          setNotice(`Đã tạo mã chuyển khoản cho đơn #${payment.order.orderCode}. Vui lòng chờ cổng thanh toán xác nhận rồi làm mới danh sách.`);
+        }
       } else {
         const result = await shopApi<{ payment: PaymentRecord }>(`/api/payments/${payment._id}/counter-confirm`, {
           method: 'POST', token: user.token, body: { paymentMethod: 'CASH', receivedAmount }
@@ -81,6 +94,17 @@ export default function CounterPaymentsPage() {
     }
   };
 
+  const confirmDemoQr = async (payment: CounterPayment) => {
+    if (!user || busyId || !demoQr[payment._id]) return;
+    setBusyId(payment._id); setError(''); setNotice('');
+    try {
+      const result = await shopApi<{ payment: PaymentRecord }>(`/api/payments/${payment._id}/counter-demo-confirm`, { method: 'POST', token: user.token });
+      setPayments(current => current.map(item => item._id === payment._id ? { ...item, ...result.payment, order: item.order } : item));
+      setNotice(`Đã xác nhận thanh toán QR mô phỏng cho đơn #${payment.order?.orderCode}.`);
+    } catch (err) { setError((err as Error).message); }
+    finally { setBusyId(null); }
+  };
+
   const pending = payments.filter((payment) => payment.status === 'PENDING' && payment.order?.status !== 'CANCELLED').sort((a, b) => Number(b.order?._id === highlightedOrderId) - Number(a.order?._id === highlightedOrderId));
   const completed = payments.filter((payment) => payment.status === 'SUCCESS');
   const refunded = payments.filter((payment) => payment.status === 'REFUNDED');
@@ -89,7 +113,7 @@ export default function CounterPaymentsPage() {
     <div className="mx-auto max-w-5xl">
       <button onClick={() => navigate('/cashier')} className="text-sm font-semibold text-primary">← Về trang thu ngân</button>
       <h1 className="mt-4 text-3xl font-bold text-slate-950">Thanh toán tại quầy</h1>
-      <p className="mt-2 text-slate-600">Tiền mặt do thu ngân xác nhận. Chuyển khoản chỉ hoàn tất khi cổng thanh toán gửi xác nhận có chữ ký; MoMo/VNPay tại quầy chưa được kết nối.</p>
+      <p className="mt-2 text-slate-600">Tiền mặt do thu ngân xác nhận. QR trong bản demo được xác nhận thủ công sau khi khách quét; không chuyển tiền thật.</p>
       {error && <p role="alert" className="mt-5 rounded-lg bg-red-50 p-4 text-red-700">{error}</p>}
       {notice && <p role="status" className="mt-5 rounded-lg bg-emerald-50 p-4 text-emerald-800">{notice}</p>}
       <button onClick={() => void refresh()} disabled={loading} className="mt-5 rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-primary disabled:opacity-50">Làm mới danh sách</button>
@@ -100,13 +124,14 @@ export default function CounterPaymentsPage() {
           <div className="flex flex-wrap justify-between gap-3"><div><h3 className="font-bold">#{payment.order?.orderCode}</h3><p className="mt-1 text-sm text-slate-600">{payment.order?.orderType === 'DINE_IN' ? `Tại bàn ${payment.order.tableNumber || '—'}` : 'Khách đến lấy'} · {payment.order?.recipientName || payment.order?.customer?.fullName || 'Khách tại quầy'}</p></div><strong className="text-xl text-primary">{formatVnd(payment.amount)}</strong></div>
           <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
             <label className="text-sm font-semibold">Hình thức thanh toán<div className="mt-1 rounded-lg border border-blue-100 p-2.5">{methodLabels[payment.paymentMethod as CounterMethod] || payment.paymentMethod}</div></label>
-            <button onClick={() => void confirm(payment)} disabled={!!busyId} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{busyId === payment._id ? 'Đang xử lý...' : payment.paymentMethod === 'BANK_TRANSFER' ? 'Hiện mã QR chuyển khoản' : 'Đã nhận đủ tiền mặt'}</button>
+            <button onClick={() => void confirm(payment)} disabled={!!busyId || (payment.paymentMethod === 'BANK_TRANSFER' && demoEnabled === null)} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{busyId === payment._id ? 'Đang xử lý...' : payment.paymentMethod === 'BANK_TRANSFER' ? 'Hiện mã QR chuyển khoản' : 'Đã nhận đủ tiền mặt'}</button>
           </div>
           {payment.paymentMethod !== 'BANK_TRANSFER' && <label className="mt-3 block text-sm font-semibold">Tiền khách đưa
             <input type="number" min={payment.amount} step="1" inputMode="numeric" value={cashReceived[payment._id] ?? String(payment.amount)} onChange={(event) => setCashReceived(current => ({ ...current, [payment._id]: event.target.value }))} className="mt-1 block w-full max-w-xs rounded-lg border border-blue-100 p-2.5" />
             <span className="mt-1 block font-normal text-slate-600">Tiền thối lại: {formatVnd(Math.max(0, (Number(cashReceived[payment._id] ?? payment.amount) || 0) - payment.amount))}</span>
           </label>}
           {gatewayInfo[payment._id] && payment.paymentMethod === 'BANK_TRANSFER' && <div className="mt-4 flex flex-wrap items-center gap-4 rounded-lg bg-blue-50 p-4 text-sm"><img src={gatewayInfo[payment._id].qrUrl} alt={`Mã QR thanh toán đơn ${payment.order?.orderCode}`} className="h-40 w-40 bg-white object-contain" /><div><p><strong>Ngân hàng:</strong> {gatewayInfo[payment._id].bankName}</p><p><strong>Tài khoản:</strong> {gatewayInfo[payment._id].accountNo} · {gatewayInfo[payment._id].accountName}</p><p><strong>Nội dung:</strong> {payment.order?.orderCode}</p><p><strong>Mã đối soát:</strong> {payment.transactionCode}</p><p className="mt-2 text-blue-800">Thanh toán vẫn chờ xác nhận từ cổng.</p></div></div>}
+          {demoQr[payment._id] && payment.paymentMethod === 'BANK_TRANSFER' && <div className="mt-4 flex flex-wrap items-center gap-4 rounded-lg bg-amber-50 p-4 text-sm"><img src={demoQr[payment._id]} alt={`Mã QR mô phỏng đơn ${payment.order?.orderCode}`} className="h-40 w-40 bg-white object-contain" /><div><strong>QR mô phỏng · {formatVnd(payment.amount)}</strong><p>Mã đơn: {payment.order?.orderCode}</p><p className="mb-3 text-amber-800">Không chuyển tiền thật. Đơn vẫn chờ thanh toán cho đến khi thu ngân xác nhận.</p><button type="button" disabled={!!busyId} onClick={() => void confirmDemoQr(payment)} className="rounded-lg bg-primary px-4 py-2 font-bold text-white disabled:opacity-50">Xác nhận đã thanh toán (demo)</button></div></div>}
         </article>)}</div>
         <h2 className="mt-10 text-xl font-bold">Đã thanh toán ({completed.length})</h2>
         <div className="mt-4 space-y-2">{completed.map((payment) => <div key={payment._id} className="flex flex-wrap justify-between gap-2 rounded-lg border border-blue-100 bg-white p-4"><span>#{payment.order?.orderCode} · {methodLabels[payment.paymentMethod as CounterMethod] || payment.paymentMethod}{payment.transactionCode ? ` · ${payment.transactionCode}` : ''}</span><strong>{formatVnd(payment.amount)}</strong></div>)}</div>

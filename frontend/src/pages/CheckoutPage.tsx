@@ -25,6 +25,8 @@ export default function CheckoutPage({ onRequestAuth }: { onRequestAuth: () => v
   const shop = useShopRules();
   const [areas, setAreas] = useState<DeliveryAreaOption[]>([]);
   const [areasLoading, setAreasLoading] = useState(true);
+  const [deliveryAvailable, setDeliveryAvailable] = useState<boolean | null>(null);
+  const [availabilityError, setAvailabilityError] = useState(false);
   const [areaError, setAreaError] = useState('');
   const [name, setName] = useState(user?.fullName || '');
   const [phone, setPhone] = useState(user?.phone || '');
@@ -47,6 +49,19 @@ export default function CheckoutPage({ onRequestAuth }: { onRequestAuth: () => v
       .finally(() => setAreasLoading(false));
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      shopApi<{ available: boolean }>('/api/delivery-areas/availability')
+        .then(result => { if (active) { setDeliveryAvailable(result.available); setAvailabilityError(false); } })
+        .catch(() => { if (active) { setDeliveryAvailable(null); setAvailabilityError(true); } });
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 30000);
+    window.addEventListener('focus', refresh);
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', refresh); };
+  }, []);
+
   const items = cart.items.filter(item => item.checked);
   const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
   const step = loyalty?.rules?.points_step || 10;
@@ -58,7 +73,7 @@ export default function CheckoutPage({ onRequestAuth }: { onRequestAuth: () => v
   const fee = subtotal < shop.rules.freeship_threshold ? configuredDistrictFee : 0;
   const total = subtotal - discount + fee;
   const customer = user?.role === 'CUSTOMER';
-  const ready = !areasLoading && !!customer && !!selectedArea && !areaError && cart.ready && cart.ownerId === user?._id && !cart.syncError && !shop.loading && !shop.error && !loyaltyLoading && !loyaltyError;
+  const ready = deliveryAvailable === true && !areasLoading && !!customer && !!selectedArea && !areaError && cart.ready && cart.ownerId === user?._id && !cart.syncError && !shop.loading && !shop.error && !loyaltyLoading && !loyaltyError;
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!user) { onRequestAuth(); return; }
@@ -81,6 +96,7 @@ export default function CheckoutPage({ onRequestAuth }: { onRequestAuth: () => v
   return <div className="bg-[#f8fafc] px-3 py-6"><div className="mx-auto max-w-[1140px]">
     <div className="mx-auto mb-6 grid max-w-xl grid-cols-3 text-center text-xs font-semibold">{['Giỏ hàng', 'Xác nhận đơn', 'Thanh toán'].map((label, index) => <div key={label} className={index < 2 ? 'text-primary' : 'text-stone-400'}><span className={`mx-auto mb-2 grid h-9 w-9 place-items-center rounded-full ${index < 2 ? 'bg-primary text-white' : 'bg-stone-200'}`}>{index === 0 ? '✓' : index + 1}</span>{label}</div>)}</div>
     {!customer && <div className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm"><p>{user ? 'Tài khoản quản trị/nhân viên chỉ dùng cho nghiệp vụ nội bộ. Hãy đăng nhập bằng tài khoản CUSTOMER.' : 'Bạn có thể nhập trước thông tin giao hàng. Đăng nhập bằng tài khoản khách hàng để xác nhận đơn.'}</p><button className="swp-primary-button" onClick={onRequestAuth}>Đăng nhập tài khoản khách hàng</button></div>}
+    {deliveryAvailable !== true && <p role="status" className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{availabilityError ? 'Chưa kiểm tra được shipper đang trong ca. Hệ thống sẽ thử lại sau ít phút.' : deliveryAvailable === false ? 'Hiện chưa có shipper đang trong ca. Vui lòng quay lại khi có nhân viên giao hàng.' : 'Đang kiểm tra nhân viên giao hàng...'}</p>}
     {(error || areaError || (!areasLoading && !areas.length && 'Chưa có khu vực giao hàng được cấu hình.') || loyaltyError || shop.error || cart.syncError) && <p role="alert" className="mb-5 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error || areaError || (!areasLoading && !areas.length && 'Chưa có khu vực giao hàng được cấu hình.') || loyaltyError || shop.error || cart.syncError}</p>}
     <form onSubmit={submit} className="swp-checkout-grid"><div>
       <section className="swp-checkout-card"><h2><span className="material-symbols-outlined">person</span>Thông tin người nhận <small className="ml-auto text-xs font-normal text-primary">Bước 2 / 3</small></h2><div className="rounded-xl border border-red-100 bg-[#fffafa] p-4">

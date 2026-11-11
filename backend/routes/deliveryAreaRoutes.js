@@ -2,8 +2,14 @@ const express = require('express');
 const mongoose = require('mongoose');
 const DeliveryArea = require('../models/DeliveryArea');
 const { protect } = require('../middlewares/authMiddleware');
+const { hasShipperOnShift } = require('../utils/shipperAvailability');
 
 const router = express.Router();
+
+router.get('/availability', async (_req, res) => {
+  try { res.json({ available: await hasShipperOnShift() }); }
+  catch (error) { res.status(500).json({ message: error.message }); }
+});
 
 const DEFAULT_DISTRICTS = [
   { district: 'Cầu Giấy', deliveryFee: 18000, isActive: true },

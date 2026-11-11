@@ -32,7 +32,8 @@ test('Final baseline: checkout identity, rollback, payment integrity and atomic 
   const admin = await User.create({ fullName: 'Final Admin', phone: '0900000103', passwordHash: 'fixture', role: 'ADMIN' });
   const foreign = await User.create({ fullName: 'Other Cashier', phone: '0900000104', passwordHash: 'fixture', role: 'STAFF', position: 'CASHIER' });
   const shipper = await User.create({ fullName: 'Final Shipper', phone: '0900000105', passwordHash: 'fixture', role: 'STAFF', position: 'SHIPPER' });
-  await WorkSchedule.create({ user: shipper._id, workDate: new Date(), shiftName: 'CHECKOUT', status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) });
+  await require('../models/ShopSetting').create({ settingKey: 'shift_morning', settingValue: '00:00-23:59' });
+  await WorkSchedule.create({ user: shipper._id, workDate: new Date(), shiftName: 'MORNING', status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) });
   const token = u => jwt.sign({ id: u._id }, require('../config/jwtSecret')());
   const request = async (method, path, body, user = customer) => {
     const res = await fetch(`http://127.0.0.1:${server.address().port}${path}`, { method, headers: { 'Content-Type': 'application/json', ...(user ? { Authorization: `Bearer ${token(user)}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
