@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 require('dotenv').config();
 const User = require('../models/User');
+const WorkSchedule = require('../models/WorkSchedule');
 const Product = require('../models/Product');
 const Category = require('../models/Category');
 const Order = require('../models/Order');
@@ -22,6 +23,8 @@ test('legacy topping names round trip through cart and checkout without dropping
     await mongoose.connection.dropDatabase(); await mongoose.disconnect();
   });
   const customer = await User.create({ fullName: 'Topping Customer', phone: '0900000771', passwordHash: 'test-only', role: 'CUSTOMER', totalPoints: 120 });
+  const shipper = await User.create({ fullName: 'Topping Shipper', phone: '0900000772', passwordHash: 'test-only', role: 'STAFF', position: 'SHIPPER' });
+  await WorkSchedule.create({ user: shipper._id, workDate: new Date(), shiftName: 'DELIVERY', status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) });
   const category = await Category.create({ name: 'Coffee' });
   const product = await Product.create({ category: category._id, name: 'Cà Phê Muối', basePrice: 45000, variantsConfig: { sizes: { M: 0 }, toppings: [{ name: 'Extra kem muß╗æi', price: 8000 }] } });
   await ShopSetting.create([{ settingKey: 'points_step', settingValue: '10' }, { settingKey: 'points_step_value', settingValue: '2000' }]);

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { PageRoute, Order, OrderStatus } from '../../types';
 import { PosHeader } from './PosHeader';
 import CounterOrderEditor from './CounterOrderEditor';
@@ -15,7 +16,6 @@ import {
   fmtDateTime,
   fmtMoney,
   fmtTime,
-  nowSql,
   orderCustomerName,
   orderItemsOf,
   paymentOf,
@@ -31,7 +31,8 @@ interface PosOrdersPageProps {
 type StatusFilter = 'all' | OrderStatus;
 
 export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShowToast, onOpenBill }) => {
-  const { db, transact, setOrderStatus, cancelOrder } = useDb();
+  const { db, rawId, setOrderStatus, cancelOrder } = useDb();
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'DINE_IN' | 'TAKEAWAY'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,16 +78,12 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
   };
 
   const handleCollectPayment = (o: Order) => {
-    const pay = paymentOf(db, o.id);
-    if (!pay) return;
-    transact(tx => tx.update('payments', pay.id, { status: 'SUCCESS', paid_at: nowSql() }));
-    onShowToast?.(`Đã thu ${fmtMoney(pay.amount)} cho đơn ${o.order_code}.`);
+    navigate(`/cashier/payments?orderId=${encodeURIComponent(rawId(o.id))}`);
   };
 
-  const handleCancel = (o: Order) => {
+  const handleCancel = async (o: Order) => {
     const reason = prompt(`Nhập lý do hủy đơn ${o.order_code}:`);
-    if (reason && reason.trim()) {
-      cancelOrder(o.id, reason.trim());
+    if (reason && reason.trim() && await cancelOrder(o.id, reason.trim())) {
       onShowToast?.(`Đã hủy đơn ${o.order_code}.`);
     }
   };

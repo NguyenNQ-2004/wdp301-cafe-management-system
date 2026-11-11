@@ -130,3 +130,12 @@ test('product management calculates the same cost from normalized purchase rows'
   db.purchase_orders[0].status = 'CANCELLED';
   assert.equal(interfaceUtils.productCost(db, 1), null);
 });
+
+test('attendance and handovers render cleanly in admin layout without crashing', () => {
+  for (const name of ['Attendance', 'Handovers']) {
+    const html = renderToString(React.createElement(MemoryRouter, null,
+      React.createElement(context.Provider, { value: { db: empty(), loading: false, refresh: async () => {} } }, React.createElement(components[name], { onNavigate() {} }))));
+    assert.match(html, name === 'Attendance' ? /Chấm công nhân sự/ : /Biên bản bàn giao ca/);
+    assert.doesNotMatch(html, /\b(?:NaN|undefined)\b/);
+  }
+});

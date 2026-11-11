@@ -4,6 +4,7 @@ const { randomBytes, randomUUID } = require('crypto');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+process.env.PAYMENT_DEMO_ENABLED = 'true';
 
 const app = require('../server');
 const User = require('../models/User');
@@ -14,6 +15,7 @@ const ProductIngredient = require('../models/ProductIngredient');
 const Cart = require('../models/Cart');
 const Order = require('../models/Order');
 const Payment = require('../models/Payment');
+const WorkSchedule = require('../models/WorkSchedule');
 const Loyalty = require('../models/LoyaltyTransaction');
 const ShopSetting = require('../models/ShopSetting');
 const jwtSecret = require('../config/jwtSecret')();
@@ -64,6 +66,7 @@ test('checkoutFlow comprehensive integration: address validation, stock check, c
   const barista = await User.create({ fullName: 'Staff Barista', phone: '0902222222', email: 'barista@aura.vn', passwordHash: 'pwd', role: 'STAFF', position: 'BARISTA' });
   const shipper = await User.create({ fullName: 'Staff Shipper', phone: '0903333333', email: 'shipper@aura.vn', passwordHash: 'pwd', role: 'STAFF', position: 'SHIPPER' });
   const admin = await User.create({ fullName: 'Admin Aura', phone: '0904444444', email: 'admin@aura.vn', passwordHash: 'pwd', role: 'ADMIN' });
+  await WorkSchedule.create([barista, shipper].map((user, index) => ({ user: user._id, workDate: new Date(), shiftName: `TEST-${index}`, status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) })));
 
   const custToken = jwt.sign({ id: customer._id }, jwtSecret);
   const baristaToken = jwt.sign({ id: barista._id }, jwtSecret);
@@ -407,5 +410,33 @@ test('checkoutFlow comprehensive integration: address validation, stock check, c
 
     const finalCustomer = await User.findById(customer._id);
     assert.equal(finalCustomer.totalPoints, 100 + 70);
+  });
+
+  await t.test('demo transfer confirms checkout, clears only ordered cart items and is idempotent', async () => {
+    const created = await request('POST', '/api/orders', {
+      checkoutFlow: true, orderType: 'ONLINE', paymentMethod: 'BANK_TRANSFER',
+      recipientName: 'Khách hàng A', recipientPhone: '0901234567',
+      district: 'Cầu Giấy', ward: 'Dịch Vọng Hậu', addressDetail: 'Số 8 Tôn Thất Thuyết',
+      expectedTotal: 63000,
+      items: [{ productId: tea._id, size: 'L', quantity: 1, customization: { sugar: '100%', ice: 'Đá chuẩn' } }]
+    }, custToken);
+    assert.equal(created.status, 201);
+    const payment = await Payment.findOne({ order: created.data._id });
+    assert.equal(payment.status, 'PENDING');
+    assert.equal((await request('POST', `/api/payments/${payment._id}/demo-confirm`, { demoProvider: 'MOMO' }, baristaToken)).status, 403);
+    const confirmed = await request('POST', `/api/payments/${payment._id}/demo-confirm`, { demoProvider: 'MOMO' }, custToken);
+    assert.equal(confirmed.status, 200);
+    assert.equal(confirmed.data.payment.status, 'SUCCESS');
+    assert.equal(confirmed.data.payment.demoProvider, 'MOMO');
+    assert.equal((await Order.findById(created.data._id)).status, 'CONFIRMED');
+    const bill = await request('GET', `/api/payments/order/${created.data._id}`, null, custToken);
+    assert.equal(bill.data.payment.demoProvider, 'MOMO');
+    const cart = await Cart.findOne({ customer: customer._id });
+    assert.equal(cart.items.length, 1);
+    assert.equal(String(cart.items[0].product), String(coffee._id));
+    const replay = await request('POST', `/api/payments/${payment._id}/demo-confirm`, { demoProvider: 'MOMO' }, custToken);
+    assert.equal(replay.status, 200);
+    assert.equal(replay.data.payment.transactionCode, confirmed.data.payment.transactionCode);
+    assert.equal((await Cart.findOne({ customer: customer._id })).items.length, 1);
   });
 });

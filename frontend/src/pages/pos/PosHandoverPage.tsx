@@ -6,11 +6,14 @@ import useAuthStore from '../../store/authStore';
 import './PosHandoverPage.css';
 
 interface Cashier { _id: string; fullName: string; phone: string; position: string }
+interface CodRemittance { _id: string; user: Cashier; endingCashSystem: number; endingCashActual: number; checkOutTime?: string; note?: string }
+interface ShiftInfo { code: string; name: string; startTime: string; endTime: string }
 interface ShiftRecord {
   _id: string;
   user: Cashier;
   workDate: string;
   shiftName: string;
+  shiftInfo?: ShiftInfo;
   status: string;
   checkInTime?: string;
   checkOutTime?: string;
@@ -22,6 +25,7 @@ interface PaymentMethodSummary {
 }
 interface HandoverSummary {
   cashSales: number;
+  codReceipts?: number;
   paymentCount: number;
   nonCashSales: number;
   totalSales: number;
@@ -46,6 +50,7 @@ interface HandoverDetail {
   resubmittedAt?: string | null;
   openingCash: number | null;
   cashRevenue: number;
+  codReceipts: number;
   paymentCount: number;
   unattributedCash: number;
   unattributedCount: number;
@@ -66,10 +71,18 @@ const initialRange = () => {
   start.setUTCDate(start.getUTCDate() - 14);
   return { from: dateKey(start), to: dateKey(end) };
 };
-const displayDay = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
-const displayTime = (iso?: string | null) => iso
-  ? new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso))
-  : '—';
+const displayDay = (iso?: string) => iso ? iso.slice(0, 10).split('-').reverse().join('/') : '—';
+const displayTime = (iso?: string | null) => {
+  if (!iso) return '—';
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return '—';
+  return new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(ms));
+};
+const formatShiftTitle = (shiftName: string, shiftInfo?: ShiftInfo) => shiftInfo?.name || labels[shiftName] || shiftName;
+const formatShiftHours = (shiftName: string, shiftInfo?: ShiftInfo) =>
+  shiftInfo?.startTime && shiftInfo?.endTime
+    ? `${shiftInfo.startTime} – ${shiftInfo.endTime}`
+    : shiftTimes[shiftName] || '';
 const validMoney = (value: string) => /^\d+$/.test(value) && Number.isSafeInteger(Number(value));
 
 export default function PosHandoverPage() {
@@ -97,14 +110,39 @@ export default function PosHandoverPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [pendingCod, setPendingCod] = useState<CodRemittance[]>([]);
+  const [codCash, setCodCash] = useState<Record<string, string>>({});
+  const [codNote, setCodNote] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!token || !canConfirm) return;
+    let active = true;
+    shopApi<CodRemittance[]>('/api/work-schedules/cod-remittances', { token })
+      .then(rows => { if (active) setPendingCod(rows); })
+      .catch((err: Error) => { if (active) setError(err.message); });
+    return () => { active = false; };
+  }, [token, canConfirm, reloadKey]);
+
+  const receiveCod = async (row: CodRemittance) => {
+    const amount = codCash[row._id] ?? String(row.endingCashActual);
+    if (!token || busy || !validMoney(amount)) { setError('Nhập số tiền COD thực nhận hợp lệ.'); return; }
+    setBusy(true); setError(''); setNotice('');
+    try {
+      await shopApi(`/api/work-schedules/${row._id}/confirm-cod`, { method: 'POST', token, body: { cash: Number(amount), note: codNote[row._id]?.trim() || '' } });
+      setNotice(`Đã xác nhận nhận ${formatVnd(Number(amount))} COD từ ${row.user?.fullName || 'shipper'}.`);
+      setReloadKey(key => key + 1);
+    } catch (err) { setError((err as Error).message); }
+    finally { setBusy(false); }
+  };
 
   useEffect(() => {
     if (!token) return;
     let active = true;
     setLoading(true);
     shopApi<ShiftRecord[]>(`/api/shift-handovers?from=${range.from}&to=${range.to}`, { token })
-      .then((rows) => {
+      .then((raw) => {
         if (!active) return;
+        const rows = Array.isArray(raw) ? raw : [];
         setShifts(rows);
         const queryScheduleId = searchParams.get('scheduleId');
         if (queryScheduleId && rows.some((row) => row._id === queryScheduleId)) {
@@ -195,7 +233,7 @@ export default function PosHandoverPage() {
     }
   };
 
-  const expectedPreview = detail?.expectedCash ?? (detail?.openingCash === null && validMoney(openingCash) ? Number(openingCash) + detail.cashRevenue : null);
+  const expectedPreview = detail?.expectedCash ?? (detail?.openingCash === null && validMoney(openingCash) ? Number(openingCash) + detail.cashRevenue + detail.codReceipts : null);
   const differencePreview = expectedPreview !== null && validMoney(actualCash) ? Number(actualCash) - expectedPreview : null;
   const isDiff = differencePreview !== null && differencePreview !== 0;
 
@@ -299,6 +337,21 @@ export default function PosHandoverPage() {
           </div>
         )}
 
+        {canConfirm && pendingCod.length > 0 && (
+          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+            <h2 className="font-bold text-amber-950">COD shipper chờ thu ngân nhận ({pendingCod.length})</h2>
+            <p className="text-xs text-amber-900">Kiểm đếm tiền thực nhận trước khi xác nhận. Khoản này sẽ vào két của ca thu ngân hiện tại.</p>
+            {pendingCod.map(row => (
+              <div key={row._id} className="grid gap-2 rounded-lg bg-white p-3 text-sm md:grid-cols-[1fr_130px_1fr_auto] md:items-end">
+                <div><strong>{row.user?.fullName || 'Shipper'}</strong><div className="text-xs text-slate-600">Hệ thống: {formatVnd(row.endingCashSystem)} · Shipper khai nộp: {formatVnd(row.endingCashActual)}</div></div>
+                <label className="text-xs font-semibold">Thực nhận<input className="mt-1 w-full rounded border p-2" type="number" min="0" step="1" value={codCash[row._id] ?? String(row.endingCashActual)} onChange={event => setCodCash({ ...codCash, [row._id]: event.target.value })} /></label>
+                <label className="text-xs font-semibold">Ghi chú chênh lệch<input className="mt-1 w-full rounded border p-2" maxLength={500} value={codNote[row._id] ?? ''} onChange={event => setCodNote({ ...codNote, [row._id]: event.target.value })} /></label>
+                <button type="button" disabled={busy} onClick={() => void receiveCod(row)} className="rounded bg-primary px-3 py-2 font-bold text-white disabled:opacity-50">Xác nhận nhận COD</button>
+              </div>
+            ))}
+          </section>
+        )}
+
         {/* Top Shift Info Banner Matching SWP Shift Banner Card */}
         {detail && (
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
@@ -309,7 +362,8 @@ export default function PosHandoverPage() {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-lg font-extrabold text-slate-900">
-                    {labels[detail.schedule.shiftName] || detail.schedule.shiftName} ({shiftTimes[detail.schedule.shiftName] || '06:30 – 12:30'})
+                    {formatShiftTitle(detail.schedule.shiftName, detail.schedule.shiftInfo)}
+                    {formatShiftHours(detail.schedule.shiftName, detail.schedule.shiftInfo) && ` (${formatShiftHours(detail.schedule.shiftName, detail.schedule.shiftInfo)})`}
                   </h2>
                   <span className={`rounded-md px-2.5 py-0.5 text-xs font-bold ${
                     detail.handedOver
@@ -393,7 +447,7 @@ export default function PosHandoverPage() {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <strong className="text-sm font-bold text-slate-900">{labels[shift.shiftName] || shift.shiftName}</strong>
+                    <strong className="text-sm font-bold text-slate-900">{formatShiftTitle(shift.shiftName, shift.shiftInfo)}</strong>
                     <span className="text-xs text-slate-500">{displayDay(shift.workDate)}</span>
                   </div>
                   {user?.role === 'ADMIN' && (
@@ -509,6 +563,10 @@ export default function PosHandoverPage() {
                             <strong className="text-xs font-bold text-emerald-700 block mt-0.5">
                               {formatVnd(cashSales)}
                             </strong>
+                          </div>
+                          <div className="rounded-lg bg-white p-2.5 border border-slate-200 shadow-2xs">
+                            <span className="text-[10px] font-bold text-slate-400 block uppercase">+ COD nhận từ shipper</span>
+                            <strong className="text-xs font-bold text-emerald-700 block mt-0.5">{formatVnd(detail.codReceipts || 0)}</strong>
                           </div>
                           <div className="rounded-lg bg-white p-2.5 border border-red-200 shadow-2xs">
                             <span className="text-[10px] font-bold text-primary block uppercase">= Phải có trong két</span>
@@ -776,7 +834,7 @@ export default function PosHandoverPage() {
                     )}
 
                     {/* 5 Handover Metrics Strip matching SWP */}
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">TIỀN ĐẦU CA</span>
                         <strong className="mt-1 block text-base font-extrabold text-slate-800">{formatVnd(detail.openingCash || 0)}</strong>
@@ -784,6 +842,10 @@ export default function PosHandoverPage() {
                       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">DOANH THU TIỀN MẶT</span>
                         <strong className="mt-1 block text-base font-extrabold text-emerald-700">{formatVnd(cashSales)}</strong>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">COD NHẬN TỪ SHIPPER</span>
+                        <strong className="mt-1 block text-base font-extrabold text-emerald-700">{formatVnd(detail.codReceipts || 0)}</strong>
                       </div>
                       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">DOANH THU KHÔNG TIỀN MẶT</span>
@@ -902,7 +964,7 @@ export default function PosHandoverPage() {
                           </div>
                           <div className="my-2.5 border-t border-dashed border-black" />
                           <div className="space-y-0.5">
-                            <div>Ca: {labels[detail.schedule.shiftName] || detail.schedule.shiftName} · {displayDay(detail.schedule.workDate)}</div>
+                            <div>Ca: {formatShiftTitle(detail.schedule.shiftName, detail.schedule.shiftInfo)} · {displayDay(detail.schedule.workDate)}</div>
                             <div>Thu ngân: {detail.schedule.user?.fullName}</div>
                             <div>Giờ vào: {displayTime(detail.schedule.checkInTime)}</div>
                             <div>Giờ ra: {displayTime(detail.schedule.checkOutTime)}</div>
@@ -912,6 +974,7 @@ export default function PosHandoverPage() {
                           <div className="space-y-1">
                             <div className="flex justify-between"><span>Tiền đầu ca</span><strong>{formatVnd(detail.openingCash || 0)}</strong></div>
                             <div className="flex justify-between"><span>Thu tiền mặt ({methods.CASH.count})</span><strong>{formatVnd(cashSales)}</strong></div>
+                            <div className="flex justify-between"><span>Nhận COD từ shipper</span><strong>{formatVnd(detail.codReceipts || 0)}</strong></div>
                             <div className="flex justify-between"><span>Theo hệ thống</span><strong>{formatVnd(detail.expectedCash || 0)}</strong></div>
                             <div className="flex justify-between"><span>Thực tế trong két</span><strong>{formatVnd(detail.actualCash || 0)}</strong></div>
                             <div className="mt-1 flex justify-between border-t border-dashed border-black pt-1">

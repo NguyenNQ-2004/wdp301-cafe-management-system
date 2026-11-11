@@ -4,11 +4,19 @@ import { AdminLayout, inputCls } from './AdminUi';
 import { formatVnd, shopApi } from '../../lib/shopApi';
 import useAuthStore from '../../store/authStore';
 
+interface ShiftInfo {
+  code: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+}
+
 interface Handover {
   _id: string;
   user: { _id: string; fullName: string; phone: string } | null;
   workDate: string;
   shiftName: string;
+  shiftInfo?: ShiftInfo;
   handoverAt?: string;
   startingCash?: number;
   endingCashSystem?: number;
@@ -28,8 +36,13 @@ const initialRange = () => {
   return { from: from.toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) };
 };
 
-const shiftLabel = (name: string) => ({ MORNING: 'Ca sáng', AFTERNOON: 'Ca chiều', EVENING: 'Ca tối' })[name] || name;
-const time = (value: string) => new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
+const shiftLabel = (name: string) => ({ MORNING: 'Ca sáng', AFTERNOON: 'Ca chiều', EVENING: 'Ca tối' })[name] || name || 'Ca làm';
+const time = (value?: string) => {
+  if (!value) return '—';
+  const ms = Date.parse(value);
+  if (Number.isNaN(ms)) return '—';
+  return new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' }).format(new Date(ms));
+};
 
 export default function AdminHandoversPage() {
   const token = useAuthStore(state => state.user?.token);
@@ -52,7 +65,7 @@ export default function AdminHandoversPage() {
     setLoading(true);
     setError('');
     shopApi<Handover[]>(`/api/shift-handovers?from=${range.from}&to=${range.to}`, { token })
-      .then(data => { if (active) setRows(data.filter(row => row.handoverAt)); })
+      .then(data => { if (active) setRows(Array.isArray(data) ? data.filter(row => row && row.handoverAt) : []); })
       .catch(err => { if (active) { setRows([]); setError(err.message); } })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -136,11 +149,14 @@ export default function AdminHandoversPage() {
               {visible.map(row => {
                 const difference = (row.endingCashActual ?? 0) - (row.endingCashSystem ?? 0);
                 const status = row.handoverStatus || 'SUBMITTED';
+                const workDay = (row.workDate || '').slice(0, 10);
+                const shiftTitle = row.shiftInfo?.name || shiftLabel(row.shiftName);
+                const shiftHours = row.shiftInfo?.startTime && row.shiftInfo?.endTime ? ` (${row.shiftInfo.startTime}–${row.shiftInfo.endTime})` : '';
                 return (
                   <tr key={row._id} className="border-t border-stone-100">
                     <td className="px-4 py-4">
-                      <strong>{shiftLabel(row.shiftName)} · {row.workDate.slice(0, 10).split('-').reverse().join('/')}</strong>
-                      <small className="mt-1 block text-stone-500">Chốt {time(row.handoverAt!)}</small>
+                      <strong>{shiftTitle}{shiftHours} · {workDay ? workDay.split('-').reverse().join('/') : '—'}</strong>
+                      <small className="mt-1 block text-stone-500">Chốt {time(row.handoverAt)}</small>
                       {row.resubmittedAt && <small className="block text-amber-600 font-medium">Đã gửi lại {time(row.resubmittedAt)}</small>}
                     </td>
                     <td className="px-4 py-4">{row.user?.fullName || 'Nhân viên đã xóa'}<small className="block text-stone-500">{row.user?.phone}</small></td>
@@ -148,7 +164,7 @@ export default function AdminHandoversPage() {
                       <td key={index} className="px-4 py-4 text-right tabular-nums">{value == null ? '—' : formatVnd(value)}</td>
                     ))}
                     <td className={`px-4 py-4 font-semibold ${difference < 0 ? 'text-red-700' : difference > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-                      {difference === 0 ? 'Khớp' : `${difference > 0 ? 'Thừa +' : 'Thiếu '}${formatVnd(difference)}`}
+                      {difference === 0 ? 'Khớp' : `${difference > 0 ? 'Thừa +' : 'Thiếu '}${formatVnd(Math.abs(difference))}`}
                     </td>
                     <td className="max-w-64 whitespace-normal break-words px-4 py-4">
                       <div>{row.handoverNote || '—'}</div>

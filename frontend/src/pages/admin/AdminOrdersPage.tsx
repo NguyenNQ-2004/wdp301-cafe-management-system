@@ -55,7 +55,9 @@ interface Order {
 }
 
 interface Payment {
+  _id: string;
   order: string | { _id: string };
+  amount: number;
   paymentMethod?: string;
   status?: string;
 }
@@ -262,6 +264,7 @@ export const AdminOrdersPage: React.FC<AdminOrdersPageProps> = ({
     const status = changes.status || order.status;
     if (status === order.status && changes.shipperId === undefined) return;
     let cancelReason: string | undefined;
+    let refund: { method: string; reference: string; amount: number } | undefined;
     if (changes.status === 'CANCELLED') {
       const reason = window.prompt('Nhập lý do hủy đơn:');
       if (reason === null) return;
@@ -271,17 +274,40 @@ export const AdminOrdersPage: React.FC<AdminOrdersPageProps> = ({
         setError('Vui lòng nhập lý do hủy đơn.');
         return;
       }
+      const paid = paymentByOrder.get(order._id);
+      if (paid?.status === 'SUCCESS') {
+        const defaultMethod = paid.paymentMethod === 'DEMO_ONLINE' ? 'DEMO_ONLINE' : paid.paymentMethod || 'CASH';
+        const refundMethod = window.prompt('Đã hoàn tiền bằng cách nào? Nhập CASH, BANK_TRANSFER, MOMO, VNPAY hoặc DEMO_ONLINE:', defaultMethod);
+        if (refundMethod === null) return;
+        const normalized = refundMethod.trim().toUpperCase();
+        if (!['CASH', 'BANK_TRANSFER', 'MOMO', 'VNPAY', 'DEMO_ONLINE'].includes(normalized)) { setError('Phương thức hoàn tiền không hợp lệ.'); return; }
+        let reference = '';
+        if (!['CASH', 'DEMO_ONLINE'].includes(normalized)) {
+          const entered = window.prompt('Nhập mã giao dịch HOÀN TIỀN đã thực hiện:');
+          if (entered === null) return;
+          reference = entered.trim();
+          if (!reference || reference.length > 100) { setError('Cần mã giao dịch hoàn tiền, tối đa 100 ký tự.'); return; }
+        }
+        if (!window.confirm(`Xác nhận đã hoàn đủ ${formatMoney(paid.amount)} cho đơn ${order.orderCode || ''} rồi hủy đơn?`)) return;
+        refund = { method: normalized, reference, amount: paid.amount };
+      }
     }
 
     setUpdatingOrderId(order._id);
     setError('');
     setNotice('');
     try {
-      await shopApi(`/api/orders/${encodeURIComponent(order._id)}/status`, {
-        method: 'PUT',
-        token: token || undefined,
-        body: { ...changes, status, ...(cancelReason ? { cancelReason } : {}) }
-      });
+      if (refund) {
+        await shopApi(`/api/payments/order/${encodeURIComponent(order._id)}/refund-and-cancel`, {
+          method: 'POST', token: token || undefined,
+          body: { amount: refund.amount, refundMethod: refund.method, refundReference: refund.reference, cancelReason }
+        });
+      } else {
+        await shopApi(`/api/orders/${encodeURIComponent(order._id)}/status`, {
+          method: 'PUT', token: token || undefined,
+          body: { ...changes, status, ...(cancelReason ? { cancelReason } : {}) }
+        });
+      }
       setOrders((current) => current.map((item) => item._id === order._id
         ? {
           ...item,

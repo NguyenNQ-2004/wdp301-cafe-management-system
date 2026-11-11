@@ -13,6 +13,7 @@ const WorkSchedule = require('../models/WorkSchedule');
 
 function validateCustomer(body, creating) {
   objectBody(body);
+  if (creating && (typeof body.password !== 'string' || body.password.length < 8 || Buffer.byteLength(body.password, 'utf8') > 72)) throw invalid('Mật khẩu phải có ít nhất 8 ký tự và tối đa 72 byte.');
   if (creating || body.fullName !== undefined) text(body.fullName, 'Họ tên', 100);
   if (creating || body.phone !== undefined) {
     if (typeof body.phone !== 'string' || !/^[0-9]{9,15}$/.test(body.phone.trim())) throw invalid('Số điện thoại phải có từ 9 đến 15 chữ số.');
@@ -172,7 +173,7 @@ router.get('/customers/:id', adminOrCashier, async (req, res) => {
 router.post('/customers', adminOrCashier, async (req, res) => {
   try {
     validateCustomer(req.body, true);
-    const { fullName, phone, email, birthday, address, initialPoints = 0 } = req.body;
+    const { fullName, phone, email, password, birthday, address, initialPoints = 0 } = req.body;
 
     if (!fullName || !phone) {
       return res.status(400).json({ message: 'Họ tên và Số điện thoại là bắt buộc.' });
@@ -183,8 +184,7 @@ router.post('/customers', adminOrCashier, async (req, res) => {
       return res.status(400).json({ message: 'Số điện thoại này đã tồn tại trong hệ thống.' });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash('123456', salt);
+    const passwordHash = await bcrypt.hash(password, 10);
 
     const points = Math.max(0, Number(initialPoints) || 0);
 
@@ -303,7 +303,10 @@ router.get('/:id', adminOnly, async (req, res) => {
 // 3. ADMIN CREATE USER (Staff, Barista, Cashier, Shipper, Customer)
 router.post('/', adminOnly, async (req, res) => {
   try {
-    const { fullName, phone, email, password = '123456', role, position, baseSalary, hireDate, birthday, address } = req.body;
+    const { fullName, phone, email, password, role, position, baseSalary, hireDate, birthday, address } = req.body;
+
+    if (typeof fullName !== 'string' || !fullName.trim() || typeof phone !== 'string' || !phone.trim()) return res.status(400).json({ message: 'Họ tên và số điện thoại là bắt buộc.' });
+    if (typeof password !== 'string' || password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) return res.status(400).json({ message: 'Mật khẩu phải có ít nhất 8 ký tự và tối đa 72 byte.' });
     
     const existing = await User.findOne({ phone });
     if (existing) return res.status(400).json({ message: 'Số điện thoại này đã được sử dụng.' });

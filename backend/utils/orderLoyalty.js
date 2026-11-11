@@ -51,8 +51,10 @@ async function refundRedemption(order) {
   try {
     if (refund) transactions.push(await LoyaltyTransaction.create({ customer: order.customer, order: order._id, pointsChange: refund, transactionType: 'REFUND', redemptionRefund: true, reason: 'Hoàn điểm đổi ưu đãi do hủy đơn' }));
     if (reversal) transactions.push(await LoyaltyTransaction.create({ customer: order.customer, order: order._id, pointsChange: -reversal, transactionType: 'ADJUST', earningReversal: true, reason: 'Thu hồi điểm tích từ đơn đã hủy' }));
-    const customer = await User.findOneAndUpdate({ _id: order.customer, ...(net < 0 ? { totalPoints: { $gte: -net } } : {}) }, { $inc: { totalPoints: net } }, { returnDocument: 'after' });
-    if (!customer) throw Object.assign(new Error('Số điểm hiện tại không đủ để thu hồi điểm của đơn đã hủy.'), { status: 409 });
+    // A refund must still complete after the customer spent earned points.
+    // A negative balance is a points debt offset by future earnings.
+    const customer = await User.findOneAndUpdate({ _id: order.customer }, { $inc: { totalPoints: net } }, { returnDocument: 'after' });
+    if (!customer) throw Object.assign(new Error('Không tìm thấy khách hàng để hoàn điểm.'), { status: 409 });
     customerUpdated = true;
     if (refund && order.reward) {
       const result = await RewardItem.updateOne({ _id: order.reward, stock: { $gte: 0 } }, { $inc: { stock: 1 } });

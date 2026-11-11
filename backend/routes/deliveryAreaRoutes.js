@@ -159,4 +159,27 @@ router.delete('/:id', requireAdmin, async (req, res) => {
   }
 });
 
+// POST /api/delivery-areas/seed-defaults: Admin seeds default delivery areas
+router.post('/seed-defaults', requireAdmin, async (req, res) => {
+  try {
+    let createdCount = 0;
+    for (const item of DEFAULT_DISTRICTS) {
+      const existing = await DeliveryArea.findOne({
+        district: { $regex: new RegExp(`^${item.district.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      });
+      if (!existing) {
+        await DeliveryArea.create(item);
+        createdCount++;
+      }
+    }
+    const all = await DeliveryArea.find().sort({ district: 1 });
+    res.json({ message: `Đã nạp ${createdCount} khu vực giao hàng mặc định.`, count: createdCount, areas: all });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.ensureSeed = ensureSeed;
+router.DEFAULT_DISTRICTS = DEFAULT_DISTRICTS;
+
 module.exports = router;

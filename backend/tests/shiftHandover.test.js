@@ -59,6 +59,8 @@ test('UC27 reconciles only cashier cash payments and saves one printable snapsho
 
   const today = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
   const start = new Date(Date.now() - 3600000);
+  const shiftA = await WorkSchedule.create({ user: cashierA._id, workDate: new Date(today), shiftName: 'MORNING', status: 'PRESENT', checkInTime: start, startingCash: 100000 });
+  const shiftB = await WorkSchedule.create({ user: cashierB._id, workDate: new Date(today), shiftName: 'MORNING', status: 'PRESENT', checkInTime: start });
   const makeOrder = async (code, amount, orderType = 'DINE_IN') => Order.create({
     orderCode: code, orderType, totalAmount: amount, finalAmount: amount, status: 'COMPLETED', cashier: cashierA._id
   });
@@ -70,13 +72,12 @@ test('UC27 reconciles only cashier cash payments and saves one printable snapsho
   assert.equal(paidA.status, 200);
   assert.equal(String((await Payment.findById(cashA._id)).receivedBy), String(cashierA._id));
   assert.equal((await request('POST', `/api/payments/${cashB._id}/counter-confirm`, { paymentMethod: 'CASH' }, bToken)).status, 200);
-  assert.equal((await request('POST', `/api/payments/${bankA._id}/counter-confirm`, { paymentMethod: 'BANK_TRANSFER', transactionCode: 'BANK-UC27' }, aToken)).status, 200);
+  assert.equal((await request('POST', `/api/payments/${bankA._id}/counter-confirm`, { paymentMethod: 'BANK_TRANSFER', transactionCode: 'BANK-UC27' }, aToken)).status, 409);
   await Payment.create({ order: (await makeOrder('UC27-OLD', 7000))._id, paymentMethod: 'CASH', amount: 7000, status: 'SUCCESS', paidAt: new Date() });
   await Payment.create({ order: (await makeOrder('UC27-ONLINE', 90000, 'ONLINE'))._id, paymentMethod: 'CASH', amount: 90000, status: 'SUCCESS', paidAt: new Date(), receivedBy: cashierA._id });
 
   const end = new Date();
-  const shiftA = await WorkSchedule.create({ user: cashierA._id, workDate: new Date(today), shiftName: 'MORNING', status: 'COMPLETED', checkInTime: start, checkOutTime: end, startingCash: 100000 });
-  const shiftB = await WorkSchedule.create({ user: cashierB._id, workDate: new Date(today), shiftName: 'MORNING', status: 'COMPLETED', checkInTime: start, checkOutTime: end });
+  await WorkSchedule.updateMany({ _id: { $in: [shiftA._id, shiftB._id] } }, { $set: { status: 'COMPLETED', checkOutTime: end } });
   const unfinished = await WorkSchedule.create({ user: cashierA._id, workDate: new Date(today), shiftName: 'AFTERNOON', status: 'PRESENT', checkInTime: start });
   const listPath = `/api/shift-handovers?from=${today}&to=${today}`;
   assert.equal((await request('GET', listPath)).status, 401);

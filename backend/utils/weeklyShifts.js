@@ -34,15 +34,72 @@ async function withWeekLock(week, action) {
   try { return await action(); }
   finally { release(); if (locks.get(key) === barrier) locks.delete(key); }
 }
+const DEFAULT_SHIFT_LABELS = { MORNING: 'Ca sáng', AFTERNOON: 'Ca chiều', EVENING: 'Ca tối' };
+const DEFAULT_SHIFT_TIMES = { MORNING: '07:00-12:00', AFTERNOON: '12:00-17:00', EVENING: '17:00-22:00' };
+const VALID_TIME_RANGE = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/;
+
 const shiftJson = (shift) => ({ _id: shift._id, weekStart: shift.weekStart, code: shift.shiftName, name: shift.shiftName, startTime: shift.startTime, endTime: shift.endTime });
 async function resolveShift(schedule) {
   const week = mondayOf(schedule.workDate);
   const shift = await WorkShift.findOne({ weekStart: week, shiftName: schedule.shiftName });
   if (shift) return `${shift.startTime}-${shift.endTime}`;
   // Existing schedules remain usable without rewriting historical data.
-  const defaults = { MORNING: '07:00-12:00', AFTERNOON: '12:00-17:00', EVENING: '17:00-22:00' };
-  if (await WorkShift.exists({ weekStart: week }) || !defaults[schedule.shiftName]) throw invalid('Ca làm không thuộc tuần của lịch phân công.', 409);
+  if (await WorkShift.exists({ weekStart: week }) || !DEFAULT_SHIFT_TIMES[schedule.shiftName]) throw invalid('Ca làm không thuộc tuần của lịch phân công.', 409);
   const setting = await ShopSetting.findOne({ settingKey: `shift_${schedule.shiftName.toLowerCase()}` });
-  return setting?.settingValue || defaults[schedule.shiftName];
+  return setting?.settingValue || DEFAULT_SHIFT_TIMES[schedule.shiftName];
 }
-module.exports = { invalid, parseDay, parseWeek, mondayOf, currentWeek, assertEditable, withWeekLock, shiftJson, resolveShift };
+
+async function attachShiftInfo(schedules) {
+  const items = schedules.map((item) => (typeof item?.toObject === 'function' ? item.toObject() : { ...item }));
+  if (!items.length) return items;
+
+  const weekMap = new Map();
+  for (const item of items) {
+    if (!item.workDate) continue;
+    const date = new Date(item.workDate);
+    if (Number.isNaN(date.getTime())) continue;
+    const week = mondayOf(date);
+    weekMap.set(week.toISOString().slice(0, 10), week);
+  }
+
+  const [workShifts, settings] = await Promise.all([
+    weekMap.size ? WorkShift.find({ weekStart: { $in: Array.from(weekMap.values()) } }).lean() : Promise.resolve([]),
+    ShopSetting.find({ settingKey: { $in: ['shift_morning', 'shift_afternoon', 'shift_evening'] } }).lean()
+  ]);
+
+  const byWeekAndName = new Map(
+    workShifts.map((ws) => [`${new Date(ws.weekStart).toISOString().slice(0, 10)}::${ws.shiftName}`, ws])
+  );
+  const settingRanges = new Map(
+    settings.map((s) => [s.settingKey.replace('shift_', '').toUpperCase(), s.settingValue])
+  );
+
+  return items.map((obj) => {
+    const name = obj.shiftName || '';
+    let weekKey = '';
+    if (obj.workDate && !Number.isNaN(new Date(obj.workDate).getTime())) {
+      weekKey = mondayOf(obj.workDate).toISOString().slice(0, 10);
+    }
+    const ws = weekKey ? byWeekAndName.get(`${weekKey}::${name}`) : null;
+    if (ws) {
+      obj.shiftInfo = {
+        code: name,
+        name: DEFAULT_SHIFT_LABELS[name] || ws.shiftName || name,
+        startTime: ws.startTime,
+        endTime: ws.endTime
+      };
+      return obj;
+    }
+    if (DEFAULT_SHIFT_TIMES[name]) {
+      const stored = settingRanges.get(name);
+      const range = typeof stored === 'string' && VALID_TIME_RANGE.test(stored) ? stored : DEFAULT_SHIFT_TIMES[name];
+      const [startTime, endTime] = range.split('-');
+      obj.shiftInfo = { code: name, name: DEFAULT_SHIFT_LABELS[name], startTime, endTime };
+      return obj;
+    }
+    obj.shiftInfo = { code: name, name: name || 'Ca làm', startTime: '', endTime: '' };
+    return obj;
+  });
+}
+
+module.exports = { invalid, parseDay, parseWeek, mondayOf, currentWeek, assertEditable, withWeekLock, shiftJson, resolveShift, attachShiftInfo };

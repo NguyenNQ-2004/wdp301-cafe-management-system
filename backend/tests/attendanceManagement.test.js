@@ -108,4 +108,15 @@ test('UC26 records own attendance once and lets admin review and mark absence', 
   assert.equal(absent.data.status, 'ABSENT');
   assert.equal((await request('PATCH', `/api/work-schedules/${missed._id}/absence`, null, adminToken)).status, 409);
   assert.equal((await WorkSchedule.findById(other._id)).status, 'SCHEDULED');
+
+  const WorkShift = require('../models/WorkShift');
+  const { mondayOf } = require('../utils/weeklyShifts');
+  const weekStart = mondayOf(today);
+  const customShift = await WorkShift.create({ weekStart, shiftName: 'a', startTime: '06:30', endTime: '11:30' });
+  await WorkSchedule.create({ user: staffB._id, workDate: new Date(today), shiftName: 'a', shift: customShift._id });
+  const customAttendance = await request('GET', `/api/work-schedules/attendance${query}&userId=${staffB._id}`, null, adminToken);
+  assert.equal(customAttendance.status, 200);
+  const customRecord = customAttendance.data.find((item) => item.shiftName === 'a');
+  assert.ok(customRecord);
+  assert.deepEqual(customRecord.shiftInfo, { code: 'a', name: 'a', startTime: '06:30', endTime: '11:30' });
 });

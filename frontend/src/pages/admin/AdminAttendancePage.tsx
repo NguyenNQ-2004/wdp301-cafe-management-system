@@ -5,11 +5,11 @@ import { shopApi } from '../../lib/shopApi';
 import useAuthStore from '../../store/authStore';
 import { AdminLayout, inputCls } from './AdminUi';
 
-type ShiftName = 'MORNING' | 'AFTERNOON' | 'EVENING';
+type ShiftName = string;
 type AttendanceStatus = 'SCHEDULED' | 'PRESENT' | 'ABSENT' | 'COMPLETED';
 interface Employee { _id: string; fullName: string; phone: string; position: string }
-interface RecordItem { _id: string; user: Employee | null; workDate: string; shiftName: ShiftName; status: AttendanceStatus; checkInTime?: string; checkOutTime?: string; note?: string }
 interface Shift { code: ShiftName; name: string; startTime: string; endTime: string }
+interface RecordItem { _id: string; user: Employee | null; workDate: string; shiftName: ShiftName; shiftInfo?: Shift; status: AttendanceStatus; checkInTime?: string; checkOutTime?: string; note?: string }
 const fallbackShifts: Shift[] = [
   { code: 'MORNING', name: 'Ca sáng', startTime: '07:00', endTime: '12:00' },
   { code: 'AFTERNOON', name: 'Ca chiều', startTime: '12:00', endTime: '17:00' },
@@ -17,6 +17,13 @@ const fallbackShifts: Shift[] = [
 ];
 const statusLabels: Record<AttendanceStatus, string> = {
   SCHEDULED: 'Chưa chấm công', PRESENT: 'Đang trong ca', ABSENT: 'Vắng mặt', COMPLETED: 'Đã hoàn thành'
+};
+const isValidTime = (value?: string): value is string => typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+const resolveShiftForRecord = (record: RecordItem, shifts: Shift[]): Shift => {
+  if (record.shiftInfo) return record.shiftInfo;
+  return shifts.find((item) => item.code === record.shiftName)
+    || fallbackShifts.find((item) => item.code === record.shiftName)
+    || { code: record.shiftName || '', name: record.shiftName || 'Ca làm', startTime: '', endTime: '' };
 };
 const nowInVietnam = () => new Date(Date.now() + 7 * 3600000);
 const initialRange = () => {
@@ -32,16 +39,22 @@ const nextDayKey = (key: string) => {
   date.setUTCDate(date.getUTCDate() + 1);
   return date.toISOString().slice(0, 10);
 };
-const formatTime = (iso?: string) => iso
-  ? new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso))
-  : '—';
+const formatTime = (iso?: string) => {
+  if (!iso) return '—';
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return '—';
+  return new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(ms));
+};
 const differenceMinutes = (record: RecordItem, shift: Shift, field: 'checkInTime' | 'checkOutTime') => {
   const actual = record[field];
-  if (!actual) return null;
+  const expectedTime = field === 'checkInTime' ? shift.startTime : shift.endTime;
+  if (!actual || !record.workDate || !isValidTime(expectedTime)) return null;
   const [year, month, day] = record.workDate.slice(0, 10).split('-').map(Number);
-  const [hour, minute] = (field === 'checkInTime' ? shift.startTime : shift.endTime).split(':').map(Number);
+  const [hour, minute] = expectedTime.split(':').map(Number);
   const expected = Date.UTC(year, month - 1, day, hour - 7, minute);
-  return Math.round((Date.parse(actual) - expected) / 60000);
+  const actualMs = Date.parse(actual);
+  if (Number.isNaN(expected) || Number.isNaN(actualMs)) return null;
+  return Math.round((actualMs - expected) / 60000);
 };
 
 export default function AdminAttendancePage() {
@@ -80,9 +93,9 @@ export default function AdminAttendancePage() {
       isAdmin ? shopApi<Employee[]>('/api/employees', { token }) : Promise.resolve([])
     ]).then(([history, shiftResponse, staff]) => {
       if (!active) return;
-      setRecords(history);
-      setShifts(shiftResponse.shifts);
-      setEmployees(staff);
+      setRecords(Array.isArray(history) ? history : []);
+      setShifts(Array.isArray(shiftResponse?.shifts) && shiftResponse.shifts.length ? shiftResponse.shifts : fallbackShifts);
+      setEmployees(Array.isArray(staff) ? staff : []);
       setError('');
     }).catch((err: Error) => { if (active) setError(err.message); })
       .finally(() => { if (active) setLoading(false); });
@@ -148,18 +161,22 @@ export default function AdminAttendancePage() {
       <table className="w-full min-w-[940px] text-left text-sm">
         <thead><tr className="bg-stone-50 text-stone-700"><th className="p-3">Ngày</th>{isAdmin && <th className="p-3">Nhân viên</th>}<th className="p-3">Ca theo lịch</th><th className="p-3">Vào thực tế</th><th className="p-3">Ra thực tế</th><th className="p-3">Đối chiếu</th><th className="p-3">Trạng thái</th><th className="p-3">Thao tác</th></tr></thead>
         <tbody>{records.map((record) => {
-          const shift = shifts.find((item) => item.code === record.shiftName) || fallbackShifts.find((item) => item.code === record.shiftName)!;
+          const shift = resolveShiftForRecord(record, shifts);
+          const hasTimeWindow = isValidTime(shift.startTime) && isValidTime(shift.endTime);
           const late = differenceMinutes(record, shift, 'checkInTime');
           const early = differenceMinutes(record, shift, 'checkOutTime');
-          const workDay = record.workDate.slice(0, 10);
-          const [startHour, startMinute] = shift.startTime.split(':').map(Number);
-          const [endHour, endMinute] = shift.endTime.split(':').map(Number);
-          const canCheckIn = workDay === today && vietnamMinute >= startHour * 60 + startMinute - 60 && vietnamMinute <= endHour * 60 + endMinute;
-          const canCheckOut = workDay === today || (nextDayKey(workDay) === today && vietnamHour < 6);
+          const workDay = (record.workDate || '').slice(0, 10);
+          let canCheckIn = workDay === today;
+          if (hasTimeWindow) {
+            const [startHour, startMinute] = shift.startTime.split(':').map(Number);
+            const [endHour, endMinute] = shift.endTime.split(':').map(Number);
+            canCheckIn = workDay === today && vietnamMinute >= startHour * 60 + startMinute - 60 && vietnamMinute <= endHour * 60 + endMinute;
+          }
+          const canCheckOut = workDay === today || (workDay ? nextDayKey(workDay) === today && vietnamHour < 6 : false);
           return <tr key={record._id} className="border-t border-stone-100 align-top">
-            <td className="p-3 font-semibold">{workDay.split('-').reverse().join('/')}</td>
+            <td className="p-3 font-semibold">{workDay ? workDay.split('-').reverse().join('/') : '—'}</td>
             {isAdmin && <td className="p-3"><strong className="block">{record.user?.fullName || 'Nhân viên đã xóa'}</strong><span className="text-xs text-stone-500">{record.user?.phone}</span></td>}
-            <td className="p-3">{shift.name}<span className="block text-xs text-stone-500">{shift.startTime}–{shift.endTime}</span></td>
+            <td className="p-3">{shift.name}<span className="block text-xs text-stone-500">{hasTimeWindow ? `${shift.startTime}–${shift.endTime}` : 'Chưa rõ khung giờ'}</span></td>
             <td className="p-3">{formatTime(record.checkInTime)}</td>
             <td className="p-3">{formatTime(record.checkOutTime)}</td>
             <td className="p-3 text-xs">{late !== null && late > 0 && <span className="block text-amber-700">Vào trễ {late} phút</span>}{early !== null && early < 0 && <span className="block text-amber-700">Ra sớm {-early} phút</span>}{(late === null || late <= 0) && (early === null || early >= 0) && <span className="text-stone-500">—</span>}</td>

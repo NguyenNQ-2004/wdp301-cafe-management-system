@@ -31,6 +31,8 @@ test('Final baseline: checkout identity, rollback, payment integrity and atomic 
   const cashier = await User.create({ fullName: 'Final Cashier', phone: '0900000102', passwordHash: 'fixture', role: 'STAFF', position: 'CASHIER' });
   const admin = await User.create({ fullName: 'Final Admin', phone: '0900000103', passwordHash: 'fixture', role: 'ADMIN' });
   const foreign = await User.create({ fullName: 'Other Cashier', phone: '0900000104', passwordHash: 'fixture', role: 'STAFF', position: 'CASHIER' });
+  const shipper = await User.create({ fullName: 'Final Shipper', phone: '0900000105', passwordHash: 'fixture', role: 'STAFF', position: 'SHIPPER' });
+  await WorkSchedule.create({ user: shipper._id, workDate: new Date(), shiftName: 'CHECKOUT', status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) });
   const token = u => jwt.sign({ id: u._id }, require('../config/jwtSecret')());
   const request = async (method, path, body, user = customer) => {
     const res = await fetch(`http://127.0.0.1:${server.address().port}${path}`, { method, headers: { 'Content-Type': 'application/json', ...(user ? { Authorization: `Bearer ${token(user)}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
@@ -160,7 +162,6 @@ test('Final baseline: checkout identity, rollback, payment integrity and atomic 
     } finally { mongoose.connection.db.admin = adminCommand; }
   });
   await t.test('COD remittance uses collection time and claims each payment only once', async () => {
-    const shipper = await User.create({ fullName: 'Final Shipper', phone: '0900000105', passwordHash: 'fixture', role: 'STAFF', position: 'SHIPPER' });
     const start = new Date(Date.now() - 60000);
     const first = await WorkSchedule.create({ user: shipper._id, workDate: new Date(), shiftName: 'COD-A', status: 'PRESENT', checkInTime: start });
     const second = await WorkSchedule.create({ user: shipper._id, workDate: new Date(), shiftName: 'COD-B', status: 'PRESENT', checkInTime: start });
@@ -172,6 +173,23 @@ test('Final baseline: checkout identity, rollback, payment integrity and atomic 
     const again = await request('PUT', `/api/work-schedules/${second._id}/shift-action`, { action: 'REMIT_COD', cash: 0 }, shipper);
     assert.equal(again.status, 200); assert.equal(again.data.expectedCash, 0);
     assert.equal((await Payment.findById(payment._id)).remittanceSchedule.toString(), first._id.toString());
+    assert.equal((await request('POST', `/api/work-schedules/${first._id}/confirm-cod`, { cash: 63000 }, shipper)).status, 403);
+    assert.equal((await request('POST', `/api/work-schedules/${first._id}/confirm-cod`, { cash: 63000 }, cashier)).status, 409);
+    const cashierShift = await WorkSchedule.create({ user: cashier._id, workDate: new Date(), shiftName: 'COD-RECEIVE', status: 'PRESENT', checkInTime: start, startingCash: 100000 });
+    const pending = await request('GET', '/api/work-schedules/cod-remittances', null, cashier);
+    assert.equal(pending.status, 200);
+    assert.ok(pending.data.some(row => row._id === String(first._id)));
+    assert.equal((await request('POST', `/api/work-schedules/${first._id}/confirm-cod`, { cash: 62000 }, cashier)).status, 400);
+    const received = await request('POST', `/api/work-schedules/${first._id}/confirm-cod`, { cash: 63000 }, cashier);
+    assert.equal(received.status, 200, JSON.stringify(received.data));
+    assert.equal(received.data.codReceivingSchedule, String(cashierShift._id));
+    assert.equal((await request('POST', `/api/work-schedules/${first._id}/confirm-cod`, { cash: 63000 }, cashier)).status, 409);
+    const preview = await request('GET', `/api/shift-handovers/${cashierShift._id}`, null, cashier);
+    assert.equal(preview.data.codReceipts, 63000);
+    assert.equal(preview.data.expectedCash, 100000 + preview.data.cashRevenue + 63000);
+    const closed = await request('POST', `/api/shift-handovers/${cashierShift._id}/confirm`, { actualCash: preview.data.expectedCash }, cashier);
+    assert.equal(closed.status, 200, JSON.stringify(closed.data));
+    assert.equal(closed.data.codReceipts, 63000);
   });
   await t.test('callback versus replacement leaves a single consistent payment outcome', async () => {
     const raceSession = randomUUID();

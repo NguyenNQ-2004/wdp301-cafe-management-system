@@ -122,6 +122,16 @@ test('Valid and empty bills render safely', () => {
   assert.match(renderWithDb(bill(1), db), /ONLY-ORDER-001/);
   assert.match(renderWithDb(bill(null), emptyDb()), /Chưa có đơn hàng/);
 });
+test('A COD order awaiting collection is shown as unpaid on its printable receipt', () => {
+  const db = emptyDb();
+  db.orders = [{ ...sampleOrder, order_type: 'ONLINE', status: 'CONFIRMED', payment_method: 'COD' }];
+  db.payments = [{ id: 2, order_id: 1, payment_method: 'CASH', status: 'PENDING', amount: 30000, transaction_code: 'COD-ONLY-ORDER-001', paid_at: null, payment_note: null }];
+  const html = renderWithDb(bill(1), db);
+  assert.match(html, /Đơn COD — chưa thu tiền/);
+  assert.match(html, /Chưa thu tiền — thu khi giao hàng/);
+  assert.match(html, /Cần thu khi giao/);
+  assert.doesNotMatch(html, /Mã GD:/);
+});
 test('Login route renders the password form', () => {
   auth.getState().logout();
   const html = renderToString(React.createElement(MemoryRouter, { initialEntries: ['/login'] }, React.createElement(App)));

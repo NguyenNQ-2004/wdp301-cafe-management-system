@@ -4,6 +4,7 @@ const Payment = require('../models/Payment');
 const User = require('../models/User');
 const WorkSchedule = require('../models/WorkSchedule');
 const ShiftHandover = require('../models/ShiftHandover');
+const { attachShiftInfo } = require('../utils/weeklyShifts');
 const { protect } = require('../middlewares/authMiddleware');
 
 const { atomicRouter } = require('../utils/atomicRoute');
@@ -40,6 +41,7 @@ const cashLedger = async (schedule) => {
   };
   const result = {
     cashRevenue: 0,
+    codReceipts: 0,
     paymentCount: 0,
     unattributedCash: 0,
     unattributedCount: 0,
@@ -71,6 +73,9 @@ const cashLedger = async (schedule) => {
     }
   }
   result.orderCount = orderIds.size;
+  const codShifts = await WorkSchedule.find({ codReceivingSchedule: schedule._id, codReceivedBy: schedule.user, codReceivedAt: { $gte: startTime, $lte: endTime } }).select('codReceivedAmount');
+  result.codReceipts = codShifts.reduce((total, shift) => total + shift.codReceivedAmount, 0);
+  if (!Number.isSafeInteger(result.codReceipts) || result.codReceipts < 0) throw Object.assign(new Error('Tiền COD nhận trong ca không hợp lệ.'), { status: 409 });
   if (!Number.isSafeInteger(result.cashRevenue) || !Number.isSafeInteger(result.unattributedCash)) throw Object.assign(new Error('Tổng giao dịch tiền mặt vượt giới hạn cho phép.'), { status: 409 });
   return result;
 };
@@ -79,14 +84,15 @@ const detail = (schedule, ledger, handover = null) => {
   const saved = !!schedule.handoverAt;
   const openingCash = Number.isSafeInteger(schedule.startingCash) && schedule.startingCash >= 0 ? schedule.startingCash : null;
   const cashRevenue = saved ? schedule.handoverCashSales : ledger?.cashRevenue ?? 0;
-  const expectedCash = saved ? schedule.endingCashSystem : openingCash === null ? null : openingCash + cashRevenue;
+  const codReceipts = saved ? (schedule.handoverCodReceipts ?? 0) : (ledger?.codReceipts ?? 0);
+  const expectedCash = saved ? schedule.endingCashSystem : openingCash === null ? null : openingCash + cashRevenue + codReceipts;
   const actualCash = saved ? schedule.endingCashActual : null;
   const status = handover?.status || (saved ? 'SUBMITTED' : null);
 
   return {
     schedule: {
       _id: schedule._id, user: schedule.user, workDate: schedule.workDate, shiftName: schedule.shiftName,
-      status: schedule.status, checkInTime: schedule.checkInTime, checkOutTime: schedule.checkOutTime
+      shiftInfo: schedule.shiftInfo, status: schedule.status, checkInTime: schedule.checkInTime, checkOutTime: schedule.checkOutTime
     },
     ready: canClose(schedule),
     handedOver: saved,
@@ -101,6 +107,7 @@ const detail = (schedule, ledger, handover = null) => {
     history: handover?.history || [],
     openingCash,
     cashRevenue,
+    codReceipts,
     paymentCount: saved ? schedule.handoverPaymentCount : ledger?.paymentCount ?? 0,
     unattributedCash: saved ? schedule.handoverUnattributedCash : ledger?.unattributedCash ?? 0,
     unattributedCount: saved ? schedule.handoverUnattributedCount : ledger?.unattributedCount ?? 0,
@@ -110,6 +117,7 @@ const detail = (schedule, ledger, handover = null) => {
     note: saved ? (handover?.note ?? schedule.handoverNote ?? '') : '',
     summary: {
       cashSales: cashRevenue,
+      codReceipts,
       paymentCount: saved ? schedule.handoverPaymentCount : ledger?.paymentCount ?? 0,
       nonCashSales: ledger?.nonCashSales ?? 0,
       totalSales: (saved ? schedule.handoverCashSales : (ledger?.cashRevenue ?? 0)) + (ledger?.nonCashSales ?? 0),
@@ -152,7 +160,7 @@ router.get('/', async (req, res) => {
       }
     }
     const schedules = await WorkSchedule.find(filter)
-      .select('user workDate shiftName status checkInTime checkOutTime handoverAt startingCash endingCashSystem endingCashActual handoverCashSales handoverPaymentCount handoverNote')
+      .select('user workDate shiftName status checkInTime checkOutTime handoverAt startingCash endingCashSystem endingCashActual handoverCashSales handoverCodReceipts handoverPaymentCount handoverNote')
       .populate('user', 'fullName phone position')
       .sort({ workDate: -1, shiftName: 1 });
 
@@ -161,10 +169,10 @@ router.get('/', async (req, res) => {
       .populate('reviewedBy', 'fullName phone');
     const handoverMap = new Map(handovers.map(h => [String(h.schedule), h]));
 
-    const response = schedules.map(s => {
-      const obj = s.toObject();
-      const h = handoverMap.get(String(s._id));
-      obj.handoverStatus = h?.status || (s.handoverAt ? 'SUBMITTED' : null);
+    const schedulesWithShift = await attachShiftInfo(schedules);
+    const response = schedulesWithShift.map(obj => {
+      const h = handoverMap.get(String(obj._id));
+      obj.handoverStatus = h?.status || (obj.handoverAt ? 'SUBMITTED' : null);
       obj.handoverDoc = h || null;
       obj.reviewerNote = h?.reviewerNote || null;
       obj.reviewedBy = h?.reviewedBy || null;
@@ -182,9 +190,10 @@ router.get('/:id', async (req, res) => {
     const schedule = await findSchedule(req.params.id, req.user);
     if (schedule === null) return res.status(404).json({ message: 'Không tìm thấy ca làm.' });
     if (schedule === false) return res.status(403).json({ message: 'Không được xem bàn giao ca này.' });
+    const [enriched] = await attachShiftInfo([schedule]);
     const ledger = (canClose(schedule) || schedule.status === 'PRESENT' || !!schedule.handoverAt) ? await cashLedger({ ...schedule.toObject(), user: schedule.user._id }) : null;
     const handover = await ShiftHandover.findOne({ schedule: schedule._id }).populate('reviewedBy', 'fullName phone');
-    res.json(detail(schedule, ledger, handover));
+    res.json(detail(enriched, ledger, handover));
   } catch (error) { handleError(error, res); }
 });
 
@@ -204,15 +213,15 @@ router.post('/:id/confirm', async (req, res) => {
     if (body.note !== undefined && (typeof body.note !== 'string' || body.note.trim().length > 500)) throw badRequest('Ghi chú không được quá 500 ký tự.');
     const openingCash = hasOpening ? schedule.startingCash : body.openingCash;
     const ledger = await cashLedger({ ...schedule.toObject(), user: req.user._id });
-    const expectedCash = openingCash + ledger.cashRevenue;
+    const expectedCash = openingCash + ledger.cashRevenue + ledger.codReceipts;
     if (!Number.isSafeInteger(expectedCash)) throw badRequest('Tổng tiền hệ thống không hợp lệ.');
     if (body.actualCash !== expectedCash && !body.note?.trim()) throw badRequest('Cần ghi lý do khi tiền thực tế chênh lệch với hệ thống.');
     const updated = await WorkSchedule.findOneAndUpdate(
-      { _id: schedule._id, user: req.user._id, status: schedule.status, handoverAt: { $exists: false }, checkInTime: { $exists: true }, ...(schedule.status === 'PRESENT' ? { checkOutTime: { $exists: false } } : { checkOutTime: schedule.checkOutTime }) },
+      { _id: schedule._id, user: req.user._id, status: schedule.status, codLedgerVersion: schedule.codLedgerVersion ? schedule.codLedgerVersion : { $in: [null, 0] }, handoverAt: { $exists: false }, checkInTime: { $exists: true }, ...(schedule.status === 'PRESENT' ? { checkOutTime: { $exists: false } } : { checkOutTime: schedule.checkOutTime }) },
       { $set: {
         status: 'COMPLETED', checkOutTime: schedule.checkOutTime || new Date(),
         startingCash: openingCash, endingCashSystem: expectedCash, endingCashActual: body.actualCash,
-        handoverCashSales: ledger.cashRevenue, handoverPaymentCount: ledger.paymentCount,
+        handoverCashSales: ledger.cashRevenue, handoverCodReceipts: ledger.codReceipts, handoverPaymentCount: ledger.paymentCount,
         handoverUnattributedCash: ledger.unattributedCash, handoverUnattributedCount: ledger.unattributedCount,
         handoverAt: new Date(), handoverNote: body.note?.trim() || ''
       } }, { returnDocument: 'after', runValidators: true }
@@ -230,6 +239,7 @@ router.post('/:id/confirm', async (req, res) => {
           checkOutTime: updated.checkOutTime,
           openingCash,
           cashSales: ledger.cashRevenue,
+          codReceipts: ledger.codReceipts,
           expectedCash,
           actualCash: body.actualCash,
           difference: body.actualCash - expectedCash,
@@ -241,7 +251,8 @@ router.post('/:id/confirm', async (req, res) => {
       { upsert: true, returnDocument: 'after', runValidators: true }
     );
 
-    res.json(detail(updated, ledger, handover));
+    const [enriched] = await attachShiftInfo([updated]);
+    res.json(detail(enriched, ledger, handover));
   } catch (error) { handleError(error, res); }
 });
 

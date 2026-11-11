@@ -1,0 +1,39 @@
+.swp-storefront .swp-home-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.swp-storefront .swp-banner-copy {
+  left: 68px;
+  max-width: min(56%, calc(100% - 136px));
+}
+
+@media (max-width: 767px) {
+  .swp-storefront .swp-banner-copy {
+    left: 58px;
+    max-width: calc(100% - 116px);
+  }
+}
+
+.swp-storefront .swp-banner-pause {
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  right: 12px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #5d2825;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.swp-storefront .swp-banner-pause:focus-visible {
+  outline: 3px solid #900b1a;
+  outline-offset: 2px;
+}
+
+.swp-storefront .swp-store-empty h3 {
+  color: #0f172a;
+  font-weight: 700;
+  margin-bottom: 8px;
+}

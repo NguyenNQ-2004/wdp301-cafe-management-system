@@ -35,7 +35,7 @@ interface PosCartItem {
 
 const SUGAR_LEVELS = ['0%', '30%', '50%', '70%', '100%'];
 const ICE_LEVELS = ['Không đá', 'Ít đá', 'Đá chuẩn'];
-const METHODS: PaymentMethod[] = ['CASH', 'BANK_TRANSFER', 'VNPAY', 'MOMO'];
+const METHODS: PaymentMethod[] = ['CASH', 'BANK_TRANSFER'];
 
 export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNavigate, onShowToast }) => {
   const navigate = useNavigate();

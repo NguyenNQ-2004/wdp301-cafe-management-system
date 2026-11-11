@@ -1,4 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { shopApi } from '../../lib/shopApi';
+import useAuthStore from '../../store/authStore';
+import type { PaymentRecord } from '../../types/shop';
+import type { Payment } from '../types/db';
 import type { PageRoute } from '../types';
 import { useDb } from '../data/DbContext';
 import {
@@ -24,16 +28,44 @@ interface BillPageProps {
 }
 
 export const BillPage: React.FC<BillPageProps> = ({ orderId, onSelectOrder, onNavigate, onShowToast }) => {
-  const { db } = useDb();
+  const { db, rawId } = useDb();
+  const user = useAuthStore(state => state.user);
   const orders = [...db.orders].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   const order = orderId === null ? orders[0] : db.orders.find(o => o.id === orderId);
+  const [paymentDetail, setPaymentDetail] = useState<PaymentRecord | null>(null);
+  const [paymentError, setPaymentError] = useState('');
+  const selectedOrderId = order ? rawId(order.id) : '';
+  useEffect(() => {
+    setPaymentDetail(null);
+    setPaymentError('');
+    if (!selectedOrderId || !user?.token) return;
+    let active = true;
+    shopApi<{ payment: PaymentRecord }>(`/api/payments/order/${encodeURIComponent(selectedOrderId)}`, { token: user.token })
+      .then(result => { if (active) setPaymentDetail(result.payment); })
+      .catch(error => { if (active) setPaymentError((error as Error).message); });
+    return () => { active = false; };
+  }, [selectedOrderId, user?.token]);
 
   if (!order) {
     return <div role="status" className="p-10 text-center text-stone-500">{orderId === null ? 'Chưa có đơn hàng nào.' : 'Không tìm thấy đơn hàng hoặc bạn không có quyền xem hóa đơn này.'}</div>;
   }
 
   const items = orderItemsOf(db, order.id);
-  const payment = paymentOf(db, order.id);
+  const payment: Payment | undefined = paymentDetail ? {
+    id: 0, order_id: order.id, payment_method: paymentDetail.paymentMethod,
+    demo_provider: paymentDetail.demoProvider, transaction_code: paymentDetail.transactionCode ?? null,
+    amount: paymentDetail.amount, status: paymentDetail.status,
+    paid_at: paymentDetail.paidAt ?? null, payment_note: paymentDetail.paymentNote ?? null,
+    received_amount: paymentDetail.receivedAmount, change_amount: paymentDetail.changeAmount,
+    refund_amount: paymentDetail.refundAmount, refund_method: paymentDetail.refundMethod,
+    refunded_at: paymentDetail.refundedAt
+  } : paymentOf(db, order.id);
+  const codAwaitingCash = order.status !== 'CANCELLED' && order.payment_method === 'COD' && payment?.status === 'PENDING';
+  const receiptTitle = order.status === 'CANCELLED' ? 'Đơn hàng đã hủy'
+    : payment?.status === 'REFUNDED' ? 'Đơn hàng đã hoàn tiền'
+    : payment?.status === 'SUCCESS' ? 'Hóa đơn đã thanh toán'
+    : order.payment_method === 'COD' ? 'Đơn COD — chưa thu tiền'
+    : 'Đơn hàng chờ thanh toán';
   const customer = order.customer_id ? db.users.find(u => u.id === order.customer_id) : null;
 
   return (
@@ -51,7 +83,7 @@ export const BillPage: React.FC<BillPageProps> = ({ orderId, onSelectOrder, onNa
             </button>
             <div>
               <span className="text-xs font-bold text-primary uppercase tracking-wider">Screen 10 • Hóa đơn</span>
-              <h1 className="text-lg font-black text-stone-900">Chi Tiết Hóa Đơn</h1>
+              <h1 className="text-lg font-black text-stone-900">Chi tiết đơn hàng</h1>
             </div>
           </div>
 
@@ -72,7 +104,7 @@ export const BillPage: React.FC<BillPageProps> = ({ orderId, onSelectOrder, onNa
               className="px-3.5 py-1.5 bg-primary text-white text-xs font-bold rounded-xl flex items-center gap-1.5 hover:bg-primary-container transition-colors shadow-xs"
             >
               <span className="material-symbols-outlined text-[16px]">print</span>
-              In hóa đơn
+              In phiếu đơn hàng
             </button>
             <button
               onClick={() => {
@@ -102,7 +134,7 @@ export const BillPage: React.FC<BillPageProps> = ({ orderId, onSelectOrder, onNa
             <p className="text-xs text-stone-500 font-medium">{getSetting(db, 'store_address')}</p>
             <p className="text-xs text-stone-500 font-mono">Hotline: {getSetting(db, 'store_hotline')}</p>
             <div className="inline-block mt-2 px-3 py-1 bg-stone-100 rounded-full text-xs font-bold text-stone-700 uppercase tracking-widest">
-              Hóa đơn thanh toán
+              {receiptTitle}
             </div>
           </div>
 
@@ -216,6 +248,10 @@ export const BillPage: React.FC<BillPageProps> = ({ orderId, onSelectOrder, onNa
                 <span className="font-mono">+{fmtMoney(order.delivery_fee)}</span>
               </div>
             )}
+            <div className="flex justify-between text-stone-600">
+              <span>VAT (chưa áp dụng trong bản demo):</span>
+              <span className="font-mono">{fmtMoney(0)}</span>
+            </div>
             <div className="flex justify-between items-baseline pt-2 border-t border-stone-100 text-stone-900">
               <strong className="text-sm">TỔNG THANH TOÁN:</strong>
               <strong className="text-xl font-mono text-primary font-black">{fmtMoney(order.final_amount)}</strong>
@@ -228,19 +264,25 @@ export const BillPage: React.FC<BillPageProps> = ({ orderId, onSelectOrder, onNa
               {payment ? (
                 <>
                   <p>
-                    Phương thức: <strong className="text-stone-800">{PAYMENT_METHOD_LABEL[payment.payment_method]}</strong>
+                    Phương thức: <strong className="text-stone-800">{order.payment_method === 'COD' ? 'Thanh toán khi nhận hàng (COD)' : payment.payment_method === 'DEMO_ONLINE' && payment.demo_provider ? `${PAYMENT_METHOD_LABEL[payment.payment_method]} (${payment.demo_provider === 'BANK_TRANSFER' ? 'Chuyển khoản' : payment.demo_provider === 'MOMO' ? 'MoMo' : 'VNPay'})` : PAYMENT_METHOD_LABEL[payment.payment_method]}</strong>
                   </p>
                   <p>
                     Trạng thái:{' '}
                     <strong className={payment.status === 'SUCCESS' ? 'text-emerald-700' : 'text-amber-700'}>
-                      {PAYMENT_STATUS_LABEL[payment.status]}
+                      {codAwaitingCash ? 'Chưa thu tiền — thu khi giao hàng' : PAYMENT_STATUS_LABEL[payment.status]}
                     </strong>
                     {payment.paid_at && <span> lúc {fmtDateTime(payment.paid_at)}</span>}
                   </p>
-                  {payment.transaction_code && <p className="font-mono text-[11px]">Mã GD: {payment.transaction_code}</p>}
+                  {codAwaitingCash && <p className="font-semibold text-amber-800">Cần thu khi giao: {fmtMoney(order.final_amount)}</p>}
+                  {payment.transaction_code && !codAwaitingCash && <p className="font-mono text-[11px]">Mã GD: {payment.transaction_code}</p>}
+                  {payment.payment_method === 'CASH' && payment.status === 'SUCCESS' && payment.received_amount !== undefined && <>
+                    <p>Tiền khách đưa: <strong>{fmtMoney(payment.received_amount)}</strong></p>
+                    <p>Tiền thối lại: <strong>{fmtMoney(payment.change_amount ?? 0)}</strong></p>
+                  </>}
+                  {payment.status === 'REFUNDED' && <p>Đã hoàn: <strong>{fmtMoney(payment.refund_amount ?? payment.amount)}</strong>{payment.refund_method ? ` qua ${PAYMENT_METHOD_LABEL[payment.refund_method]}` : ''}{payment.refunded_at ? ` lúc ${fmtDateTime(payment.refunded_at)}` : ''}</p>}
                 </>
               ) : (
-                <p>Chưa có thông tin thanh toán</p>
+                <p>{paymentError ? `Không tải được thanh toán: ${paymentError}` : 'Đang tải thông tin thanh toán...'}</p>
               )}
               <p className="text-[10px] text-stone-400 pt-1">Cảm ơn Quý khách!</p>
             </div>

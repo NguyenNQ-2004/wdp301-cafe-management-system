@@ -107,13 +107,15 @@ export const PAYMENT_METHOD_ICON: Record<PaymentMethod, string> = {
 export const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {
   PENDING: 'Chờ thanh toán',
   SUCCESS: 'Đã thanh toán',
-  FAILED: 'Thất bại'
+  FAILED: 'Thất bại',
+  REFUNDED: 'Đã hoàn tiền'
 };
 
 export const PAYMENT_STATUS_STYLE: Record<PaymentStatus, string> = {
   PENDING: 'bg-amber-100 text-amber-900',
   SUCCESS: 'bg-emerald-100 text-emerald-800',
-  FAILED: 'bg-rose-100 text-rose-800'
+  FAILED: 'bg-rose-100 text-rose-800',
+  REFUNDED: 'bg-slate-100 text-slate-700'
 };
 
 export const REVIEW_TYPE_LABEL: Record<ReviewType, string> = {

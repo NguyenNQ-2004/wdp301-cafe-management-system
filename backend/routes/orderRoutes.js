@@ -9,6 +9,7 @@ const User = require('../models/User');
 const RewardItem = require('../models/RewardItem');
 const ShopSetting = require('../models/ShopSetting');
 const DeliveryArea = require('../models/DeliveryArea');
+const WorkSchedule = require('../models/WorkSchedule');
 const { protect } = require('../middlewares/authMiddleware');
 const { normalizeCartItems } = require('../utils/cartItems');
 const { demoPaymentsEnabled } = require('../utils/paymentMode');
@@ -23,8 +24,33 @@ const { adminOrCashier, authorizePosition } = require('../middlewares/authMiddle
 const { atomicRouter } = require('../utils/atomicRoute');
 const router = atomicRouter(express.Router());
 router.use(protect);
+router.use(async (req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) || req.user.role !== 'STAFF') return next();
+  try {
+    const now = new Date();
+    const active = await WorkSchedule.exists({
+      user: req.user._id, status: 'PRESENT',
+      checkInTime: { $gte: new Date(now.getTime() - 24 * 60 * 60 * 1000), $lte: now },
+      checkOutTime: { $exists: false }, handoverAt: { $exists: false }
+    });
+    if (!active) return res.status(409).json({ message: 'Nhân viên cần check-in ca đang làm trước khi thao tác đơn hàng.' });
+    next();
+  } catch (error) { next(error); }
+});
 const orderError = (message, status = 400) => Object.assign(new Error(message), { status });
 const { lockOrder } = require('../utils/orderMutation');
+const hasShipperOnShift = async (shipperId) => {
+  const now = new Date();
+  const shipperFilter = { role: 'STAFF', position: 'SHIPPER', status: 'ACTIVE' };
+  if (shipperId) shipperFilter._id = shipperId;
+  const shipperIds = await User.distinct('_id', shipperFilter);
+  if (!shipperIds.length) return false;
+  return !!await WorkSchedule.exists({
+    user: { $in: shipperIds }, status: 'PRESENT',
+    checkInTime: { $gte: new Date(now.getTime() - 24 * 60 * 60 * 1000), $lte: now },
+    checkOutTime: { $exists: false }, handoverAt: { $exists: false }
+  });
+};
 const validPhone = (value) => typeof value === 'string'
   && value.trim().length <= 30
   && /^\+?[0-9 .()-]+$/.test(value.trim())
@@ -163,6 +189,8 @@ router.post('/', async (req, res) => {
       ? (paymentMethod || (orderType === 'ONLINE' ? 'COD' : 'CASH'))
       : (checkoutFlow ? 'BANK_TRANSFER' : orderType === 'ONLINE' ? (['DEMO_ONLINE', 'BANK_TRANSFER'].includes(paymentMethod) ? paymentMethod : 'COD') : 'PAY_AT_COUNTER');
     if (!['COD', 'PAY_AT_COUNTER', 'CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER', 'DEMO_ONLINE'].includes(finalPaymentMethod)) throw orderError('Phương thức thanh toán không hợp lệ.');
+    if (isStaffOrAdmin && ['VNPAY', 'MOMO'].includes(finalPaymentMethod)) throw orderError('MoMo/VNPay tại quầy chưa kết nối cổng đối soát, vui lòng chọn tiền mặt hoặc chuyển khoản.', 503);
+    if (isStaffOrAdmin && finalPaymentMethod === 'BANK_TRANSFER' && !paymentGateway.enabled()) throw orderError('Chuyển khoản tại quầy chưa cấu hình cổng đối soát.', 503);
     if (finalPaymentMethod === 'DEMO_ONLINE' && (orderType !== 'ONLINE' || req.user.role !== 'CUSTOMER' || !demoPaymentsEnabled())) throw orderError('Thanh toán mô phỏng hiện không khả dụng.', 403);
     if (!checkoutFlow && orderType === 'ONLINE' && finalPaymentMethod === 'BANK_TRANSFER' && !paymentGateway.enabled()) throw orderError('Thanh toán chuyển khoản chưa được cấu hình.', 503);
     if (demoProvider != null && (finalPaymentMethod !== 'DEMO_ONLINE' || !['MOMO', 'VNPAY', 'BANK_TRANSFER'].includes(demoProvider))) throw orderError('Kênh thanh toán mô phỏng không hợp lệ.');
@@ -218,6 +246,9 @@ router.post('/', async (req, res) => {
     const deliveryFee = orderType === 'ONLINE' && totalAmount < threshold ? areaFee : 0;
     const finalAmount = totalAmount + deliveryFee - discountAmount;
     if (req.user.role === 'CUSTOMER' && (!Number.isInteger(req.body.expectedTotal) || req.body.expectedTotal !== finalAmount)) return res.status(409).json({ message: 'Giá món, ưu đãi điểm hoặc phí giao hàng đã thay đổi. Vui lòng kiểm tra lại giỏ hàng trước khi đặt.', finalAmount });
+    if (orderType === 'ONLINE' && !await hasShipperOnShift()) {
+      throw orderError('Hiện không có shipper đã check-in trong ca để nhận đơn giao. Vui lòng thử lại sau.', 409);
+    }
     // Validation is complete. Replacement and all subsequent effects share the
     // same database transaction as callbacks/cancellation, not just a JS lock.
     if (checkoutFlow) {
@@ -306,7 +337,7 @@ router.post('/', async (req, res) => {
       amount: finalAmount,
       status: 'PENDING',
       paymentNote: finalPaymentMethod === 'DEMO_ONLINE' ? 'Giao dịch mô phỏng, không thu tiền thật' : orderType === 'ONLINE' ? 'Đơn đặt online' : 'Thanh toán tại quầy',
-      ...(orderType === 'ONLINE' && finalPaymentMethod === 'BANK_TRANSFER' ? { transactionCode: `QR-${randomBytes(12).toString('hex').toUpperCase()}` } : {})
+      ...(finalPaymentMethod === 'BANK_TRANSFER' ? { transactionCode: `QR-${randomBytes(12).toString('hex').toUpperCase()}` } : {})
     });
 
     if (pointsReserved) await LoyaltyTransaction.create({ customer: pointsOwnerId, order: order._id, pointsChange: -pointsReserved, transactionType: 'REDEEM' });
@@ -394,6 +425,9 @@ router.put('/:id/status', withOrderMutation(async (req, res) => {
     if (status === 'CANCELLED' && (!cancelReason || !cancelReason.trim())) {
       return res.status(400).json({ message: 'Vui lòng nhập lý do hủy đơn.' });
     }
+    if (status === 'CANCELLED' && await Payment.exists({ order: order._id, status: 'SUCCESS' })) {
+      return res.status(409).json({ message: 'Đơn đã thanh toán. Quản lý cần xác nhận hoàn tiền rồi hủy đơn trong màn hình quản trị.' });
+    }
     if (status !== 'CANCELLED' && cancelReason !== undefined) {
       return res.status(400).json({ message: 'Chỉ được gửi lý do khi hủy đơn.' });
     }
@@ -435,6 +469,12 @@ router.put('/:id/status', withOrderMutation(async (req, res) => {
         if (isShipper && String(shipperId) !== String(req.user._id)) return res.status(403).json({ message: 'Shipper chỉ được nhận đơn cho chính mình.' });
         if (isShipper && order.shipper && String(order.shipper) !== String(shipperId)) return res.status(409).json({ message: 'Đơn hàng đã được gán cho shipper khác.' });
         order.shipper = shipper._id;
+      }
+    }
+
+    if (order.orderType === 'ONLINE' && ['DELIVERING', 'COMPLETED'].includes(status)) {
+      if (!order.shipper || !await hasShipperOnShift(order.shipper)) {
+        return res.status(409).json({ message: 'Shipper được phân công phải đã check-in và còn trong ca trước khi giao hoặc hoàn tất đơn.' });
       }
     }
 

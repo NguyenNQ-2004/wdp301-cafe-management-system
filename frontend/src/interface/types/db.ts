@@ -40,6 +40,8 @@ export interface WorkSchedule {
   starting_cash: number | null;
   ending_cash_system: number | null;
   ending_cash_actual: number | null;
+  cod_received_at?: string | null;
+  cod_received_amount?: number | null;
   status: ScheduleStatus;
   note: string | null;
 }
@@ -136,7 +138,7 @@ export interface OrderItem {
 }
 
 export type PaymentMethod = 'CASH' | 'VNPAY' | 'MOMO' | 'BANK_TRANSFER' | 'DEMO_ONLINE';
-export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED';
+export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
 
 // 7. payments
 export interface Payment {
@@ -148,6 +150,12 @@ export interface Payment {
   status: PaymentStatus;
   paid_at: string | null;
   payment_note: string | null;
+  demo_provider?: 'MOMO' | 'VNPAY' | 'BANK_TRANSFER';
+  received_amount?: number;
+  change_amount?: number;
+  refund_amount?: number;
+  refund_method?: PaymentMethod;
+  refunded_at?: string;
 }
 
 export type LoyaltyType = 'EARN' | 'REDEEM' | 'REFUND' | 'ADJUST';

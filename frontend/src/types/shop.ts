@@ -76,8 +76,14 @@ export interface PaymentRecord {
   paymentMethod: 'CASH' | 'VNPAY' | 'MOMO' | 'BANK_TRANSFER' | 'DEMO_ONLINE';
   demoProvider?: 'MOMO' | 'VNPAY' | 'BANK_TRANSFER';
   amount: number;
-  status: 'PENDING' | 'SUCCESS' | 'FAILED';
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
   transactionCode?: string;
   paidAt?: string;
+  receivedAmount?: number;
+  changeAmount?: number;
+    refundedAt?: string;
+    refundAmount?: number;
+    refundMethod?: 'CASH' | 'BANK_TRANSFER' | 'MOMO' | 'VNPAY' | 'DEMO_ONLINE';
+    refundReference?: string;
   paymentNote?: string;
 }
