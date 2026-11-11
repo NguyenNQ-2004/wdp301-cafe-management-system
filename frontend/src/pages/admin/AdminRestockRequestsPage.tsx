@@ -1,9 +1,9 @@
 import { NumberInput } from '../../components/NumberInput';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
-import { PosHeader } from '../../interface/pages/pos/PosHeader';
+import CashierWorkHeader from '../../components/CashierWorkHeader';
 import { AdminLayout, inputCls } from './AdminUi';
 import { shopApi } from '../../lib/shopApi';
 import useAuthStore from '../../store/authStore';
@@ -11,9 +11,8 @@ type Ingredient = { _id: string; name: string; unit: string; currentStock: numbe
 type RequestRow = { _id: string; requester?: { fullName: string }; reviewer?: { fullName: string }; status: string; reason: string; note: string; reviewNote?: string; createdAt: string; updatedAt: string; history?: { actor?: { fullName: string }; action: string; at: string; note?: string }[]; items: { ingredient: Ingredient | null; quantity: number; itemNote?: string }[] };
 const labels: Record<string, string> = { DRAFT: 'Bản nháp', PENDING_APPROVAL: 'Chờ duyệt', APPROVED: 'Đã duyệt', REJECTED: 'Từ chối', CANCELLED: 'Đã hủy' };
 export default function AdminRestockRequestsPage({ cashier = false }: { cashier?: boolean }) {
-  const navigate = useNavigate();
   const [editing, setEditing] = useState<RequestRow | null>(null);
-  const wrap = (children: ReactNode) => cashier ? <><PosHeader currentRoute="pos-restock" onNavigate={route => navigate(({ 'pos-create': '/cashier', 'pos-orders': '/cashier/orders', 'pos-shift': '/cashier/handover?mode=close', 'pos-handover': '/cashier/handover?mode=handover', 'pos-restock': '/cashier/restock-requests' } as Record<string, string>)[route] || '/cashier')} /><main className="mx-auto max-w-6xl p-6"><h1 className="mb-5 text-2xl font-bold">Đề xuất nhập hàng</h1>{children}</main></> : <AdminLayout title="Đề xuất nhập hàng" activePath="/admin/restock-requests" subtitle="Xem lịch sử và xác nhận hoặc từ chối đề xuất của thu ngân." actions={<Link to="/admin/purchases">Phiếu nhập hàng →</Link>}>{children}</AdminLayout>;
+  const wrap = (children: ReactNode) => cashier ? <><CashierWorkHeader currentRoute="pos-restock" /><main className="mx-auto max-w-6xl p-6"><h1 className="mb-5 text-2xl font-bold">Đề xuất nhập hàng</h1>{children}</main></> : <AdminLayout title="Đề xuất nhập hàng" activePath="/admin/restock-requests" subtitle="Xem lịch sử và xác nhận hoặc từ chối đề xuất của thu ngân." actions={<Link to="/admin/purchases">Phiếu nhập hàng →</Link>}>{children}</AdminLayout>;
   const token = useAuthStore(state => state.user?.token);
   const [rows, setRows] = useState<RequestRow[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
