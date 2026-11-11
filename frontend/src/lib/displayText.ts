@@ -38,7 +38,7 @@ export function repairDisplayText(value: string): string {
 
 const displayFields = new Set([
   'name', 'fullName', 'full_name', 'description', 'subtitle', 'badge', 'unit',
-  'productNameAtTime', 'product_name_at_time', 'ingredientName', 'ingredient_name',
+  'size', 'sizes', 'sugar', 'ice', 'topping', 'productNameAtTime', 'product_name_at_time', 'ingredientName', 'ingredient_name',
   'recipientName', 'recipient_name', 'address', 'deliveryAddress', 'delivery_address',
   'note', 'orderNote', 'order_note', 'paymentNote', 'cancelReason', 'reason',
   'reviewNote', 'itemNote', 'handoverNote', 'content', 'response', 'reply',
@@ -51,7 +51,10 @@ export function repairDisplayData<T>(value: T, field = ''): T {
   if (typeof value === 'string') return (displayFields.has(field) ? repairDisplayText(value) : value) as T;
   if (Array.isArray(value)) return value.map(item => repairDisplayData(item, field)) as T;
   if (value !== null && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, repairDisplayData(item, key)])) as T;
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [
+      field === 'sizes' ? repairDisplayText(key) : key,
+      repairDisplayData(item, key)
+    ])) as T;
   }
   return value;
 }

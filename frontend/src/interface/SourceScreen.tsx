@@ -20,6 +20,7 @@ import { DeliveryProblemPage } from './pages/delivery/DeliveryProblemPage';
 import { DeliveryCodPage } from './pages/delivery/DeliveryCodPage';
 import { AdminProductsPage } from './pages/admin/AdminProductsPage';
 import { ProductOptionsDialog, SelectedItemsDialog } from './components/StorefrontDialogs';
+import StaffWorkNav from '../components/StaffWorkNav';
 
 const PATHS: Partial<Record<PageRoute, string>> = {
   'pos-restock': '/cashier/restock-requests',
@@ -97,7 +98,9 @@ export default function SourceScreen({ screen }: { screen: PageRoute }) {
   if (store.loading) return <div className="grid min-h-[60vh] place-items-center"><p className="animate-pulse text-sm text-stone-500">Đang tải dữ liệu cửa hàng…</p></div>;
 
   return <div>
-    {['pos-create', 'pos-orders', 'kds-terminal', 'delivery-orders', 'delivery-report', 'delivery-cod'].includes(screen) && <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-2 text-xs text-stone-600"><Link to="/" className="font-semibold text-primary">← Trang chủ Aura Café</Link><div className="flex items-center gap-4">{(account?.role === 'ADMIN' || ['CASHIER', 'MANAGER'].includes(account?.position || '')) && <Link to="/cashier/payments" className="font-semibold">Thanh toán tại quầy</Link>}{account?.role === 'STAFF' && <Link to="/my-schedule">Lịch làm của tôi</Link>}<span>{account?.fullName}</span><button onClick={() => { useAuthStore.getState().logout(); navigate('/'); }} className="font-semibold text-red-700">Đăng xuất</button></div></div>}
+    {['pos-create', 'pos-orders', 'kds-terminal', 'delivery-orders', 'delivery-report', 'delivery-cod'].includes(screen) && (account?.role === 'STAFF'
+      ? <StaffWorkNav showCounterPayments={['CASHIER', 'MANAGER'].includes(account.position || '')} />
+      : <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-2 text-xs text-stone-600"><Link to="/" className="font-semibold text-primary">← Trang chủ Aura Café</Link><div className="flex items-center gap-4">{account?.role === 'ADMIN' && <Link to="/cashier/payments" className="font-semibold">Thanh toán tại quầy</Link>}<span>{account?.fullName}</span><button onClick={() => { useAuthStore.getState().logout(); navigate('/'); }} className="font-semibold text-red-700">Đăng xuất</button></div></div>)}
     {missing.length > 0 && <div role="alert" className="mx-4 my-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><span>Chưa tải được: {[...new Set(missing.map(path => DATA_LABELS[path] || 'dữ liệu cửa hàng'))].join(', ')}. Vui lòng thử lại.</span><button onClick={() => void store.refresh()} className="font-bold underline">Thử lại</button></div>}
     {store.error && <p role="alert" className="mx-4 my-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{store.error}</p>}
     {store.notice && !store.error && <p role="status" className="mx-4 my-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{store.notice}</p>}

@@ -1,9 +1,9 @@
 import { NumberInput } from '../../components/NumberInput';
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { shopApi } from '../../lib/shopApi';
 import useAuthStore from '../../store/authStore';
+import StaffWorkNav from '../../components/StaffWorkNav';
 import { AdminLayout, inputCls } from './AdminUi';
 
 type ShiftName = string;
@@ -59,7 +59,6 @@ const differenceMinutes = (record: RecordItem, shift: Shift, field: 'checkInTime
 };
 
 export default function AdminAttendancePage() {
-  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const token = user?.token;
   const isAdmin = user?.role === 'ADMIN';
@@ -200,5 +199,8 @@ export default function AdminAttendancePage() {
   </div>;
 
   if (isAdmin) return <AdminLayout route="admin-attendance" table="work_schedules" title="26. Chấm công nhân sự" subtitle="Theo dõi giờ vào, giờ ra và đối chiếu với ca đã phân.">{content}</AdminLayout>;
-  return <div className="mx-auto w-full max-w-7xl p-4 md:p-8"><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold">Chấm công của tôi</h1><p className="text-sm text-stone-600">Check-in và check-out theo ca đã được phân.</p></div><button onClick={() => navigate('/my-schedule')} className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold">Xem lịch phân ca</button></div>{content}</div>;
+  return <>
+    <StaffWorkNav showCounterPayments={['CASHIER', 'MANAGER'].includes(user?.position || '')} />
+    <div className="mx-auto w-full max-w-7xl p-4 md:p-8"><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold">Chấm công của tôi</h1><p className="text-sm text-stone-600">Check-in và check-out theo ca đã được phân.</p></div></div>{content}</div>
+  </>;
 }

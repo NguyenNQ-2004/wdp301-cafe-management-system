@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { formatVnd, shopApi } from '../../lib/shopApi';
 import useAuthStore from '../../store/authStore';
+import StaffWorkNav from '../../components/StaffWorkNav';
 import type { PaymentRecord } from '../../types/shop';
 
 interface CounterPayment extends Omit<PaymentRecord, 'order'> {
@@ -86,9 +87,11 @@ export default function CounterPaymentsPage() {
   const completed = payments.filter((payment) => payment.status === 'SUCCESS');
   const refunded = payments.filter((payment) => payment.status === 'REFUNDED');
 
-  return <div className="min-h-[calc(100vh-5rem)] bg-[#fafafa] px-5 py-10">
-    <div className="mx-auto max-w-5xl">
-      <button onClick={() => navigate('/cashier')} className="text-sm font-semibold text-primary">← Về trang thu ngân</button>
+  return <>
+    {user?.role === 'STAFF' && <StaffWorkNav showCounterPayments={['CASHIER', 'MANAGER'].includes(user.position || '')} />}
+    <div className="min-h-[calc(100vh-5rem)] bg-[#fafafa] px-5 py-10">
+      <div className="mx-auto max-w-5xl">
+      {user?.role !== 'STAFF' && <button onClick={() => navigate('/cashier')} className="text-sm font-semibold text-primary">← Về trang thu ngân</button>}
       <h1 className="mt-4 text-3xl font-bold text-slate-950">Thanh toán tại quầy</h1>
       <p className="mt-2 text-slate-600">Tiền mặt do thu ngân xác nhận. Chuyển khoản chỉ hoàn tất khi cổng thanh toán gửi xác nhận có chữ ký; MoMo/VNPay tại quầy chưa được kết nối.</p>
       {error && <p role="alert" className="mt-5 rounded-lg bg-red-50 p-4 text-red-700">{error}</p>}
@@ -113,6 +116,7 @@ export default function CounterPaymentsPage() {
         <div className="mt-4 space-y-2">{completed.map((payment) => <div key={payment._id} className="flex flex-wrap justify-between gap-2 rounded-lg border border-blue-100 bg-white p-4"><span>#{payment.order?.orderCode} · {methodLabels[payment.paymentMethod as CounterMethod] || payment.paymentMethod}{payment.transactionCode ? ` · ${payment.transactionCode}` : ''}</span><strong>{formatVnd(payment.amount)}</strong></div>)}</div>
         {refunded.length > 0 && <><h2 className="mt-10 text-xl font-bold">Đã hoàn tiền ({refunded.length})</h2><div className="mt-4 space-y-2">{refunded.map((payment) => <div key={payment._id} className="flex flex-wrap justify-between gap-2 rounded-lg border border-amber-200 bg-white p-4"><span>#{payment.order?.orderCode} · {payment.refundMethod || payment.paymentMethod}{payment.refundReference ? ` · ${payment.refundReference}` : ''}</span><strong>{formatVnd(payment.refundAmount || payment.amount)}</strong></div>)}</div></>}
       </>}
+      </div>
     </div>
-  </div>;
+  </>;
 }
