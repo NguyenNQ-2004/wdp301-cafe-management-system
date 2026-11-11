@@ -12,7 +12,7 @@ const User = require('../models/User');
 const WorkSchedule = require('../models/WorkSchedule');
 const ShopSetting = require('../models/ShopSetting');
 
-test('UC26 records own attendance once and lets admin review and mark absence', async (t) => {
+test('UC26 lets staff and admin record attendance while preserving ownership rules', async (t) => {
   const dbName = `aura_cafe_uc26_test_${randomBytes(4).toString('hex')}`;
   await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/aura_cafe_erp', {
     dbName, serverSelectionTimeoutMS: 5000
@@ -87,7 +87,10 @@ test('UC26 records own attendance once and lets admin review and mark absence', 
   assert.equal(remitted.data.schedule.endingCashActual, 100000);
   assert.equal((await request('PUT', `/api/work-schedules/${shipperSchedule._id}/shift-action`, { action: 'REMIT_COD', cash: 100000 }, shipperToken)).status, 409);
   assert.equal((await request('PUT', `/api/work-schedules/${own._id}/shift-action`, { action: 'CHECK_IN' }, bToken)).status, 403);
-  assert.equal((await request('PUT', `/api/work-schedules/${own._id}/shift-action`, { action: 'CHECK_IN' }, adminToken)).status, 403);
+  const adminCheckedIn = await request('PUT', `/api/work-schedules/${other._id}/shift-action`, { action: 'CHECK_IN' }, adminToken);
+  assert.equal(adminCheckedIn.status, 200);
+  const adminCheckedOut = await request('PUT', `/api/work-schedules/${other._id}/shift-action`, { action: 'CHECK_OUT' }, adminToken);
+  assert.equal(adminCheckedOut.status, 200);
   assert.equal((await request('PUT', `/api/work-schedules/${future._id}/shift-action`, { action: 'CHECK_IN' }, aToken)).status, 409);
   assert.equal((await request('PUT', `/api/work-schedules/${own._id}/shift-action`, { action: 'CHECK_IN', status: 'COMPLETED' }, aToken)).status, 400);
   assert.equal((await request('PUT', `/api/work-schedules/${own._id}/shift-action`, { action: 'CHECK_IN' }, aToken)).status, 409);
@@ -106,8 +109,11 @@ test('UC26 records own attendance once and lets admin review and mark absence', 
   const absent = await request('PATCH', `/api/work-schedules/${missed._id}/absence`, null, adminToken);
   assert.equal(absent.status, 200);
   assert.equal(absent.data.status, 'ABSENT');
+  const restored = await request('PUT', `/api/work-schedules/${missed._id}/shift-action`, { action: 'CHECK_IN' }, adminToken);
+  assert.equal(restored.status, 200);
+  assert.equal(restored.data.schedule.status, 'PRESENT');
   assert.equal((await request('PATCH', `/api/work-schedules/${missed._id}/absence`, null, adminToken)).status, 409);
-  assert.equal((await WorkSchedule.findById(other._id)).status, 'SCHEDULED');
+  assert.equal((await WorkSchedule.findById(other._id)).status, 'COMPLETED');
 
   const WorkShift = require('../models/WorkShift');
   const { mondayOf } = require('../utils/weeklyShifts');

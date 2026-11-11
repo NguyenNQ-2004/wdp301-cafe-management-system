@@ -58,7 +58,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       if (!response.ok) {
         setLoginError(response.status === 401
-          ? 'Tên đăng nhập hoặc mật khẩu không đúng. Mật khẩu phân biệt chữ hoa và chữ thường.'
+          ? 'Email hoặc mật khẩu không đúng. Mật khẩu phân biệt chữ hoa và chữ thường.'
           : data.message || 'Không thể đăng nhập. Vui lòng thử lại.');
         return;
       }
@@ -232,7 +232,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   Chào mừng trở lại
                 </h2>
                 <p className="font-body-sm text-body-sm text-secondary">
-                  Nhập số điện thoại, email hoặc tên email để đăng nhập
+                  Đăng nhập bằng Gmail
                 </p>
               </div>
 
@@ -240,7 +240,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div className="space-y-space-xs mt-space-xs">
                 <label className="font-label-md text-label-md text-on-surface font-medium block">
-                  Số điện thoại / Email / Tên đăng nhập
+                    Gmail
                 </label>
                 <div className="relative flex items-center">
                   <span className="material-symbols-outlined absolute left-space-md text-secondary pointer-events-none text-[20px]">

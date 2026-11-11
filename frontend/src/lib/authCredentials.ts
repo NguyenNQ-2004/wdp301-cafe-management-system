@@ -3,7 +3,7 @@ export const validEmail = (value: string) => value.length <= 254 && /^[^\s@]+@[^
 
 export function loginCredentials(identifier: string, password: string) {
   const email = normalizeEmail(identifier);
-  if (!validEmail(email) && !/^\+?\d{9,15}$/.test(email) && !/^[a-z0-9][a-z0-9._+-]{0,63}$/i.test(email)) throw new Error('Nhập số điện thoại, email hoặc tên email hợp lệ.');
+  if (!validEmail(email)) throw new Error('Nhập email hợp lệ để đăng nhập.');
   if (!password) throw new Error('Vui lòng nhập mật khẩu.');
   return { email, password };
 }
