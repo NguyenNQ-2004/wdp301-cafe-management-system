@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360">
+  <rect width="480" height="360" fill="#f5eee7"/>
+  <circle cx="240" cy="170" r="105" fill="#ead9cb"/>
+  <ellipse cx="235" cy="248" rx="95" ry="12" fill="#d8bda8"/>
+  <path d="M170 125h135v70a52 52 0 0 1-52 52h-31a52 52 0 0 1-52-52v-70Z" fill="#900b1a"/>
+  <path d="M305 137h12a32 32 0 1 1 0 64h-17" fill="none" stroke="#900b1a" stroke-width="15"/>
+  <ellipse cx="237" cy="125" rx="67" ry="16" fill="#b2292e"/>
+  <ellipse cx="237" cy="125" rx="53" ry="10" fill="#4c2c22"/>
+  <path d="M215 98c-18-18 14-25 0-43m37 43c-18-18 14-25 0-43" fill="none" stroke="#b39179" stroke-width="6" stroke-linecap="round"/>
+  <text x="240" y="305" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="600" letter-spacing="4" fill="#900b1a">AURA CAFÉ</text>
+</svg>
