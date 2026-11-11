@@ -1,3 +1,4 @@
+import { NumberInput } from '../../components/NumberInput';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { formatVnd, shopApi } from '../../lib/shopApi';
@@ -103,7 +104,7 @@ export default function CounterPaymentsPage() {
             <button onClick={() => void confirm(payment)} disabled={!!busyId} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{busyId === payment._id ? 'Đang xử lý...' : payment.paymentMethod === 'BANK_TRANSFER' ? 'Hiện mã QR chuyển khoản' : 'Đã nhận đủ tiền mặt'}</button>
           </div>
           {payment.paymentMethod !== 'BANK_TRANSFER' && <label className="mt-3 block text-sm font-semibold">Tiền khách đưa
-            <input type="number" min={payment.amount} step="1" inputMode="numeric" value={cashReceived[payment._id] ?? String(payment.amount)} onChange={(event) => setCashReceived(current => ({ ...current, [payment._id]: event.target.value }))} className="mt-1 block w-full max-w-xs rounded-lg border border-blue-100 p-2.5" />
+            <NumberInput type="number" min={payment.amount} step="1" inputMode="numeric" value={cashReceived[payment._id] ?? String(payment.amount)} onChange={(event) => setCashReceived(current => ({ ...current, [payment._id]: event.target.value }))} className="mt-1 block w-full max-w-xs rounded-lg border border-blue-100 p-2.5" />
             <span className="mt-1 block font-normal text-slate-600">Tiền thối lại: {formatVnd(Math.max(0, (Number(cashReceived[payment._id] ?? payment.amount) || 0) - payment.amount))}</span>
           </label>}
           {gatewayInfo[payment._id] && payment.paymentMethod === 'BANK_TRANSFER' && <div className="mt-4 flex flex-wrap items-center gap-4 rounded-lg bg-blue-50 p-4 text-sm"><img src={gatewayInfo[payment._id].qrUrl} alt={`Mã QR thanh toán đơn ${payment.order?.orderCode}`} className="h-40 w-40 bg-white object-contain" /><div><p><strong>Ngân hàng:</strong> {gatewayInfo[payment._id].bankName}</p><p><strong>Tài khoản:</strong> {gatewayInfo[payment._id].accountNo} · {gatewayInfo[payment._id].accountName}</p><p><strong>Nội dung:</strong> {payment.order?.orderCode}</p><p><strong>Mã đối soát:</strong> {payment.transactionCode}</p><p className="mt-2 text-blue-800">Thanh toán vẫn chờ xác nhận từ cổng.</p></div></div>}

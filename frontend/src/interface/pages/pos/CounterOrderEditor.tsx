@@ -1,3 +1,4 @@
+import { NumberInput } from '../../../components/NumberInput';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { Order } from '../../types';
@@ -85,7 +86,7 @@ export default function CounterOrderEditor({ order, onClose }: { order: Order; o
               <label className="text-xs">Size<select aria-label={`Size món ${index + 1}`} value={line.size} onChange={event => setLines(current => current.map(item => item.key === line.key ? { ...item, size: event.target.value } : item))} className="mt-1 w-full rounded-lg border border-stone-200 bg-white p-2">
                 {[...new Set([...sizes, line.size])].map(size => <option key={size}>{size}</option>)}
               </select></label>
-              <label className="text-xs">Số lượng<input aria-label={`Số lượng món ${index + 1}`} type="number" required min={1} max={99} step={1} value={Number.isNaN(line.quantity) ? '' : line.quantity} onChange={event => setLines(current => current.map(item => item.key === line.key ? { ...item, quantity: event.target.valueAsNumber } : item))} className="mt-1 w-full rounded-lg border border-stone-200 bg-white p-2" /></label>
+              <label className="text-xs">Số lượng<NumberInput aria-label={`Số lượng món ${index + 1}`} type="number" required min={1} max={99} step={1} value={Number.isNaN(line.quantity) ? '' : line.quantity} onChange={event => setLines(current => current.map(item => item.key === line.key ? { ...item, quantity: event.target.valueAsNumber } : item))} className="mt-1 w-full rounded-lg border border-stone-200 bg-white p-2" /></label>
               <button type="button" aria-label={`Xóa món ${index + 1}`} onClick={() => setLines(current => current.filter(item => item.key !== line.key))} className="self-end rounded-lg border border-rose-200 p-2 text-xs text-rose-700">Xóa</button>
             </div>;
           })}</div>

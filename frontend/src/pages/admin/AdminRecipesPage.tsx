@@ -1,3 +1,4 @@
+import { NumberInput } from '../../components/NumberInput';
 import React, { useState } from 'react';
 import type { PageRoute } from '../../types';
 import { useDb } from '../../data/DbContext';
@@ -264,7 +265,7 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
                 </div>
                 <div className="col-span-6 row-start-2 sm:col-span-3 sm:row-start-auto">
                 <div className="relative">
-                <input
+                <NumberInput
                   aria-label={`Lượng dùng ${i + 1}`}
                   required
                   type="number"
@@ -295,7 +296,7 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
                   <p className="font-semibold text-stone-800">Bổ sung giá tồn: {ingredient(l.ingredient_id)?.name}</p>
                   <p className="mt-1 text-xs leading-relaxed text-stone-600">Lượng tồn chưa có giá: <b>{fmtNumber(unpricedQuantity(l.ingredient_id))} {ingredient(l.ingredient_id)?.unit}</b>. Nhập tổng tiền mua của đúng lượng này, hệ thống tự chia ra đơn giá.</p>
                   <label className="mt-3 block text-[11px] font-medium text-stone-700" htmlFor={`stock-cost-${i}`}>Tổng tiền của lượng tồn trên (đ)</label>
-                  <div className="mt-1 flex flex-col gap-2 sm:flex-row"><input id={`stock-cost-${i}`} aria-label={`Tổng giá trị tồn ${ingredient(l.ingredient_id)?.name}`} type="number" min="0" step="1" disabled={saving} value={valuation.totalCost} onChange={e => setValuation({ ...valuation, totalCost: e.target.value === '' ? '' : Number(e.target.value) })} placeholder="Nhập tổng tiền mua" className={inputCls} /><button type="button" disabled={saving || valuation.totalCost === ''} onClick={() => void saveIngredientCost()} className="shrink-0 rounded-xl bg-[#800020] px-4 py-2 font-semibold text-white disabled:opacity-50">{saving ? 'Đang lưu...' : 'Lưu giá & tính cost'}</button><button type="button" disabled={saving} onClick={() => setValuation(null)} className="shrink-0 px-2 py-2 text-stone-500">Đóng</button></div>
+                  <div className="mt-1 flex flex-col gap-2 sm:flex-row"><NumberInput id={`stock-cost-${i}`} aria-label={`Tổng giá trị tồn ${ingredient(l.ingredient_id)?.name}`} type="number" min="0" step="1" disabled={saving} value={valuation.totalCost} onChange={e => setValuation({ ...valuation, totalCost: e.target.value === '' ? '' : Number(e.target.value) })} placeholder="Nhập tổng tiền mua" className={inputCls} /><button type="button" disabled={saving || valuation.totalCost === ''} onClick={() => void saveIngredientCost()} className="shrink-0 rounded-xl bg-[#800020] px-4 py-2 font-semibold text-white disabled:opacity-50">{saving ? 'Đang lưu...' : 'Lưu giá & tính cost'}</button><button type="button" disabled={saving} onClick={() => setValuation(null)} className="shrink-0 px-2 py-2 text-stone-500">Đóng</button></div>
                   {valuation.totalCost !== '' && Number.isFinite(valuation.totalCost) && valuation.totalCost >= 0 && unpricedQuantity(l.ingredient_id) > 0 && <p className="mt-2 text-[11px] tabular-nums text-stone-600">Đơn giá tự tính: {fmtMoney(valuation.totalCost)} ÷ {fmtNumber(unpricedQuantity(l.ingredient_id))} = {fmtMoney(valuation.totalCost / unpricedQuantity(l.ingredient_id))}/{ingredient(l.ingredient_id)?.unit}</p>}
                   <p className="mt-2 text-[10px] text-stone-500">Lưu giá sẽ cập nhật giá trị nguyên liệu trong kho, giữ nguyên số lượng tồn. Công thức được lưu riêng bằng nút bên dưới.</p>
                 </div>}

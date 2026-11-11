@@ -3,6 +3,8 @@ import type { PageRoute } from '../../types';
 import { useDb } from '../../data/DbContext';
 import { POSITION_LABEL, SHIFT_LABEL, initials, shiftTimeRange } from '../../data/dbUtils';
 
+import useAuthStore from '../../../store/authStore';
+
 interface PosHeaderProps {
   currentRoute: PageRoute;
   onNavigate: (route: PageRoute) => void;
@@ -11,6 +13,7 @@ interface PosHeaderProps {
 
 export const PosHeader: React.FC<PosHeaderProps> = ({ currentRoute, onNavigate }) => {
   const { db, session } = useDb();
+  const canRequest = useAuthStore(state => state.user?.role === 'STAFF' && state.user?.position === 'CASHIER');
   const [timeStr, setTimeStr] = useState('');
   const cashier = db.users.find(u => u.id === session.cashierId);
   // Ca đang làm của thu ngân (work_schedules.status = PRESENT)
@@ -61,7 +64,8 @@ export const PosHeader: React.FC<PosHeaderProps> = ({ currentRoute, onNavigate }
             { id: 'pos-create', label: 'Tạo đơn tại quầy', icon: 'point_of_sale' },
             { id: 'pos-orders', label: 'Danh sách đơn', icon: 'receipt_long' },
             { id: 'pos-shift', label: 'Chốt ca', icon: 'calculate' },
-            { id: 'pos-handover', label: 'Bàn giao ca', icon: 'assignment_turned_in' }
+            { id: 'pos-handover', label: 'Bàn giao ca', icon: 'assignment_turned_in' },
+            ...(canRequest ? [{ id: 'pos-restock', label: 'Đề xuất nhập hàng', icon: 'inventory_2' }] : [])
           ].map(tab => {
             const active = currentRoute === tab.id;
             return (

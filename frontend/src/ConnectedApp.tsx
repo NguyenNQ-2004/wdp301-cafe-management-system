@@ -177,6 +177,7 @@ const AppLayout = () => {
       <main className="flex-1">
         <RouteErrorBoundary key={location.pathname} onGoHome={() => navigate('/')}>
           <Routes>
+          <Route path="/cashier/restock-requests" element={user?.role === 'STAFF' && user.position === 'CASHIER' ? <AdminRestockRequestsPage cashier /> : <Navigate to="/" />} />
           <Route path="/" element={<SourceScreen screen="home" />} />
           <Route path="/home" element={<SourceScreen screen="home" />} />
           <Route path="/customer" element={<Navigate to="/" replace />} />

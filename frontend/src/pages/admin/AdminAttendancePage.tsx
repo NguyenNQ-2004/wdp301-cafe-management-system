@@ -1,3 +1,4 @@
+import { NumberInput } from '../../components/NumberInput';
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -183,7 +184,7 @@ export default function AdminAttendancePage() {
             <td className="p-3"><span className={`rounded-lg px-2 py-1 text-xs font-semibold ${record.status === 'ABSENT' ? 'bg-red-50 text-red-700' : record.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>{statusLabels[record.status]}</span>{record.note && <p className="mt-2 text-xs text-stone-500">{record.note}</p>}</td>
             <td className="p-3">
               {!isAdmin && record.status === 'SCHEDULED' && canCheckIn && <div className="space-y-2">
-                {['CASHIER', 'MANAGER'].includes(user?.position || '') && <label className="block text-xs font-semibold text-stone-600">Tiền đầu ca (đ)<input type="number" min="0" step="1" value={openingCash[record._id] ?? '0'} onChange={(event) => setOpeningCash((current) => ({ ...current, [record._id]: event.target.value }))} className="mt-1 w-28 rounded-lg border border-stone-200 px-2 py-1" /></label>}
+                {['CASHIER', 'MANAGER'].includes(user?.position || '') && <label className="block text-xs font-semibold text-stone-600">Tiền đầu ca (đ)<NumberInput type="number" min="0" step="1" value={openingCash[record._id] ?? '0'} onChange={(event) => setOpeningCash((current) => ({ ...current, [record._id]: event.target.value }))} className="mt-1 w-28 rounded-lg border border-stone-200 px-2 py-1" /></label>}
                 <button disabled={busyId === record._id} onClick={() => void changeAttendance(record, 'CHECK_IN')} className="rounded-lg bg-[#800020] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Check-in</button>
               </div>}
               {!isAdmin && record.status === 'PRESENT' && canCheckOut && <button disabled={busyId === record._id} onClick={() => void changeAttendance(record, 'CHECK_OUT')} className="rounded-lg bg-[#800020] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Check-out</button>}

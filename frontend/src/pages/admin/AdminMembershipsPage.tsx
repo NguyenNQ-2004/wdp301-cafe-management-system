@@ -1,3 +1,4 @@
+import { NumberInput } from '../../components/NumberInput';
 import { API_BASE } from '../../lib/shopApi';
 import React, { useState, useEffect, useCallback } from 'react';
 import useAuthStore from '../../store/authStore';
@@ -342,7 +343,7 @@ export const AdminMembershipsPage: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Field label="Chi tiêu để được 1 điểm (VNĐ) *" column="points_earn_unit">
-              <input
+              <NumberInput
                 type="number"
                 min={1}
                 required
@@ -353,7 +354,7 @@ export const AdminMembershipsPage: React.FC = () => {
             </Field>
 
             <Field label="Bậc đổi điểm (điểm) *" column="points_step">
-              <input
+              <NumberInput
                 type="number"
                 min={1}
                 required
@@ -364,7 +365,7 @@ export const AdminMembershipsPage: React.FC = () => {
             </Field>
 
             <Field label="Giá trị mỗi bậc (VNĐ) *" column="points_step_value">
-              <input
+              <NumberInput
                 type="number"
                 min={0}
                 required
@@ -660,7 +661,7 @@ export const AdminMembershipsPage: React.FC = () => {
               label={adjustModal.type === 'add' ? 'Số điểm cộng thêm *' : 'Số điểm trừ/quy đổi *'}
               column="Điều chỉnh điểm (ADJUST)"
             >
-              <input
+              <NumberInput
                 type="number"
                 min={1}
                 required

@@ -1,3 +1,4 @@
+import { NumberInput } from '../../components/NumberInput';
 import { API_BASE } from '../../lib/shopApi';
 import React, { useState, useEffect, useCallback } from 'react';
 import useAuthStore from '../../store/authStore';
@@ -693,7 +694,7 @@ export const AdminCustomersPage: React.FC = () => {
             </Field>
 
             <Field label="Điểm thưởng tặng khởi tạo" column="loyalty_transactions (EARN)">
-              <input
+              <NumberInput
                 type="number"
                 min={0}
                 value={createForm.initialPoints}
