@@ -22,6 +22,7 @@ import { AdminProductsPage } from './pages/admin/AdminProductsPage';
 import { ProductOptionsDialog, SelectedItemsDialog } from './components/StorefrontDialogs';
 
 const PATHS: Partial<Record<PageRoute, string>> = {
+  'pos-restock': '/cashier/restock-requests',
   home: '/', menu: '/menu', profile: '/profile', cart: '/cart', checkout: '/checkout', payment: '/payment', bill: '/bill', orders: '/orders', feedback: '/feedback',
   'pos-create': '/cashier', 'pos-orders': '/cashier/orders', 'pos-shift': '/cashier/handover?mode=close', 'pos-handover': '/cashier/handover?mode=handover', 'kds-terminal': '/barista',
   'delivery-orders': '/delivery', 'delivery-report': '/delivery/problems', 'delivery-cod': '/delivery/cod',

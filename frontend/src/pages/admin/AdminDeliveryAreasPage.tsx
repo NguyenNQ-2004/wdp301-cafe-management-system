@@ -1,3 +1,4 @@
+import { NumberInput } from '../../components/NumberInput';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { AdminLayout, Badge, inputCls, StatCard } from './AdminUi';
@@ -341,7 +342,7 @@ export default function AdminDeliveryAreasPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700">Phí giao hàng (VNĐ) *</label>
-                <input
+                <NumberInput
                   required
                   type="number"
                   min="0"

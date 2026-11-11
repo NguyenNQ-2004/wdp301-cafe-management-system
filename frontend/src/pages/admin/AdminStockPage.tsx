@@ -1,3 +1,4 @@
+import { NumberInput } from '../../components/NumberInput';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { shopApi, ShopApiError } from '../../lib/shopApi';
@@ -27,7 +28,7 @@ export default function AdminStockPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
-  const [form, setForm] = useState<{ ingredientId: string; type: 'ADJUSTMENT' | 'SPOILAGE'; quantity: number }>({ ingredientId: '', type: 'SPOILAGE', quantity: 0 });
+  const [form, setForm] = useState<{ ingredientId: string; type: 'ADJUSTMENT' | 'SPOILAGE'; quantity: number | '' }>({ ingredientId: '', type: 'SPOILAGE', quantity: '' });
 
   const loadInventory = useCallback(async () => {
     if (!token) return;
@@ -62,7 +63,7 @@ export default function AdminStockPage() {
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
     if (saving) return;
-    if (!token || !form.ingredientId || !Number.isFinite(form.quantity) || form.quantity <= 0) return showToast('Số lượng phải lớn hơn 0.');
+    if (!token || !form.ingredientId || !Number.isFinite(form.quantity) || Number(form.quantity) <= 0) return showToast('Số lượng phải lớn hơn 0.');
     setSaving(true);
     try {
       await shopApi('/api/inventory-transactions', {
@@ -70,7 +71,7 @@ export default function AdminStockPage() {
         body: { ingredient: form.ingredientId, transactionType: form.type, quantity: form.quantity, isAddition: form.type === 'ADJUSTMENT', note: form.type === 'ADJUSTMENT' ? 'Kiểm kê thừa' : 'Hao hụt / hủy hàng' }
       });
       setIsModalOpen(false);
-      setForm((current) => ({ ...current, quantity: 0 }));
+      setForm((current) => ({ ...current, quantity: '' }));
       showToast('Đã ghi phiếu điều chỉnh vào cơ sở dữ liệu.');
       await loadInventory();
     } catch (requestError) {
@@ -132,13 +133,13 @@ export default function AdminStockPage() {
           </Field>
           <Field label={`Số lượng (${selectedUnit})`}>
             <div className="relative">
-              <input
+              <NumberInput
                 required
                 type="number"
                 min="0.001"
                 step="0.001"
                 value={form.quantity}
-                onChange={(event) => setForm((current) => ({ ...current, quantity: Number(event.target.value) }))}
+                onChange={(event) => setForm((current) => ({ ...current, quantity: event.target.value === '' ? '' : Number(event.target.value) }))}
                 className={`${inputCls} pr-20`}
               />
               <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-semibold text-stone-500">

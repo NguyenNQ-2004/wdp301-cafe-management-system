@@ -21,6 +21,7 @@ export type PageRoute =
   | 'feedback'
   | 'pos-shift'
   | 'pos-handover'
+  | 'pos-restock'
   | 'delivery-report'
   | 'delivery-cod'
   | 'admin-ingredients'

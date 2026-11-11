@@ -1,3 +1,4 @@
+import { NumberInput } from '../../components/NumberInput';
 import React, { useState } from 'react';
 import type { PageRoute, Ingredient } from '../../types';
 import { useDb } from '../../data/DbContext';
@@ -11,7 +12,7 @@ interface AdminIngredientsPageProps {
   onShowToast?: (msg: string) => void;
 }
 
-type IngredientForm = Omit<Ingredient, 'id'> & { openingTotalCost?: number | ''; unpricedTotalCost?: number | '' };
+type IngredientForm = Omit<Ingredient, 'id' | 'current_stock' | 'min_stock_level'> & { current_stock: number | ''; min_stock_level: number | '' } & { openingTotalCost?: number | ''; unpricedTotalCost?: number | '' };
 const UNITS = ['gram', 'ml', 'piece', 'kg', 'lít', 'hộp', 'chai', 'gói'];
 
 export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNavigate, onShowToast }) => {
@@ -82,12 +83,12 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
     e.preventDefault();
     if (!editing || saving || !token) return;
     const f = editing.form;
-    if (f.current_stock < 0 || f.min_stock_level < 0) {
+    if (Number(f.current_stock) < 0 || Number(f.min_stock_level) < 0) {
       notify('Tồn kho và mức tối thiểu không được âm (chk_ingredient_stock).');
       return;
     }
-    const row = { name: f.name.trim(), unit: f.unit.trim(), supplier: f.supplier_id || null, minStockLevel: f.min_stock_level,
-      ...(!editing.id ? { currentStock: f.current_stock, ...(f.openingTotalCost !== undefined && f.openingTotalCost !== '' ? { openingTotalCost: f.openingTotalCost } : {}) } : {}) };
+    const row = { name: f.name.trim(), unit: f.unit.trim(), supplier: f.supplier_id || null, minStockLevel: Number(f.min_stock_level),
+      ...(!editing.id ? { currentStock: Number(f.current_stock), ...(f.openingTotalCost !== undefined && f.openingTotalCost !== '' ? { openingTotalCost: f.openingTotalCost } : {}) } : {}) };
     if (!row.name || !row.unit) { notify('Vui lòng nhập tên và đơn vị nguyên liệu.'); return; }
     setSaving(true);
     try {
@@ -142,8 +143,8 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
                 supplier_id: db.suppliers?.[0]?.id ?? null,
                 name: '',
                 unit: 'gram',
-                current_stock: 0,
-                min_stock_level: 0
+                current_stock: '',
+                min_stock_level: ''
               }
             })
           }
@@ -265,7 +266,7 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Đơn vị tính *">
-                <input required disabled={Boolean(editing.id) && editing.form.current_stock > 0} list="unit-options" maxLength={20} value={editing.form.unit} onChange={e => setForm({ unit: e.target.value })} className={inputCls} />
+                <input required disabled={Boolean(editing.id) && Number(editing.form.current_stock) > 0} list="unit-options" maxLength={20} value={editing.form.unit} onChange={e => setForm({ unit: e.target.value })} className={inputCls} />
                 <datalist id="unit-options">
                   {UNITS.map(u => (
                     <option key={u} value={u} />
@@ -290,23 +291,23 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
                 </select>
               </Field>
               <Field label="Tồn hiện tại">
-                <input
+                <NumberInput
                   type="number"
                   min={0}
                   step="0.001"
                   value={editing.form.current_stock}
                   disabled={Boolean(editing.id)}
-                  onChange={e => setForm({ current_stock: Number(e.target.value) })}
+                  onChange={e => setForm({ current_stock: e.target.value === '' ? '' : Number(e.target.value) })}
                   className={inputCls}
                 />
               </Field>
               <Field label="Mức tối thiểu">
-                <input
+                <NumberInput
                   type="number"
                   min={0}
                   step="0.001"
                   value={editing.form.min_stock_level}
-                  onChange={e => setForm({ min_stock_level: Number(e.target.value) })}
+                  onChange={e => setForm({ min_stock_level: e.target.value === '' ? '' : Number(e.target.value) })}
                   className={inputCls}
                 />
               </Field>
@@ -320,7 +321,7 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
               <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-bold text-stone-800">Giá vốn nguyên liệu</h3><Badge className={editingUnpriced > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-50 text-emerald-700'}>{editingUnpriced > 0 ? 'Cần bổ sung giá' : 'Đã có giá tồn'}</Badge></div>
               {editingUnpriced > 0 ? <>
                 <p className="text-xs leading-relaxed text-stone-600">Lượng tồn chưa có giá: <b>{fmtNumber(editingUnpriced)} {editingIngredient?.unit}</b>. Nhập tổng tiền mua của đúng lượng này để tính giá vốn.</p>
-                <Field label={`Tổng tiền của ${fmtNumber(editingUnpriced)} ${editingIngredient?.unit} (đ)`}><input id="ingredient-stock-total" aria-label="Tổng giá trị tồn chưa có giá" aria-describedby="ingredient-price-message" type="number" min="0" step="1" disabled={saving} placeholder="Ví dụ: 810000" className={inputCls} value={editing.form.unpricedTotalCost ?? ''} onChange={e => { setForm({ unpricedTotalCost: e.target.value === '' ? '' : Number(e.target.value) }); setPriceMessage(''); }} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void saveEditingPrice(); } }} /></Field>
+                <Field label={`Tổng tiền của ${fmtNumber(editingUnpriced)} ${editingIngredient?.unit} (đ)`}><NumberInput id="ingredient-stock-total" aria-label="Tổng giá trị tồn chưa có giá" aria-describedby="ingredient-price-message" type="number" min="0" step="1" disabled={saving} placeholder="Ví dụ: 810000" className={inputCls} value={editing.form.unpricedTotalCost ?? ''} onChange={e => { setForm({ unpricedTotalCost: e.target.value === '' ? '' : Number(e.target.value) }); setPriceMessage(''); }} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void saveEditingPrice(); } }} /></Field>
                 {editing.form.unpricedTotalCost !== undefined && editing.form.unpricedTotalCost !== '' && Number.isFinite(editing.form.unpricedTotalCost) && editing.form.unpricedTotalCost >= 0 && <p className="text-xs tabular-nums text-stone-700">Đơn giá tự tính: <b>{fmtMoney(editing.form.unpricedTotalCost / editingUnpriced)}/{editingIngredient?.unit}</b></p>}
                 <button type="button" disabled={saving} onClick={() => void saveEditingPrice()} className="cursor-pointer rounded-lg bg-[#800020] px-3 py-2 text-xs font-semibold text-white hover:bg-[#68001a] disabled:cursor-wait disabled:opacity-50">{saving ? 'Đang lưu...' : 'Lưu giá vốn'}</button>
                 <p className="text-[10px] leading-relaxed text-stone-500">Giá vốn lưu riêng tại đây; tên, nhà cung cấp và mức tối thiểu lưu bằng “Lưu thay đổi”.</p>
@@ -328,12 +329,12 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
               <p className="text-[10px] leading-relaxed text-stone-500">Hàng mua mới: nhập số lượng và tổng tiền tại <a href="/admin/purchases" className="font-medium text-[#800020] underline">Phiếu nhập hàng</a>. Chi phí sử dụng tính theo từng lô nhập.</p>
               <p id="ingredient-price-message" role="status" className="text-xs text-stone-700">{priceMessage}</p>
             </section>}
-            {!editing.id && editing.form.current_stock > 0 && <Field label="Tổng tiền của lượng tồn đầu (đ)"><input type="number" min="0" step="1" className={inputCls} value={editing.form.openingTotalCost ?? ''} onChange={e => setForm({ openingTotalCost: e.target.value === '' ? '' : Number(e.target.value) })} /><p className="text-xs text-stone-500">Hệ thống tự chia tổng tiền cho số lượng để tính giá vốn.</p></Field>}
+            {!editing.id && Number(editing.form.current_stock) > 0 && <Field label="Tổng tiền của lượng tồn đầu (đ)"><NumberInput type="number" min="0" step="1" className={inputCls} value={editing.form.openingTotalCost ?? ''} onChange={e => setForm({ openingTotalCost: e.target.value === '' ? '' : Number(e.target.value) })} /><p className="text-xs text-stone-500">Hệ thống tự chia tổng tiền cho số lượng để tính giá vốn.</p></Field>}
             <FormActions loading={saving} onCancel={() => setEditing(null)} submitLabel={editing.id ? 'Lưu thay đổi' : 'Thêm nguyên liệu'} />
           </form>
         </Modal>
       )}
-      {valuation && <Modal title={`Giá tồn cũ: ${valuation.name}`} onClose={() => setValuation(null)}><form onSubmit={saveValuation} className="space-y-4"><p className="text-sm">Lượng chưa có giá: <b>{fmtNumber(valuation.quantity)} {valuation.unit}</b>. Nhập tổng tiền của đúng lượng này.</p><Field label="Tổng giá trị (đ)"><input required type="number" min="0" step="1" className={inputCls} value={valuation.total} onChange={e => setValuation({ ...valuation, total: e.target.value === '' ? '' : Number(e.target.value) })} /></Field><FormActions loading={saving} onCancel={() => setValuation(null)} submitLabel="Lưu giá vốn" /></form></Modal>}
+      {valuation && <Modal title={`Giá tồn cũ: ${valuation.name}`} onClose={() => setValuation(null)}><form onSubmit={saveValuation} className="space-y-4"><p className="text-sm">Lượng chưa có giá: <b>{fmtNumber(valuation.quantity)} {valuation.unit}</b>. Nhập tổng tiền của đúng lượng này.</p><Field label="Tổng giá trị (đ)"><NumberInput required type="number" min="0" step="1" className={inputCls} value={valuation.total} onChange={e => setValuation({ ...valuation, total: e.target.value === '' ? '' : Number(e.target.value) })} /></Field><FormActions loading={saving} onCancel={() => setValuation(null)} submitLabel="Lưu giá vốn" /></form></Modal>}
     </AdminLayout>
   );
 };

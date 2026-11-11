@@ -1,3 +1,4 @@
+import { NumberInput } from '../../../components/NumberInput';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { PageRoute, PaymentMethod, Product, User, OrderCustomization } from '../../types';
@@ -320,7 +321,7 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
                 <div className="pt-2 border-t border-stone-200/60 flex items-center justify-between gap-2 text-xs">
                   <span className="text-stone-600">Đổi điểm (tối đa {maxPoints}):</span>
                   <div className="flex items-center gap-1.5">
-                    <input
+                    <NumberInput
                       type="number"
                       min={0}
                       max={maxPoints}

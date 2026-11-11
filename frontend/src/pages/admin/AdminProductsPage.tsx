@@ -1,3 +1,4 @@
+import { NumberInput } from '../../components/NumberInput';
 import React, { useState } from 'react';
 import ImageInput from '../../components/ImageInput';
 import type { PageRoute, Product } from '../../types';
@@ -287,7 +288,7 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
                 </select>
               </Field>
               <Field label="Giá cơ bản (VNĐ) *" column="base_price">
-                <input
+                <NumberInput
                   type="number"
                   min={0}
                   required
@@ -348,7 +349,7 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
                     placeholder="Tên size (M, L, Chai 250ml...)"
                     className={inputCls}
                   />
-                  <input
+                  <NumberInput
                     type="number"
                     min={0}
                     value={s.delta}
@@ -399,7 +400,7 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
                     placeholder="Tên topping"
                     className={inputCls}
                   />
-                  <input
+                  <NumberInput
                     type="number"
                     min={0}
                     value={t.price}

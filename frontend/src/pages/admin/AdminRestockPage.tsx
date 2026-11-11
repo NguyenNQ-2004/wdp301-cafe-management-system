@@ -51,7 +51,7 @@ export default function AdminRestockPage() {
   const showToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 3000); };
   const openFor = (ingredient: Ingredient) => setModal({
     ...newPurchaseLine(ingredient),
-    quantity: Math.max(ingredient.minStockLevel * 2 - ingredient.currentStock, ingredient.minStockLevel || 1),
+    quantity: '',
     note: ingredient.needsRestock ? `Tồn ${fmtNumber(ingredient.currentStock)}/${fmtNumber(ingredient.minStockLevel)} ${ingredient.unit} - dưới mức tối thiểu` : ''
   });
 

@@ -1,3 +1,4 @@
+import { NumberInput } from '../../../components/NumberInput';
 import React, { useState } from 'react';
 import type { PageRoute } from '../../types';
 import { DeliverySidebar } from './DeliverySidebar';
@@ -168,7 +169,7 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
               {DENOMS.map(d => (
                 <div key={d} className="flex items-center justify-between p-2 rounded-xl bg-stone-50 border border-stone-200/60">
                   <span className="font-bold text-stone-900">{fmtMoney(d)}</span>
-                  <input
+                  <NumberInput
                     type="number"
                     min={0}
                     value={denoms[d] ?? 0}

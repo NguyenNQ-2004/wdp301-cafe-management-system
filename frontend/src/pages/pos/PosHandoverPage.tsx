@@ -1,3 +1,4 @@
+import { NumberInput } from '../../components/NumberInput';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -306,6 +307,7 @@ export default function PosHandoverPage() {
             <span className="material-symbols-outlined text-[17px]">assignment_turned_in</span>
             <span>Bàn giao ca</span>
           </button>
+          {user?.role === 'STAFF' && user.position === 'CASHIER' && <button type="button" onClick={() => navigate('/cashier/restock-requests')} className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-slate-600"><span className="material-symbols-outlined text-[17px]">inventory_2</span><span>Đề xuất nhập hàng</span></button>}
         </nav>
 
         <div className="flex items-center gap-3">
@@ -344,7 +346,7 @@ export default function PosHandoverPage() {
             {pendingCod.map(row => (
               <div key={row._id} className="grid gap-2 rounded-lg bg-white p-3 text-sm md:grid-cols-[1fr_130px_1fr_auto] md:items-end">
                 <div><strong>{row.user?.fullName || 'Shipper'}</strong><div className="text-xs text-slate-600">Hệ thống: {formatVnd(row.endingCashSystem)} · Shipper khai nộp: {formatVnd(row.endingCashActual)}</div></div>
-                <label className="text-xs font-semibold">Thực nhận<input className="mt-1 w-full rounded border p-2" type="number" min="0" step="1" value={codCash[row._id] ?? String(row.endingCashActual)} onChange={event => setCodCash({ ...codCash, [row._id]: event.target.value })} /></label>
+                <label className="text-xs font-semibold">Thực nhận<NumberInput className="mt-1 w-full rounded border p-2" type="number" min="0" step="1" value={codCash[row._id] ?? String(row.endingCashActual)} onChange={event => setCodCash({ ...codCash, [row._id]: event.target.value })} /></label>
                 <label className="text-xs font-semibold">Ghi chú chênh lệch<input className="mt-1 w-full rounded border p-2" maxLength={500} value={codNote[row._id] ?? ''} onChange={event => setCodNote({ ...codNote, [row._id]: event.target.value })} /></label>
                 <button type="button" disabled={busy} onClick={() => void receiveCod(row)} className="rounded bg-primary px-3 py-2 font-bold text-white disabled:opacity-50">Xác nhận nhận COD</button>
               </div>
@@ -605,7 +607,7 @@ export default function PosHandoverPage() {
                               <h5 className="text-xs font-bold text-slate-800">Bổ sung giải trình và gửi lại biên bản:</h5>
                               <div>
                                 <label className="text-[11px] font-semibold text-slate-600 block">Số tiền thực tế kiểm đếm lại (nếu có cập nhật)</label>
-                                <input
+                                <NumberInput
                                   type="number"
                                   min="0"
                                   step="1000"
@@ -686,7 +688,7 @@ export default function PosHandoverPage() {
                               <span className="ml-1 text-[10px] text-slate-400 font-normal">opening_cash</span>
                             </label>
                             <div className="mt-1 relative rounded-lg border border-slate-200">
-                              <input
+                              <NumberInput
                                 type="number"
                                 min="0"
                                 step="1000"
@@ -711,7 +713,7 @@ export default function PosHandoverPage() {
                               <span className="ml-1 text-[10px] text-slate-400 font-normal">actual_cash</span>
                             </label>
                             <div className="mt-1 relative rounded-lg border border-slate-200">
-                              <input
+                              <NumberInput
                                 type="number"
                                 min="0"
                                 step="1000"

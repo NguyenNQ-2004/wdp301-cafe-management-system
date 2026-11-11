@@ -8,7 +8,7 @@ export function purchaseUnits(unit: string) {
   if (['lít', 'l', 'liter'].includes(unit)) return [{ label: unit, factor: 1 }, { label: 'ml', factor: 0.001 }];
   return [{ label: unit, factor: 1 }];
 }
-export const newPurchaseLine = (ingredient: PurchaseIngredient): PurchaseLine => ({ ingredient: ingredient._id, quantity: 1, inputUnit: ingredient.unit, totalCost: '' });
+export const newPurchaseLine = (ingredient: PurchaseIngredient): PurchaseLine => ({ ingredient: ingredient._id, quantity: '', inputUnit: ingredient.unit, totalCost: '' });
 
 export function purchaseQuantity(line: PurchaseLine, ingredient: PurchaseIngredient) {
   const unit = purchaseUnits(ingredient.unit).find(option => option.label === line.inputUnit);
