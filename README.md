@@ -80,8 +80,8 @@ npm run db:local-replica
 npm run dev
 ```
 > 👉 Server Backend sẽ khởi chạy tại: **http://localhost:5000**
-> 
-> **Khởi tạo dữ liệu mẫu (tùy chọn)**: `seed.js` sẽ xóa dữ liệu hiện có. Nếu cần dữ liệu mẫu, hãy xem mục “Tài khoản mẫu cho môi trường local” bên dưới và chạy script thủ công.
+>
+> **Dữ liệu mẫu (tùy chọn)**: Backend không có route `/api/seed`. Nếu cần nạp dữ liệu mẫu, xem mục “Tài khoản mẫu cho môi trường local” bên dưới rồi chạy `node seed.js` trong thư mục `backend`. Script này xóa dữ liệu hiện có trong các collection mà nó nạp; chỉ chạy trên database mới hoặc sau khi đã sao lưu.
 
 ### Bước 2: Khởi chạy Frontend (Giao diện React)
 Mở Terminal 2 (đứng ở thư mục gốc dự án) và chạy các lệnh sau:

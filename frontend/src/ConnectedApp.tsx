@@ -147,7 +147,7 @@ const AppLayout = () => {
     }
   }, [user, location.pathname, navigate]);
 
-  const isDedicatedScreen = ['/admin', '/cashier', '/barista', '/delivery'].some(prefix => location.pathname.startsWith(prefix));
+  const isDedicatedScreen = ['/admin', '/cashier', '/barista', '/delivery', '/my-schedule', '/my-attendance', '/staff/schedule', '/staff/attendance'].some(prefix => location.pathname.startsWith(prefix));
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
@@ -178,7 +178,12 @@ const AppLayout = () => {
         <RouteErrorBoundary key={location.pathname} onGoHome={() => navigate('/')}>
           <Routes>
           <Route path="/cashier/restock-requests" element={user?.role === 'STAFF' && user.position === 'CASHIER' ? <AdminRestockRequestsPage cashier /> : <Navigate to="/" />} />
-          <Route path="/" element={<SourceScreen screen="home" />} />
+          <Route
+            path="/"
+            element={user?.role === 'ADMIN' || user?.role === 'STAFF'
+              ? <Navigate to={getRoleRedirectPath(user, '/my-schedule')} replace />
+              : <SourceScreen screen="home" />}
+          />
           <Route path="/home" element={<SourceScreen screen="home" />} />
           <Route path="/customer" element={<Navigate to="/" replace />} />
           <Route path="/admin/feedback" element={<Navigate to="/admin/complaints" replace />} />

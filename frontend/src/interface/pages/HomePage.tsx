@@ -12,7 +12,7 @@ export const HomePage = ({ onNavigate, onSelectProduct, onCustomize }: Props) =>
   const available = db.products.filter(product => product.is_available && categories.some(category => category.id === product.category_id));
   const products = [...available].sort((a, b) => (b.total_sold || 0) - (a.total_sold || 0) || a.id - b.id).slice(0, 4);
   const [slide, setSlide] = useState(0);
-  const [autoPlay, setAutoPlay] = useState(() => typeof window === 'undefined' || !window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const [autoPlay, setAutoPlay] = useState(() => typeof window === 'undefined' || typeof window.matchMedia !== 'function' || !window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const current = products.length ? slide % products.length : 0;
