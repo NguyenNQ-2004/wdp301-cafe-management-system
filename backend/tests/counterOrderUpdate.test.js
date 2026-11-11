@@ -12,6 +12,7 @@ const Category = require('../models/Category');
 const Order = require('../models/Order');
 const OrderItem = require('../models/OrderItem');
 const Payment = require('../models/Payment');
+const WorkSchedule = require('../models/WorkSchedule');
 
 test('Counter order editing persists totals and rejects unsafe or stale mutations', async (t) => {
   const dbName = `cafe_counter_update_test_${randomBytes(6).toString('hex')}`;
@@ -27,6 +28,7 @@ test('Counter order editing persists totals and rejects unsafe or stale mutation
   });
   const tokenFor = async (role, position, phone) => {
     const user = await User.create({ fullName: role, role, position, phone, passwordHash: 'unused-test-hash' });
+    if (role === 'STAFF') await WorkSchedule.create({ user: user._id, workDate: new Date(), shiftName: 'TEST', status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) });
     return jwt.sign({ id: user._id }, process.env.JWT_SECRET);
   };
   const cashier = await tokenFor('STAFF', 'CASHIER', '0999111001');

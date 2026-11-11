@@ -111,6 +111,7 @@ export const AdminCustomersPage: React.FC = () => {
     fullName: string;
     phone: string;
     email: string;
+    password: string;
     birthday: string;
     address: string;
     initialPoints: number;
@@ -266,6 +267,7 @@ export const AdminCustomersPage: React.FC = () => {
                 fullName: '',
                 phone: '',
                 email: '',
+                password: '',
                 birthday: '',
                 address: '',
                 initialPoints: 0
@@ -665,6 +667,20 @@ export const AdminCustomersPage: React.FC = () => {
                 placeholder="khachhang@example.com"
                 className={inputCls}
               />
+            </Field>
+
+            <Field label="Mật khẩu đăng nhập *" column="users.password_hash">
+              <input
+                type="password"
+                autoComplete="new-password"
+                required
+                minLength={8}
+                maxLength={72}
+                value={createForm.password}
+                onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                className={inputCls}
+              />
+              <span className="text-[10px] text-stone-500">Ít nhất 8 ký tự. Khách hàng dùng mật khẩu này để đăng nhập.</span>
             </Field>
 
             <Field label="Địa chỉ liên hệ" column="users.address">

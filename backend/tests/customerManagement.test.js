@@ -96,6 +96,7 @@ test('Screen 28: Customer CRM management flow and access control', async (t) => 
       fullName: 'Trần Khách VIP',
       phone: '0988111222',
       email: 'khachvip@example.com',
+      password: 'crm-test-pass',
       address: '123 Đường Cà Phê, Q1',
       birthday: '1995-05-20',
       initialPoints: 160

@@ -144,6 +144,25 @@ export default function AdminDeliveryAreasPage() {
     }
   };
 
+  const handleSeedDefaults = async () => {
+    if (!token || saving) return;
+    if (!window.confirm('Bạn có muốn tự động nạp danh sách 12 quận/huyện mặc định tại Hà Nội?')) return;
+    setSaving(true);
+    setError('');
+    try {
+      const res = await shopApi<{ message: string }>('/api/delivery-areas/seed-defaults', {
+        method: 'POST',
+        token
+      });
+      showToast(res.message || 'Đã nạp khu vực mặc định thành công.');
+      setRevision(r => r + 1);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const visible = areas.filter(a => {
     const matchesSearch = a.district.toLowerCase().includes(search.toLowerCase().trim());
     const matchesStatus =
@@ -198,13 +217,24 @@ export default function AdminDeliveryAreasPage() {
             <option value="INACTIVE">Tạm ngưng</option>
           </select>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-red-800 transition-colors"
-        >
-          <span className="material-symbols-outlined text-[18px]">add_location_alt</span>
-          <span>Thêm khu vực mới</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSeedDefaults}
+            disabled={saving}
+            className="flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-stone-700 shadow-xs hover:bg-stone-50 transition-colors disabled:opacity-50"
+            title="Nạp danh sách các quận trung tâm Hà Nội mặc định"
+          >
+            <span className="material-symbols-outlined text-[18px]">restore</span>
+            <span>Nạp khu vực mặc định</span>
+          </button>
+          <button
+            onClick={openCreateModal}
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-red-800 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[18px]">add_location_alt</span>
+            <span>Thêm khu vực mới</span>
+          </button>
+        </div>
       </div>
 
       {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-red-700">{error}</p>}
@@ -214,7 +244,18 @@ export default function AdminDeliveryAreasPage() {
         {loading ? (
           <p role="status" className="p-8 text-center text-stone-500">Đang tải dữ liệu khu vực...</p>
         ) : visible.length === 0 ? (
-          <p className="p-10 text-center text-stone-500">Không tìm thấy khu vực giao hàng phù hợp.</p>
+          <div className="p-10 text-center text-stone-500">
+            <p className="mb-3">Chưa có khu vực giao hàng nào phù hợp hoặc hệ thống chưa có dữ liệu khu vực.</p>
+            {areas.length === 0 && (
+              <button
+                onClick={handleSeedDefaults}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-red-800 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px]">restore</span>
+                <span>Nạp 12 quận mặc định Hà Nội ngay</span>
+              </button>
+            )}
+          </div>
         ) : (
           <table className="w-full whitespace-nowrap text-sm">
             <thead className="bg-stone-50 text-left text-xs text-stone-500">

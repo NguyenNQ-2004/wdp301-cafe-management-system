@@ -42,7 +42,7 @@ export const DeliverySidebar: React.FC<DeliverySidebarProps> = ({ currentRoute, 
             <div className="flex items-center justify-between">
               <span className="text-stone-500">Ca:</span>
               <span className="font-semibold text-stone-800">
-                {schedule ? `${SHIFT_LABEL[schedule.shift_name]} ${schedule.work_date}` : 'Chưa xếp ca'}
+                {schedule ? `${SHIFT_LABEL[schedule.shift_name] || schedule.shift_name || 'Chưa đặt tên'} ${schedule.work_date}` : 'Chưa xếp ca'}
               </span>
             </div>
             {schedule && (

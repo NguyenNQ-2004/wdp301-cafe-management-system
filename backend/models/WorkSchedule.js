@@ -16,6 +16,13 @@ const workScheduleSchema = new mongoose.Schema({
   handoverAt: { type: Date },
   remittanceId: String,
   codPaymentIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Payment' }],
+  codReceivedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  codReceivedAt: Date,
+  codReceivedAmount: { type: Number, min: 0 },
+  codReceivedNote: { type: String, maxlength: 500 },
+  codReceivingSchedule: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkSchedule' },
+  codLedgerVersion: { type: Number, default: 0 },
+  handoverCodReceipts: { type: Number, min: 0 },
   handoverNote: { type: String, maxlength: 500 },
   status: { type: String, enum: ['SCHEDULED', 'PRESENT', 'ABSENT', 'COMPLETED'], default: 'SCHEDULED' },
   note: { type: String }

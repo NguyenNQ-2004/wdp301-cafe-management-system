@@ -129,7 +129,7 @@ router.get('/lookup', adminOrStaff, async (req, res) => {
     ]);
     const step = stepSetting ? Number(stepSetting.settingValue) : 10;
     const stepVal = valueSetting ? Number(valueSetting.settingValue) : 2000;
-    const cashValue = Math.floor((user.totalPoints || 0) / step) * stepVal;
+    const cashValue = Math.floor(Math.max(0, user.totalPoints || 0) / step) * stepVal;
 
     // Lấy thông tin đơn hàng và tổng chi tiêu
     const orders = await Order.find({ customer: user._id }).sort({ createdAt: -1 });

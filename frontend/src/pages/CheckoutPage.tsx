@@ -24,6 +24,7 @@ export default function CheckoutPage({ onRequestAuth }: { onRequestAuth: () => v
   const { summary: loyalty, loading: loyaltyLoading, error: loyaltyError } = useLoyalty(user?.token);
   const shop = useShopRules();
   const [areas, setAreas] = useState<DeliveryAreaOption[]>([]);
+  const [areasLoading, setAreasLoading] = useState(true);
   const [areaError, setAreaError] = useState('');
   const [name, setName] = useState(user?.fullName || '');
   const [phone, setPhone] = useState(user?.phone || '');
@@ -36,12 +37,14 @@ export default function CheckoutPage({ onRequestAuth }: { onRequestAuth: () => v
   const pending = useRef(false);
 
   useEffect(() => {
+    setAreasLoading(true);
     shopApi<DeliveryAreaOption[]>('/api/delivery-areas')
       .then(list => {
         setAreas(list);
         if (list.length > 0 && !district) setDistrict(list[0].district);
       })
-      .catch(() => setAreaError('Không tải được khu vực giao hàng. Vui lòng tải lại trang.'));
+      .catch(() => setAreaError('Không tải được khu vực giao hàng. Vui lòng tải lại trang.'))
+      .finally(() => setAreasLoading(false));
   }, []);
 
   const items = cart.items.filter(item => item.checked);
@@ -55,7 +58,7 @@ export default function CheckoutPage({ onRequestAuth }: { onRequestAuth: () => v
   const fee = subtotal < shop.rules.freeship_threshold ? configuredDistrictFee : 0;
   const total = subtotal - discount + fee;
   const customer = user?.role === 'CUSTOMER';
-  const ready = !!customer && !!selectedArea && !areaError && cart.ready && cart.ownerId === user?._id && !cart.syncError && !shop.loading && !shop.error && !loyaltyLoading && !loyaltyError;
+  const ready = !areasLoading && !!customer && !!selectedArea && !areaError && cart.ready && cart.ownerId === user?._id && !cart.syncError && !shop.loading && !shop.error && !loyaltyLoading && !loyaltyError;
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!user) { onRequestAuth(); return; }
@@ -78,7 +81,7 @@ export default function CheckoutPage({ onRequestAuth }: { onRequestAuth: () => v
   return <div className="bg-[#f8fafc] px-3 py-6"><div className="mx-auto max-w-[1140px]">
     <div className="mx-auto mb-6 grid max-w-xl grid-cols-3 text-center text-xs font-semibold">{['Giỏ hàng', 'Xác nhận đơn', 'Thanh toán'].map((label, index) => <div key={label} className={index < 2 ? 'text-primary' : 'text-stone-400'}><span className={`mx-auto mb-2 grid h-9 w-9 place-items-center rounded-full ${index < 2 ? 'bg-primary text-white' : 'bg-stone-200'}`}>{index === 0 ? '✓' : index + 1}</span>{label}</div>)}</div>
     {!customer && <div className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm"><p>{user ? 'Tài khoản quản trị/nhân viên chỉ dùng cho nghiệp vụ nội bộ. Hãy đăng nhập bằng tài khoản CUSTOMER.' : 'Bạn có thể nhập trước thông tin giao hàng. Đăng nhập bằng tài khoản khách hàng để xác nhận đơn.'}</p><button className="swp-primary-button" onClick={onRequestAuth}>Đăng nhập tài khoản khách hàng</button></div>}
-    {(error || areaError || (!areas.length && 'Chưa có khu vực giao hàng được cấu hình.') || loyaltyError || shop.error || cart.syncError) && <p role="alert" className="mb-5 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error || areaError || (!areas.length && 'Chưa có khu vực giao hàng được cấu hình.') || loyaltyError || shop.error || cart.syncError}</p>}
+    {(error || areaError || (!areasLoading && !areas.length && 'Chưa có khu vực giao hàng được cấu hình.') || loyaltyError || shop.error || cart.syncError) && <p role="alert" className="mb-5 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error || areaError || (!areasLoading && !areas.length && 'Chưa có khu vực giao hàng được cấu hình.') || loyaltyError || shop.error || cart.syncError}</p>}
     <form onSubmit={submit} className="swp-checkout-grid"><div>
       <section className="swp-checkout-card"><h2><span className="material-symbols-outlined">person</span>Thông tin người nhận <small className="ml-auto text-xs font-normal text-primary">Bước 2 / 3</small></h2><div className="rounded-xl border border-red-100 bg-[#fffafa] p-4">
         <div className="swp-checkout-pair"><label>Họ tên người nhận *<input className="swp-form-control" maxLength={100} required autoComplete="name" placeholder="Nguyễn Văn An" value={name} onChange={event => setName(event.target.value)} /></label><label>Số điện thoại *<input className="swp-form-control" type="tel" maxLength={15} required autoComplete="tel" placeholder="0908 123 456" value={phone} onChange={event => setPhone(event.target.value)} /></label></div>

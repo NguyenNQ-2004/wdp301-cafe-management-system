@@ -30,6 +30,7 @@
 }
 
 @media print {
+  @page { margin: 2mm; }
   body:has(#bill-print) * { visibility: hidden; }
   #bill-print, #bill-print * { visibility: visible; }
   #bill-print {

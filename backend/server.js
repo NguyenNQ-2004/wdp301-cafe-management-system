@@ -68,7 +68,15 @@ app.use((err, req, res, next) => {
 
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;
-  connectDB().then(() => {
+  connectDB().then(async () => {
+    try {
+      const deliveryAreaRoutes = require('./routes/deliveryAreaRoutes');
+      if (typeof deliveryAreaRoutes.ensureSeed === 'function') {
+        await deliveryAreaRoutes.ensureSeed();
+      }
+    } catch (seedErr) {
+      console.warn('Không thể tự động nạp khu vực giao hàng mặc định:', seedErr.message);
+    }
     app.listen(PORT, () => {
       console.log(`🚀 Server đang chạy trên cổng ${PORT}`);
     });

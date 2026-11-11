@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { Component, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import useAuthStore from './store/authStore';
 import useCartStore from './store/cartStore';
 import useCartSync from './hooks/useCartSync';
@@ -54,6 +55,48 @@ const getRoleRedirectPath = (user: { role: string; position?: string } | null, c
   // CUSTOMER: Không chuyển sang trang profile đơn độc, ở lại trang hiện tại hoặc về Trang chủ để tiếp tục mua hàng
   return currentPath && isSafeLocalPath(currentPath) && !['/login', '/register'].includes(currentPath) ? currentPath : '/';
 };
+
+class RouteErrorBoundary extends Component<
+  { onGoHome: () => void; children: ReactNode },
+  { hasError: boolean; message: string }
+> {
+  state = { hasError: false, message: '' };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, message: error?.message || 'Đã xảy ra lỗi hiển thị trang.' };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="mx-auto my-12 max-w-lg rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm">
+          <h2 className="text-lg font-bold text-stone-900">Không thể hiển thị trang này</h2>
+          <p className="mt-2 text-sm text-stone-600">{this.state.message}</p>
+          <div className="mt-5 flex justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => this.setState({ hasError: false, message: '' })}
+              className="rounded-xl bg-[#800020] px-4 py-2 text-xs font-bold text-white"
+            >
+              Thử lại
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                this.setState({ hasError: false, message: '' });
+                this.props.onGoHome();
+              }}
+              className="rounded-xl border border-stone-200 px-4 py-2 text-xs font-semibold text-stone-700"
+            >
+              Về trang chủ
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Wrapper component to provide Header and AuthModal context to all routes
 const AppLayout = () => {
@@ -132,7 +175,8 @@ const AppLayout = () => {
         />
       )}
       <main className="flex-1">
-        <Routes>
+        <RouteErrorBoundary key={location.pathname} onGoHome={() => navigate('/')}>
+          <Routes>
           <Route path="/" element={<SourceScreen screen="home" />} />
           <Route path="/home" element={<SourceScreen screen="home" />} />
           <Route path="/customer" element={<Navigate to="/" replace />} />
@@ -355,7 +399,8 @@ const AppLayout = () => {
           <Route path="/delivery/cod" element={user?.role === 'ADMIN' || (user?.role === 'STAFF' && user.position === 'SHIPPER') ? <SourceScreen screen="delivery-cod" /> : <Navigate to="/" />} />
           <Route path="*" element={<Navigate to="/" replace />} />
 
-        </Routes>
+          </Routes>
+        </RouteErrorBoundary>
       </main>
       {!isDedicatedScreen && <Footer onNavigate={handleNavigate} />}
 

@@ -18,7 +18,7 @@ interface DeliveryCodPageProps {
   onShowToast?: (msg: string) => void;
 }
 
-const DENOMS = [500000, 200000, 100000, 50000, 20000, 10000];
+const DENOMS = [500000, 200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100];
 
 export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, onShowToast }) => {
   const { db, session, remitCod, busy } = useDb();
@@ -28,12 +28,22 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
     schedules.find(s => s.status !== 'COMPLETED')?.id ?? schedules[0]?.id ?? null
   );
   const [denoms, setDenoms] = useState<Record<number, number>>({});
+  const [otherCash, setOtherCash] = useState('');
   const [note, setNote] = useState('');
   const schedule = schedules.find(s => s.id === scheduleId);
 
-  // Đơn online mình giao trong ngày của ca
+  // COD belongs to the shift when cash was collected, not when the order was created.
   const myOrders = db.orders
-    .filter(o => o.order_type === 'ONLINE' && o.shipper_id === me && (!schedule || o.created_at.startsWith(schedule.work_date)))
+    .filter(o => {
+      if (o.order_type !== 'ONLINE' || o.shipper_id !== me || !schedule) return false;
+      const payment = paymentOf(db, o.id);
+      if (payment?.payment_method === 'CASH' && payment.status === 'SUCCESS' && payment.paid_at) {
+        const paid = Date.parse(payment.paid_at);
+        return !!schedule.check_in_time && paid >= Date.parse(schedule.check_in_time)
+          && (!schedule.check_out_time || paid <= Date.parse(schedule.check_out_time));
+      }
+      return o.created_at.startsWith(schedule.work_date);
+    })
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   const rows = myOrders.map(o => ({ o, pay: paymentOf(db, o.id) }));
   const codCollected = rows
@@ -42,7 +52,7 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
   const prepaid = rows
     .filter(r => r.o.status === 'COMPLETED' && r.pay && r.pay.payment_method !== 'CASH' && r.pay.status === 'SUCCESS')
     .reduce((s, r) => s + (r.pay?.amount ?? 0), 0);
-  const counted = DENOMS.reduce((s, d) => s + d * (denoms[d] ?? 0), 0);
+  const counted = DENOMS.reduce((s, d) => s + d * (denoms[d] ?? 0), 0) + (otherCash ? Number(otherCash) : 0);
   const isClosed = schedule?.status === 'COMPLETED';
 
   const handleRemit = async () => {
@@ -56,7 +66,7 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
       return;
     }
     if (!confirm(`Xác nhận nộp ${fmtMoney(counted)} và chốt ca giao hàng?`)) return;
-    if (await remitCod(schedule.id, counted, note)) onShowToast?.(`Đã ghi nhận nộp ${fmtMoney(counted)} tiền COD và đóng ca giao hàng.`);
+    if (await remitCod(schedule.id, counted, note)) onShowToast?.(`Đã gửi đối soát ${fmtMoney(counted)} COD. Thu ngân cần xác nhận đã nhận tiền.`);
   };
 
   return (
@@ -73,13 +83,18 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
             </div>
             <select
               value={scheduleId ?? ''}
-              onChange={e => setScheduleId(Number(e.target.value) || null)}
+              onChange={e => {
+                setScheduleId(Number(e.target.value) || null);
+                setDenoms({});
+                setOtherCash('');
+                setNote('');
+              }}
               className="h-10 px-3 rounded-xl border border-stone-300 text-xs bg-white"
             >
               {schedules.length === 0 && <option value="">Chưa có lịch ca</option>}
               {schedules.map(s => (
                 <option key={s.id} value={s.id}>
-                  {SHIFT_LABEL[s.shift_name]} {fmtDate(s.work_date)} - {SCHEDULE_STATUS_LABEL[s.status]}
+                  {SHIFT_LABEL[s.shift_name] || s.shift_name || 'Chưa đặt tên'} {fmtDate(s.work_date)} - {SCHEDULE_STATUS_LABEL[s.status]}
                 </option>
               ))}
             </select>
@@ -102,7 +117,7 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
               <span className="text-[10px] uppercase font-bold text-white/80 block">Phải nộp về quán</span>
               <span className="text-2xl font-black text-white font-mono mt-0.5 block">{fmtMoney(codCollected)}</span>
               <span className="text-[11px] text-amber-200 font-semibold mt-1 block">
-                {isClosed ? `✓ Đã nộp ${fmtMoney(schedule?.ending_cash_actual)}` : 'Chưa nộp'}
+                {isClosed ? schedule?.cod_received_at ? `✓ Thu ngân đã nhận ${fmtMoney(schedule?.cod_received_amount)}` : `✓ Chờ thu ngân xác nhận ${fmtMoney(schedule?.ending_cash_actual)}` : 'Chưa nộp'}
               </span>
             </div>
           </div>
@@ -149,7 +164,7 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
 
           <div className="lg:col-span-4 bg-white p-5 rounded-2xl border border-stone-200 shadow-2xs space-y-4 text-xs">
             <h3 className="font-bold text-sm text-stone-900 pb-2 border-b border-stone-100">Kiểm đếm & nộp tiền</h3>
-            <div className="space-y-1.5 font-mono">
+            <div className="grid grid-cols-1 gap-1.5 font-mono sm:grid-cols-2">
               {DENOMS.map(d => (
                 <div key={d} className="flex items-center justify-between p-2 rounded-xl bg-stone-50 border border-stone-200/60">
                   <span className="font-bold text-stone-900">{fmtMoney(d)}</span>
@@ -166,6 +181,19 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
                 </div>
               ))}
             </div>
+            <label className="block font-semibold text-stone-700">
+              Tiền lẻ khác (đ)
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={otherCash}
+                disabled={isClosed || busy}
+                onChange={e => { if (/^\d*$/.test(e.target.value)) setOtherCash(e.target.value); }}
+                placeholder="Nhập số tiền không có trong các mệnh giá trên"
+                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white p-2.5 font-mono"
+              />
+            </label>
             <div className="p-3 bg-stone-100 rounded-xl flex justify-between items-center font-mono">
               <span className="font-sans font-bold text-stone-700">Tiền thực nộp:</span>
               <span className="text-lg font-black text-primary">{fmtMoney(counted)}</span>

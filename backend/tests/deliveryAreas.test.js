@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const app = require('../server');
 const User = require('../models/User');
+const WorkSchedule = require('../models/WorkSchedule');
 const Category = require('../models/Category');
 const Product = require('../models/Product');
 const DeliveryArea = require('../models/DeliveryArea');
@@ -49,6 +50,8 @@ test('UC71 DeliveryArea: CRUD, district fee calculation, freeship override and i
   ]);
 
   const customer = await User.create({ fullName: 'Khách Test Khu Vực', phone: '0901112233', role: 'CUSTOMER', passwordHash: 'pwd' });
+  const shipper = await User.create({ fullName: 'Delivery Shipper', phone: '0901112244', role: 'STAFF', position: 'SHIPPER', passwordHash: 'pwd' });
+  await WorkSchedule.create({ user: shipper._id, workDate: new Date(), shiftName: 'DELIVERY', status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) });
   const admin = await User.create({ fullName: 'Admin Cấu Hình', phone: '0904445566', role: 'ADMIN', passwordHash: 'pwd' });
   const custToken = jwt.sign({ id: customer._id }, jwtSecret);
   const adminToken = jwt.sign({ id: admin._id }, jwtSecret);

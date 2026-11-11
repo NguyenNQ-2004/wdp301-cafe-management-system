@@ -12,6 +12,7 @@ const Ingredient = require('../models/Ingredient');
 const Order = require('../models/Order');
 const OrderItem = require('../models/OrderItem');
 const Payment = require('../models/Payment');
+const WorkSchedule = require('../models/WorkSchedule');
 const Inventory = require('../models/InventoryTransaction');
 
 test('KDS buttons persist start, per-item completion and READY without double-consuming stock', async t => {
@@ -41,6 +42,8 @@ test('KDS buttons persist start, per-item completion and READY without double-co
   await Payment.create({ order: order._id, paymentMethod: 'CASH', amount: 78000 });
   const path = `/api/orders/${order._id}`;
   assert.equal((await call('/api/orders')).data.find(row => row._id === String(order._id)).kitchenEligible, true);
+  assert.equal((await call(`${path}/status`, { status: 'PREPARING' })).status, 409, 'barista must check in first');
+  await WorkSchedule.create({ user: barista._id, workDate: new Date(), shiftName: 'KDS', status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) });
   assert.equal((await call(`${path}/status`, { status: 'PREPARING' })).status, 200);
   let saved = await Order.findById(order._id);
   assert.equal(saved.status, 'PREPARING'); assert.equal(saved.inventoryProcessing, false);
