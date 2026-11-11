@@ -15,6 +15,7 @@ const paymentSchema = new mongoose.Schema({
   refundReference: { type: String },
   refundNote: { type: String },
   refundedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  refundSchedule: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkSchedule' },
   receivedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   remittanceId: String,
   remittanceSchedule: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkSchedule' },

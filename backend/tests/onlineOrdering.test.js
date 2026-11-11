@@ -283,10 +283,11 @@ test('UC11 order creation, UC12 demo payment and UC13 counter payment', async (t
   assert.equal((await put(deliveryPath, { status: 'DELIVERING' }, adminToken)).status, 409, 'assigned shipper has checked out');
   await WorkSchedule.updateOne({ user: shipper._id }, { $set: { status: 'PRESENT' }, $unset: { checkOutTime: 1 } });
   assert.equal((await put(deliveryPath, { status: 'DELIVERING' }, shipperToken)).status, 200);
-  assert.equal((await put(deliveryPath, { status: 'READY', shipperId: null, orderNote: 'Khách hẹn giao lại' }, shipperToken)).status, 200);
+  assert.equal((await request(`/api/orders/${deliveryOrder.data._id}/delivery/issues`, { issueType: 'UNREACHABLE', description: 'Khách hẹn giao lại', outcome: 'RETURN' }, shipperToken)).status, 201);
   const returnedOrder = await Order.findById(deliveryOrder.data._id);
   assert.equal(returnedOrder.status, 'READY');
-  assert.equal(returnedOrder.orderNote, 'Khách hẹn giao lại');
+  assert.equal(returnedOrder.orderNote, deliveryOrder.data.orderNote);
+  assert.equal((await require('../models/DeliveryIssue').findOne({ order: returnedOrder._id })).description, 'Khách hẹn giao lại');
   assert.equal(returnedOrder.shipper, undefined);
   assert.equal((await put(deliveryPath, { status: 'READY', shipperId: String(shipper._id) }, shipperToken)).status, 200);
   assert.equal((await put(deliveryPath, { status: 'DELIVERING' }, shipperToken)).status, 200);

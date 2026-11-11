@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const Payment = require('../models/Payment');
 const Order = require('../models/Order');
 const WorkSchedule = require('../models/WorkSchedule');
+const { recordDelivery } = require('../utils/orderDelivery');
 const { protect } = require('../middlewares/authMiddleware');
 const { demoPaymentsEnabled } = require('../utils/paymentMode');
 const { awardOrderPoints, refundRedemption } = require('../utils/orderLoyalty');
@@ -57,7 +58,7 @@ router.use(protect);
 router.post('/order/:orderId/refund-and-cancel', withOrderMutation(async (req, res) => {
   const manager = req.user.role === 'ADMIN' || (req.user.role === 'STAFF' && req.user.position === 'MANAGER');
   if (!manager) return res.status(403).json({ message: 'Chỉ quản lý được xác nhận hoàn tiền và hủy đơn.' });
-  const { amount, refundMethod, refundReference, cancelReason } = req.body || {};
+  const { amount, refundMethod, refundReference, cancelReason, refundCashierId } = req.body || {};
   if (typeof cancelReason !== 'string' || !cancelReason.trim() || cancelReason.trim().length > 500) return res.status(400).json({ message: 'Cần nhập lý do hủy đơn (tối đa 500 ký tự).' });
   if (!['CASH', 'BANK_TRANSFER', 'MOMO', 'VNPAY', 'DEMO_ONLINE'].includes(refundMethod)) return res.status(400).json({ message: 'Phương thức hoàn tiền không hợp lệ.' });
   const reference = typeof refundReference === 'string' ? refundReference.trim() : '';
@@ -69,12 +70,22 @@ router.post('/order/:orderId/refund-and-cancel', withOrderMutation(async (req, r
   const payment = await Payment.findOne({ order: order._id, status: 'SUCCESS', amount });
   if (!payment) return res.status(409).json({ message: 'Không tìm thấy giao dịch đã thanh toán cần hoàn.' });
   if ((payment.paymentMethod === 'DEMO_ONLINE') !== (refundMethod === 'DEMO_ONLINE')) return res.status(400).json({ message: 'Giao dịch mô phỏng chỉ được hoàn bằng phương thức mô phỏng.' });
+  let refundShift;
+  if (refundMethod === 'CASH') {
+    const cashierId = refundCashierId || payment.receivedBy;
+    if (!mongoose.isValidObjectId(cashierId)) return res.status(400).json({ message: 'Cần chọn thu ngân đang trong ca thực sự xuất tiền hoàn.' });
+    const cashier = await require('../models/User').exists({ _id: cashierId, role: 'STAFF', position: { $in: ['CASHIER', 'MANAGER'] }, status: 'ACTIVE' });
+    const now = new Date();
+    if (cashier) refundShift = await WorkSchedule.findOneAndUpdate({ user: cashierId, status: 'PRESENT', checkInTime: { $gte: new Date(now.getTime() - 86400000), $lte: now }, checkOutTime: { $exists: false }, handoverAt: { $exists: false } }, { $inc: { codLedgerVersion: 1 } }, { sort: { checkInTime: -1 }, returnDocument: 'after' });
+    if (!refundShift) return res.status(409).json({ message: 'Thu ngân xuất tiền hoàn phải đang trong ca chưa bàn giao.' });
+  }
   order.status = 'CANCELLED';
   order.cancelReason = cancelReason.trim();
+  if (order.orderType === 'ONLINE') recordDelivery(order, 'CANCELLED', req.user._id);
   await order.save();
   await refundRedemption(order);
   const updated = await Payment.findOneAndUpdate({ _id: payment._id, status: 'SUCCESS' }, { $set: {
-    status: 'REFUNDED', refundedAt: new Date(), refundAmount: amount, refundMethod,
+    status: 'REFUNDED', refundedAt: new Date(), refundAmount: amount, refundMethod, refundSchedule: refundShift?._id,
     refundReference: reference || undefined, refundNote: cancelReason.trim(), refundedBy: req.user._id
   } }, { returnDocument: 'after', runValidators: true });
   if (!updated) return res.status(409).json({ message: 'Giao dịch vừa được cập nhật. Vui lòng tải lại.' });

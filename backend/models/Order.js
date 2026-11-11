@@ -46,6 +46,16 @@ const orderSchema = new mongoose.Schema({
   ward: { type: String },
   addressDetail: { type: String },
   shipper: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  // Delivery is embedded so assignment, stages and order status commit together.
+  delivery: {
+    status: { type: String, enum: ['ASSIGNED', 'ACCEPTED', 'DELIVERING', 'DELIVERED', 'RETURNED', 'CANCELLED'] },
+    assignedAt: Date,
+    acceptedAt: Date,
+    pickedUpAt: Date,
+    deliveredAt: Date,
+    history: [{ action: String, actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      shipper: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, at: Date }]
+  },
   tableNumber: { type: String },
   orderNote: { type: String },
   cancelReason: { type: String },

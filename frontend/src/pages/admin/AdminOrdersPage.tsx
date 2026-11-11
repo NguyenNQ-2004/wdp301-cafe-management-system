@@ -31,6 +31,7 @@ interface OrderItem {
 }
 
 interface Order {
+  delivery?: { status?: string; history?: Array<{ action: string; at: string }> };
   costTotal?: number | null;
   costStatus?: string;
   _id: string;
@@ -65,6 +66,7 @@ interface Payment {
 interface Employee {
   _id: string;
   fullName: string;
+  phone?: string;
   position: string;
   status: string;
 }
@@ -160,7 +162,8 @@ const availableStatuses = (order: Order): OrderStatus[] => {
 const fetchOrdersPaymentsAndEmployees = async (token: string) => Promise.all([
   shopApi<Order[]>('/api/orders', { token }),
   shopApi<Payment[]>('/api/payments', { token }),
-  shopApi<Employee[]>('/api/employees', { token })
+  shopApi<Employee[]>('/api/employees', { token }),
+  shopApi<Array<{ _id: string; order: { _id: string } | null; issueType: string; description: string; outcome: string; createdAt: string }>>('/api/delivery-issues', { token })
 ]);
 
 export const AdminOrdersPage: React.FC<AdminOrdersPageProps> = ({
@@ -172,6 +175,7 @@ export const AdminOrdersPage: React.FC<AdminOrdersPageProps> = ({
   const [orders, setOrders] = useState<Order[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [issues, setIssues] = useState<Awaited<ReturnType<typeof fetchOrdersPaymentsAndEmployees>>[3]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | OrderType>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
@@ -185,10 +189,11 @@ export const AdminOrdersPage: React.FC<AdminOrdersPageProps> = ({
   const refreshData = useCallback(async () => {
     if (!token) return false;
     try {
-      const [loadedOrders, loadedPayments, loadedEmployees] = await fetchOrdersPaymentsAndEmployees(token);
+      const [loadedOrders, loadedPayments, loadedEmployees, loadedIssues] = await fetchOrdersPaymentsAndEmployees(token);
       setOrders(loadedOrders);
       setPayments(loadedPayments);
       setEmployees(loadedEmployees);
+      setIssues(loadedIssues);
       setError('');
       return true;
     } catch (cause) {
@@ -204,11 +209,12 @@ export const AdminOrdersPage: React.FC<AdminOrdersPageProps> = ({
     if (!token) return;
     let active = true;
     fetchOrdersPaymentsAndEmployees(token)
-      .then(([loadedOrders, loadedPayments, loadedEmployees]) => {
+      .then(([loadedOrders, loadedPayments, loadedEmployees, loadedIssues]) => {
         if (!active) return;
         setOrders(loadedOrders);
         setPayments(loadedPayments);
         setEmployees(loadedEmployees);
+        setIssues(loadedIssues);
         setError('');
       })
       .catch((cause: unknown) => {
@@ -264,7 +270,14 @@ export const AdminOrdersPage: React.FC<AdminOrdersPageProps> = ({
     const status = changes.status || order.status;
     if (status === order.status && changes.shipperId === undefined) return;
     let cancelReason: string | undefined;
-    let refund: { method: string; reference: string; amount: number } | undefined;
+    let collectedAmount: number | undefined;
+    if (status === 'COMPLETED' && order.orderType === 'ONLINE' && order.paymentMethod === 'COD') {
+      const entered = window.prompt(`Tiền COD shipper đã thu (cần đủ ${formatMoney(order.finalAmount)}):`, String(order.finalAmount));
+      if (entered === null) return;
+      collectedAmount = Number(entered);
+      if (!entered.trim() || !Number.isSafeInteger(collectedAmount) || collectedAmount !== order.finalAmount) { setError('Tiền COD thực thu phải bằng tổng đơn hàng.'); return; }
+    }
+    let refund: { method: string; reference: string; amount: number; cashierId?: string } | undefined;
     if (changes.status === 'CANCELLED') {
       const reason = window.prompt('Nhập lý do hủy đơn:');
       if (reason === null) return;
@@ -289,7 +302,15 @@ export const AdminOrdersPage: React.FC<AdminOrdersPageProps> = ({
           if (!reference || reference.length > 100) { setError('Cần mã giao dịch hoàn tiền, tối đa 100 ký tự.'); return; }
         }
         if (!window.confirm(`Xác nhận đã hoàn đủ ${formatMoney(paid.amount)} cho đơn ${order.orderCode || ''} rồi hủy đơn?`)) return;
-        refund = { method: normalized, reference, amount: paid.amount };
+        let cashierId: string | undefined;
+        if (normalized === 'CASH') {
+          const cashiers = employees.filter(person => ['CASHIER', 'MANAGER'].includes(person.position) && person.status === 'ACTIVE');
+          const phone = window.prompt(`Số điện thoại thu ngân xuất tiền hoàn:\n${cashiers.map(person => `${person.fullName}: ${person.phone || ''}`).join('\n')}`);
+          if (phone === null) return;
+          cashierId = cashiers.find(person => person.phone === phone.trim())?._id;
+          if (!cashierId) { setError('Cần chọn đúng thu ngân xuất tiền hoàn.'); return; }
+        }
+        refund = { method: normalized, reference, amount: paid.amount, cashierId };
       }
     }
 
@@ -300,12 +321,12 @@ export const AdminOrdersPage: React.FC<AdminOrdersPageProps> = ({
       if (refund) {
         await shopApi(`/api/payments/order/${encodeURIComponent(order._id)}/refund-and-cancel`, {
           method: 'POST', token: token || undefined,
-          body: { amount: refund.amount, refundMethod: refund.method, refundReference: refund.reference, cancelReason }
+          body: { amount: refund.amount, refundMethod: refund.method, refundReference: refund.reference, refundCashierId: refund.cashierId, cancelReason }
         });
       } else {
         await shopApi(`/api/orders/${encodeURIComponent(order._id)}/status`, {
           method: 'PUT', token: token || undefined,
-          body: { ...changes, status, ...(cancelReason ? { cancelReason } : {}) }
+          body: { ...changes, status, ...(collectedAmount !== undefined ? { collectedAmount } : {}), ...(cancelReason ? { cancelReason } : {}) }
         });
       }
       setOrders((current) => current.map((item) => item._id === order._id
@@ -548,6 +569,12 @@ export const AdminOrdersPage: React.FC<AdminOrdersPageProps> = ({
               </div>
             </div>
             {detail.orderNote && <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800"><strong>Ghi chú:</strong> {detail.orderNote}</p>}
+            {detail.orderType === 'ONLINE' && <section className="space-y-2 text-sm">
+              <h4 className="font-bold">Lịch sử giao hàng và sự cố</h4>
+              <p>Trạng thái giao: {({ ASSIGNED: 'Đã phân công', ACCEPTED: 'Đã nhận đơn', DELIVERING: 'Đang giao', DELIVERED: 'Đã giao', RETURNED: 'Đã trả về quán', CANCELLED: 'Đã hủy' } as Record<string, string>)[detail.delivery?.status || ''] || 'Chưa nhận đơn'}</p>
+              {(detail.delivery?.history || []).map((entry, index) => <p key={index} className="text-xs text-stone-500">{({ ASSIGNED: 'Phân công', ACCEPTED: 'Đã nhận đơn', DELIVERING: 'Đang giao', DELIVERED: 'Đã giao', RETURNED: 'Trả về quán', CANCELLED: 'Đã hủy' } as Record<string, string>)[entry.action] || 'Cập nhật giao hàng'} · {formatDate(entry.at)}</p>)}
+              {issues.filter(issue => issue.order?._id === detail._id).map(issue => <article key={issue._id} className="rounded-lg border border-stone-200 p-3"><strong>{({ UNREACHABLE: 'Không liên lạc được', BAD_ADDRESS: 'Sai địa chỉ', REFUSED: 'Khách từ chối', DAMAGED: 'Hàng bị hỏng', DELAY: 'Giao chậm', OTHER: 'Sự cố khác' } as Record<string, string>)[issue.issueType] || 'Sự cố giao hàng'}</strong><p className="whitespace-pre-wrap">{issue.description}</p><p className="text-xs text-stone-500">{formatDate(issue.createdAt)}</p></article>)}
+            </section>}
             <div className="flex justify-end gap-2 border-t border-stone-100 pt-4">
               <button type="button" onClick={() => openBill(detail)} className="inline-flex items-center gap-1.5 rounded-xl bg-stone-100 px-3.5 py-2 text-xs font-bold text-stone-700 hover:bg-stone-200">
                 <span className="material-symbols-outlined text-base">receipt_long</span>Hóa đơn

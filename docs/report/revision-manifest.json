@@ -1,0 +1,74 @@
+{
+  "revision": "2026-11-11",
+  "branch": "fix/manh-report-workflow-audit",
+  "baseCommit": "f560f68",
+  "database": "MongoDB/Mongoose, replica set required",
+  "verification": {
+    "backendTests": {
+      "passed": 102,
+      "failed": 0,
+      "skipped": 0,
+      "mongoVersion": "7.0 (isolated replica set)"
+    },
+    "frontendDirectCases": {
+      "passed": 103,
+      "failed": 0,
+      "files": 6
+    },
+    "productionBuild": "PASS (chunk-size warning)",
+    "lint": "PASS exit 0 (existing React warnings)",
+    "browserSmoke": {
+      "urls": 9,
+      "pageErrors": 0,
+      "posMethodsCreated": [
+        "BANK_TRANSFER",
+        "CASH"
+      ]
+    },
+    "formalAcceptance": "Not inferred from automated checks; group approval pending"
+  },
+  "sourceFiles": [
+    {
+      "file": "Database.docx",
+      "sha256": "09350c99ce00a3a535c53b4ecdce7437eecf8b4fe15bd82b624c64f165e57427"
+    },
+    {
+      "file": "WDP301_CafeManagementSystem_FinalReleaseDocument.docx",
+      "sha256": "7de2774d32157229a93d4d10b868be060ce8f1ca5c85577f98bd7265a85b6f08"
+    },
+    {
+      "file": "WDP301_CafeManagementSystem_ProjectTracking_MERN.xlsx",
+      "sha256": "777e9558dd68abc466686552d605916fbdc991497a4dcdba3afc13adf9fa1772"
+    },
+    {
+      "file": "WDP301_CafeManagementSystem_SDS_MERN.docx",
+      "sha256": "beec9759fa813a8e4bd82af1bd0d8985462a84ec4a7b4de3be5d52c9a1c768ea"
+    },
+    {
+      "file": "WDP301_CafeManagementSystem_SRS_MERN.docx",
+      "sha256": "5ab84d2f661a9bd478a3b7f10a2abb6bf881ea7d69baa1749fd0e3e593ffe12a"
+    }
+  ],
+  "revisedFiles": [
+    {
+      "file": "Database.docx",
+      "sha256": "942cf55063638732e921791cfd35818768ae84f21c6ef0d7adb999b7e9abcf4a"
+    },
+    {
+      "file": "WDP301_CafeManagementSystem_FinalReleaseDocument.docx",
+      "sha256": "a4f242e1a203b140a38995034cd2fba813ee968919f65ff25476b305de47710d"
+    },
+    {
+      "file": "WDP301_CafeManagementSystem_ProjectTracking_MERN.xlsx",
+      "sha256": "2bd614b6274aba7434a103391e18e28be367631fc1b61be31b6b977094c1caa1"
+    },
+    {
+      "file": "WDP301_CafeManagementSystem_SDS_MERN.docx",
+      "sha256": "05d684c6754c90efe5ed2354e9ffe3e1d279d9d193be3d7966ccd04aec331722"
+    },
+    {
+      "file": "WDP301_CafeManagementSystem_SRS_MERN.docx",
+      "sha256": "a5a389e875339006820055c26b22d8a8036a63a482a59756cf96cafda5632033"
+    }
+  ]
+}

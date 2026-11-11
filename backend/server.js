@@ -46,6 +46,7 @@ app.use('/api/purchase-orders', require('./routes/purchaseOrderRoutes'));
 app.use('/api/restock-requests', require('./routes/restockRequestRoutes'));
 app.use('/api/shop-settings', require('./routes/shopSettingRoutes'));
 app.use('/api/delivery-areas', require('./routes/deliveryAreaRoutes'));
+app.use('/api/delivery-issues', require('./routes/deliveryIssueRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
 
 // ==========================================

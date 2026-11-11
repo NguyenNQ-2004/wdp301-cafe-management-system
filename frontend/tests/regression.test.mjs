@@ -250,3 +250,30 @@ test('Counter edit action is available only to eligible staff and unpaid unprepa
     assert.doesNotMatch(screen(), /Sửa đơn/);
   } finally { initialState.user = previous; }
 });
+
+test('Delivery board requires accepting an assigned order before pickup and excludes remitted COD', async () => {
+  const { DeliveryScreen } = await vite.ssrLoadModule('/src/interface/pages/delivery/DeliveryScreen.tsx');
+  const db = emptyDb();
+  db.orders = [
+    { ...sampleOrder, id: 1, order_type: 'ONLINE', status: 'READY', shipper_id: 7, delivery: { status: 'ASSIGNED' } },
+    { ...sampleOrder, id: 2, order_type: 'ONLINE', status: 'COMPLETED', shipper_id: 7, delivery: { status: 'DELIVERED', deliveredAt: new Date().toISOString() } }
+  ];
+  db.payments = [{ id: 3, order_id: 2, payment_method: 'CASH', status: 'SUCCESS', amount: 987654, remittance_id: 'ALREADY-SUBMITTED' }];
+  const html = renderWithDb(React.createElement(DeliveryScreen, { onNavigate() {} }), db, { session: { shipperId: 7 } });
+  assert.match(html, /Xác nhận nhận đơn/);
+  assert.doesNotMatch(html, /987\.654/);
+  assert.match(html, /Đơn đã giao theo ngày/);
+});
+
+test('POS preserves the chosen bank method, member and customizations in the order request', async () => {
+  const { counterOrderPayload } = await vite.ssrLoadModule('/src/lib/counterOrderPayload.ts');
+  const input = { customer_id: 9, order_type: 'DINE_IN', table_number: 'T01', order_note: 'No straw', points_to_redeem: 10, payment_method: 'BANK_TRANSFER', items: [{ product_id: 5, quantity: 2, unit_price: 1, customization: { size: 'L', topping: ['Pearls'], sugar: '0%' } }] };
+  const payload = counterOrderPayload(input, id => `raw-${id}`);
+  assert.equal(payload.paymentMethod, 'BANK_TRANSFER');
+  assert.equal(payload.customerId, 'raw-9');
+  assert.equal(payload.orderNote, 'No straw');
+  assert.equal(payload.items[0].quantity, 2);
+  assert.deepEqual(payload.items[0].customization.topping, ['Pearls']);
+  assert.equal(payload.items[0].unitPrice, undefined, 'server sets prices');
+  assert.equal(counterOrderPayload({ ...input, payment_method: 'CASH' }, String).paymentMethod, 'CASH');
+});
