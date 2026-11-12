@@ -12,6 +12,7 @@ type ReportFilters = {
 };
 
 type ReportsData = {
+  ingredientUsage: Array<{ ingredientId: string; name: string; unit: string; quantity: number }>;
   overview: {
     orderCount: number;
     completedOrderCount: number;
@@ -36,6 +37,7 @@ type ReportsData = {
     }>;
   };
   attention: {
+    pendingRestockRequests: number;
     pendingPurchaseOrders: number;
     pendingReviews: number;
   };
@@ -246,13 +248,13 @@ const AdminReportsPage = () => {
             <section className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
               <SummaryCard label="Doanh thu đã thanh toán" value={formatVnd(report.overview.revenue)} detail="Giao dịch thành công, loại đơn đã hủy" tone="rose" />
               <SummaryCard label="Số đơn" value={report.overview.orderCount.toLocaleString('vi-VN')} detail={`${report.overview.completedOrderCount} hoàn thành · ${report.orderStatuses.find((item) => item.status === 'CANCELLED')?.orderCount || 0} hủy`} />
-              <SummaryCard label="Giá trị TB / đơn" value={formatVnd(report.overview.averageOrderValue)} detail="Trung bình trên đơn hoàn thành" />
+              <SummaryCard label="Giá trị TB / đơn đã trả" value={formatVnd(report.overview.averageOrderValue)} detail="Trung bình trên thanh toán thành công trong kỳ" />
               <SummaryCard label="Đang xử lý" value={report.overview.inProgressCount.toLocaleString('vi-VN')} detail="Đơn chưa hoàn thành hoặc hủy" tone="green" />
             </section>
 
             {report.overview.orderCount === 0 && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                Chưa có đơn hàng trong khoảng ngày đã chọn. Hãy thử mở rộng khoảng thời gian hoặc thêm dữ liệu demo bằng <code>node seedReportDemo.js</code> trong thư mục backend.
+                Chưa có đơn được tạo trong khoảng ngày đã chọn. Thanh toán của đơn cũ trong kỳ vẫn được tính theo ngày thu tiền.
               </div>
             )}
 
@@ -261,7 +263,7 @@ const AdminReportsPage = () => {
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div>
                     <h2 className="font-bold text-stone-900">Doanh thu theo {filters.groupBy === 'day' ? 'ngày' : 'tháng'}</h2>
-                    <p className="mt-1 text-xs text-stone-500">Chỉ tính thanh toán thành công của đơn hoàn thành.</p>
+                    <p className="mt-1 text-xs text-stone-500">Theo ngày thu tiền tại Việt Nam, loại đơn đã hủy. Số đơn theo ngày tạo đơn.</p>
                   </div>
                   <BarChart3 className="text-[#800020]" size={20} />
                 </div>
@@ -310,7 +312,7 @@ const AdminReportsPage = () => {
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <h2 className="font-bold text-stone-900">Top món bán chạy</h2>
-                    <p className="mt-1 text-xs text-stone-500">Theo số lượng món trong các đơn không bị hủy.</p>
+                    <p className="mt-1 text-xs text-stone-500">Theo các đơn đã thanh toán trong kỳ, loại đơn đã hủy.</p>
                   </div>
                   <button type="button" onClick={() => navigate('/admin/products')} className="shrink-0 text-xs font-semibold text-[#800020] hover:underline">
                     Sản phẩm →
@@ -335,6 +337,13 @@ const AdminReportsPage = () => {
                   </ol>
                 )}
               </article>
+            </section>
+
+            <section className="rounded-2xl border border-stone-200 bg-white p-4">
+              <h2 className="font-bold text-stone-900">Nguyên liệu đã sử dụng trong kỳ</h2>
+              <p className="mt-1 text-xs text-stone-500">Lượng xuất thực tế cho pha chế, tính theo thời điểm xuất kho. Đơn hủy sau pha chế vẫn đã tiêu hao nguyên liệu.</p>
+              {(report.ingredientUsage || []).length === 0 ? <EmptyState message="Chưa có xuất nguyên liệu cho đơn hàng trong kỳ." /> :
+                <ul className="mt-3 space-y-2">{report.ingredientUsage.map(item => <li key={item.ingredientId} className="flex justify-between gap-3 text-sm"><span>{item.name}</span><strong>{item.quantity.toLocaleString('vi-VN')} {item.unit}</strong></li>)}</ul>}
             </section>
 
             <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -397,6 +406,7 @@ const AdminReportsPage = () => {
                   <li className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-xs ${report.attention.pendingReviews ? 'bg-amber-50 text-amber-900' : 'bg-stone-50 text-stone-700'}`}>
                     <span>Đánh giá / khiếu nại chờ xử lý</span><strong>{report.attention.pendingReviews}</strong>
                   </li>
+                  <li className="flex items-center justify-between gap-3 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-700"><span>Đề xuất nhập hàng chờ duyệt</span><strong>{report.attention.pendingRestockRequests || 0}</strong></li>
                 </ul>
                 {report.inventory.lowStockItems.length > 0 && (
                   <div className="mt-4 border-t border-stone-100 pt-3">

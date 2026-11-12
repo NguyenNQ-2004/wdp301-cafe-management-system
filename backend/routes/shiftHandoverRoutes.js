@@ -29,7 +29,7 @@ const cashLedger = async (schedule) => {
   const endTime = schedule.checkOutTime || new Date();
   const startTime = schedule.checkInTime || schedule.workDate;
   const payments = await Payment.find({
-    status: 'SUCCESS',
+    status: { $in: ['SUCCESS', 'REFUNDED'] },
     paidAt: { $gte: startTime, $lte: endTime }
   }).select('order amount paymentMethod receivedBy').populate('order', 'orderType cashier');
 
@@ -41,6 +41,7 @@ const cashLedger = async (schedule) => {
   };
   const result = {
     cashRevenue: 0,
+    cashRefunds: 0,
     codReceipts: 0,
     paymentCount: 0,
     unattributedCash: 0,
@@ -54,6 +55,7 @@ const cashLedger = async (schedule) => {
   for (const payment of payments) {
     if (!payment.order || !['TAKEAWAY', 'DINE_IN'].includes(payment.order.orderType)) continue;
     if (!Number.isSafeInteger(payment.amount) || payment.amount < 0) throw Object.assign(new Error('Có giao dịch tiền mặt không hợp lệ; cần kiểm tra trước khi bàn giao.'), { status: 409 });
+    // A later refund does not remove the original physical cash receipt.
     const isShiftUser = String(payment.receivedBy) === String(schedule.user);
     if (isShiftUser) {
       orderIds.add(String(payment.order._id || payment.order));
@@ -73,6 +75,9 @@ const cashLedger = async (schedule) => {
     }
   }
   result.orderCount = orderIds.size;
+  const refunds = await Payment.find({ status: 'REFUNDED', refundMethod: 'CASH', refundSchedule: schedule._id }).select('refundAmount');
+  result.cashRefunds = refunds.reduce((sum, payment) => sum + payment.refundAmount, 0);
+  if (!Number.isSafeInteger(result.cashRefunds) || result.cashRefunds < 0) throw Object.assign(new Error('Số tiền hoàn trong ca không hợp lệ.'), { status: 409 });
   const codShifts = await WorkSchedule.find({ codReceivingSchedule: schedule._id, codReceivedBy: schedule.user, codReceivedAt: { $gte: startTime, $lte: endTime } }).select('codReceivedAmount');
   result.codReceipts = codShifts.reduce((total, shift) => total + shift.codReceivedAmount, 0);
   if (!Number.isSafeInteger(result.codReceipts) || result.codReceipts < 0) throw Object.assign(new Error('Tiền COD nhận trong ca không hợp lệ.'), { status: 409 });
@@ -85,7 +90,8 @@ const detail = (schedule, ledger, handover = null) => {
   const openingCash = Number.isSafeInteger(schedule.startingCash) && schedule.startingCash >= 0 ? schedule.startingCash : null;
   const cashRevenue = saved ? schedule.handoverCashSales : ledger?.cashRevenue ?? 0;
   const codReceipts = saved ? (schedule.handoverCodReceipts ?? 0) : (ledger?.codReceipts ?? 0);
-  const expectedCash = saved ? schedule.endingCashSystem : openingCash === null ? null : openingCash + cashRevenue + codReceipts;
+  const cashRefunds = saved ? (schedule.handoverCashRefunds ?? 0) : (ledger?.cashRefunds ?? 0);
+  const expectedCash = saved ? schedule.endingCashSystem : openingCash === null ? null : openingCash + cashRevenue + codReceipts - cashRefunds;
   const actualCash = saved ? schedule.endingCashActual : null;
   const status = handover?.status || (saved ? 'SUBMITTED' : null);
 
@@ -107,6 +113,7 @@ const detail = (schedule, ledger, handover = null) => {
     history: handover?.history || [],
     openingCash,
     cashRevenue,
+    cashRefunds,
     codReceipts,
     paymentCount: saved ? schedule.handoverPaymentCount : ledger?.paymentCount ?? 0,
     unattributedCash: saved ? schedule.handoverUnattributedCash : ledger?.unattributedCash ?? 0,
@@ -213,7 +220,7 @@ router.post('/:id/confirm', async (req, res) => {
     if (body.note !== undefined && (typeof body.note !== 'string' || body.note.trim().length > 500)) throw badRequest('Ghi chú không được quá 500 ký tự.');
     const openingCash = hasOpening ? schedule.startingCash : body.openingCash;
     const ledger = await cashLedger({ ...schedule.toObject(), user: req.user._id });
-    const expectedCash = openingCash + ledger.cashRevenue + ledger.codReceipts;
+    const expectedCash = openingCash + ledger.cashRevenue + ledger.codReceipts - ledger.cashRefunds;
     if (!Number.isSafeInteger(expectedCash)) throw badRequest('Tổng tiền hệ thống không hợp lệ.');
     if (body.actualCash !== expectedCash && !body.note?.trim()) throw badRequest('Cần ghi lý do khi tiền thực tế chênh lệch với hệ thống.');
     const updated = await WorkSchedule.findOneAndUpdate(
@@ -221,7 +228,7 @@ router.post('/:id/confirm', async (req, res) => {
       { $set: {
         status: 'COMPLETED', checkOutTime: schedule.checkOutTime || new Date(),
         startingCash: openingCash, endingCashSystem: expectedCash, endingCashActual: body.actualCash,
-        handoverCashSales: ledger.cashRevenue, handoverCodReceipts: ledger.codReceipts, handoverPaymentCount: ledger.paymentCount,
+        handoverCashSales: ledger.cashRevenue, handoverCodReceipts: ledger.codReceipts, handoverCashRefunds: ledger.cashRefunds, handoverPaymentCount: ledger.paymentCount,
         handoverUnattributedCash: ledger.unattributedCash, handoverUnattributedCount: ledger.unattributedCount,
         handoverAt: new Date(), handoverNote: body.note?.trim() || ''
       } }, { returnDocument: 'after', runValidators: true }
@@ -240,6 +247,7 @@ router.post('/:id/confirm', async (req, res) => {
           openingCash,
           cashSales: ledger.cashRevenue,
           codReceipts: ledger.codReceipts,
+          cashRefunds: ledger.cashRefunds,
           expectedCash,
           actualCash: body.actualCash,
           difference: body.actualCash - expectedCash,

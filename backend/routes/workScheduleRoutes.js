@@ -221,12 +221,17 @@ router.put('/:id/shift-action', async (req, res) => {
     if (action === 'CHECK_IN' || (action === 'CHECK_OUT' && isAdmin)) {
       [shiftStart, shiftEnd] = (await getShiftTime(schedule)).split('-');
     }
+    if (req.user.position === 'SHIPPER' && ['CHECK_OUT', 'REMIT_COD'].includes(action)) {
+      if (await Order.exists({ shipper: req.user._id, orderType: 'ONLINE', status: { $nin: ['COMPLETED', 'CANCELLED'] } })) return res.status(409).json({ message: 'Cần giao xong hoặc trả các đơn được phân công về quán trước khi chốt ca.' });
+      if (action === 'CHECK_OUT' && await Payment.exists({ receivedBy: req.user._id, paymentMethod: 'CASH', status: 'SUCCESS', remittanceId: { $exists: false } })) return res.status(409).json({ message: 'Còn tiền COD chưa nộp. Hãy mở Đối soát COD và dùng Nộp tiền & chốt ca.' });
+    }
     if (action === 'REMIT_COD') {
       if (req.user.role !== 'STAFF' || req.user.position !== 'SHIPPER') return res.status(403).json({ message: 'Chỉ shipper được nộp tiền COD của ca giao hàng.' });
       if (schedule.status !== 'PRESENT' || !schedule.checkInTime || schedule.checkOutTime) return res.status(409).json({ message: 'Ca phải đang mở để nộp COD.' });
       if (cash === undefined) throw badRequest('Cần nhập số tiền mặt thực nộp.');
       const orders = await Order.find({ shipper: req.user._id, orderType: 'ONLINE', paymentMethod: 'COD', status: 'COMPLETED' }).select('_id');
-      const payments = await Payment.find({ order: { $in: orders.map(order => order._id) }, receivedBy: req.user._id, paidAt: { $gte: schedule.checkInTime, $lte: now }, remittanceId: { $exists: false }, paymentMethod: 'CASH', status: 'SUCCESS' }).select('amount');
+      // Include older cash still held by this shipper; a new shift must not strand it.
+      const payments = await Payment.find({ order: { $in: orders.map(order => order._id) }, receivedBy: req.user._id, paidAt: { $lte: now }, remittanceId: { $exists: false }, paymentMethod: 'CASH', status: 'SUCCESS' }).select('amount');
       const expectedCash = payments.reduce((sum, payment) => sum + payment.amount, 0);
       if (!Number.isSafeInteger(expectedCash) || expectedCash < 0) throw badRequest('Tổng tiền COD không hợp lệ.');
       if (cash !== expectedCash && !note?.trim()) throw badRequest('Cần ghi lý do chênh lệch tiền COD.');

@@ -10,6 +10,8 @@ const RewardItem = require('../models/RewardItem');
 const ShopSetting = require('../models/ShopSetting');
 const DeliveryArea = require('../models/DeliveryArea');
 const WorkSchedule = require('../models/WorkSchedule');
+const DeliveryIssue = require('../models/DeliveryIssue');
+const { recordDelivery } = require('../utils/orderDelivery');
 const { protect } = require('../middlewares/authMiddleware');
 const { normalizeCartItems } = require('../utils/cartItems');
 const { demoPaymentsEnabled } = require('../utils/paymentMode');
@@ -355,6 +357,42 @@ router.post('/', async (req, res) => {
   } finally { unlockCheckout?.(); }
 });
 
+router.post('/:id/delivery/accept', authorizePosition('SHIPPER'), withOrderMutation(async (req, res) => {
+  const order = await Order.findById(req.params.id);
+  if (order.orderType !== 'ONLINE' || String(order.shipper || '') !== String(req.user._id)) return res.status(403).json({ message: 'Chỉ shipper được phân công mới được nhận đơn.' });
+  if (['COMPLETED', 'CANCELLED', 'DELIVERING'].includes(order.status)) return res.status(409).json({ message: 'Đơn không còn chờ nhận.' });
+  if (order.delivery?.status !== 'ACCEPTED') {
+    recordDelivery(order, 'ACCEPTED', req.user._id);
+    await order.save();
+  }
+  res.json({ order });
+}));
+
+router.post('/:id/delivery/issues', authorizePosition('SHIPPER'), withOrderMutation(async (req, res) => {
+  const order = await Order.findById(req.params.id);
+  if (order.orderType !== 'ONLINE' || String(order.shipper || '') !== String(req.user._id)) return res.status(403).json({ message: 'Chỉ shipper được phân công mới được báo sự cố.' });
+  if (['COMPLETED', 'CANCELLED'].includes(order.status)) return res.status(409).json({ message: 'Đơn đã kết thúc, không thể báo thêm sự cố.' });
+  const { issueType, description, outcome = 'REPORT' } = req.body || {};
+  if (Object.keys(req.body || {}).some(key => !['issueType', 'description', 'outcome'].includes(key))
+    || !['UNREACHABLE', 'BAD_ADDRESS', 'REFUSED', 'DAMAGED', 'DELAY', 'OTHER'].includes(issueType)
+    || typeof description !== 'string' || !description.trim() || description.trim().length > 500
+    || !['REPORT', 'RETURN', 'CANCEL'].includes(outcome)) return res.status(400).json({ message: 'Cần chọn loại sự cố và nhập mô tả từ 1 đến 500 ký tự.' });
+  if (outcome === 'RETURN' && !['READY', 'DELIVERING'].includes(order.status)) return res.status(409).json({ message: 'Chỉ được trả đơn đã sẵn sàng hoặc đang giao về quán.' });
+  if (outcome === 'CANCEL' && await Payment.exists({ order: order._id, status: 'SUCCESS' })) return res.status(409).json({ message: 'Đơn đã thanh toán. Hãy lưu báo cáo để quản lý xác nhận hoàn tiền và hủy.' });
+  const issue = await DeliveryIssue.create({ order: order._id, reporter: req.user._id, issueType, description: description.trim(), outcome });
+  if (outcome === 'RETURN') {
+    recordDelivery(order, 'RETURNED', req.user._id);
+    order.status = 'READY'; order.shipper = undefined;
+  } else if (outcome === 'CANCEL') {
+    recordDelivery(order, 'CANCELLED', req.user._id);
+    order.status = 'CANCELLED'; order.cancelReason = description.trim();
+    await refundRedemption(order);
+    await Payment.updateMany({ order: order._id, status: 'PENDING' }, { $set: { status: 'FAILED' } });
+  }
+  await order.save();
+  res.status(201).json({ issue, order });
+}));
+
 // 4. UPDATE ORDER STATUS (Dành cho Thu ngân, Pha chế, Shipper, Quản lý)
 router.put('/:id/status', withOrderMutation(async (req, res) => {
   let unlock;
@@ -419,7 +457,7 @@ router.put('/:id/status', withOrderMutation(async (req, res) => {
     if (status === 'DELIVERING' && order.orderType !== 'ONLINE') {
       return res.status(409).json({ message: 'Chỉ đơn giao hàng mới được chuyển sang trạng thái đang giao.' });
     }
-    if (status === 'COMPLETED' && order.orderType === 'ONLINE' && order.status !== 'DELIVERING') {
+    if (status === 'COMPLETED' && order.orderType === 'ONLINE' && !['DELIVERING', 'COMPLETED'].includes(order.status)) {
       return res.status(409).json({ message: 'Đơn giao hàng phải ở trạng thái đang giao trước khi hoàn tất.' });
     }
     if (status === 'CANCELLED' && (!cancelReason || !cancelReason.trim())) {
@@ -452,6 +490,14 @@ router.put('/:id/status', withOrderMutation(async (req, res) => {
       return res.status(403).json({ message: 'Chức vụ hiện tại không được cập nhật đơn hàng.' });
     }
 
+    if (['COMPLETED', 'CANCELLED'].includes(order.status)) {
+      if (shipperId !== undefined || (req.body.orderNote !== undefined && req.body.orderNote.trim() !== (order.orderNote || ''))
+        || (cancelReason !== undefined && cancelReason.trim() !== order.cancelReason)) return res.status(409).json({ message: 'Không thể thay đổi đơn đã kết thúc.' });
+      return res.json({ message: 'Đơn đã ở trạng thái này.', order });
+    }
+
+    if (shipperId !== undefined && order.status === 'DELIVERING') return res.status(409).json({ message: 'Không được đổi hoặc bỏ gán shipper sau khi lấy hàng. Hãy dùng báo cáo trả hàng về quán.' });
+
     if (shipperId !== undefined) {
       if (shipperId === null) {
         const managerMayRelease = isAdmin || (isStaff && position === 'MANAGER');
@@ -459,6 +505,7 @@ router.put('/:id/status', withOrderMutation(async (req, res) => {
         if (order.orderType !== 'ONLINE' || ['COMPLETED', 'CANCELLED'].includes(order.status) || (!managerMayRelease && !shipperMayRelease)) {
           return res.status(403).json({ message: 'Bạn không có quyền bỏ gán shipper khỏi đơn hàng này.' });
         }
+        recordDelivery(order, 'RETURNED', req.user._id);
         order.shipper = undefined;
       }
       else {
@@ -468,9 +515,15 @@ router.put('/:id/status', withOrderMutation(async (req, res) => {
         if (!isAdmin && !(isStaff && ['MANAGER', 'SHIPPER'].includes(position))) return res.status(403).json({ message: 'Bạn không có quyền gán nhân viên giao hàng.' });
         if (isShipper && String(shipperId) !== String(req.user._id)) return res.status(403).json({ message: 'Shipper chỉ được nhận đơn cho chính mình.' });
         if (isShipper && order.shipper && String(order.shipper) !== String(shipperId)) return res.status(409).json({ message: 'Đơn hàng đã được gán cho shipper khác.' });
-        order.shipper = shipper._id;
+        if (String(order.shipper || '') !== String(shipper._id)) {
+          order.shipper = shipper._id;
+          recordDelivery(order, 'ASSIGNED', req.user._id);
+          if (isShipper) recordDelivery(order, 'ACCEPTED', req.user._id);
+        }
       }
     }
+
+    if (status === 'DELIVERING' && order.status !== 'DELIVERING' && order.delivery?.status !== 'ACCEPTED') return res.status(409).json({ message: 'Shipper phải nhận đơn trước khi lấy hàng.' });
 
     if (order.orderType === 'ONLINE' && ['DELIVERING', 'COMPLETED'].includes(status)) {
       if (!order.shipper || !await hasShipperOnShift(order.shipper)) {
@@ -487,6 +540,12 @@ router.put('/:id/status', withOrderMutation(async (req, res) => {
     }
     if (status === 'READY' && order.status === 'PREPARING' && (!order.items.length || order.items.some(item => !item.isPrepared))) return res.status(409).json({ message: 'Cần đánh dấu tất cả món đã pha xong trước khi hoàn thành đơn.' });
     if (['PREPARING', 'READY'].includes(status)) await deductOrderStock(order, req.user._id);
+    if (order.orderType === 'ONLINE' && status !== order.status) {
+      if (status === 'DELIVERING') recordDelivery(order, 'DELIVERING', req.user._id);
+      if (status === 'COMPLETED') recordDelivery(order, 'DELIVERED', req.user._id);
+      if (status === 'CANCELLED') recordDelivery(order, 'CANCELLED', req.user._id);
+      if (order.status === 'DELIVERING' && status === 'READY') recordDelivery(order, 'RETURNED', req.user._id);
+    }
     order.status = status;
     if (cancelReason !== undefined) order.cancelReason = cancelReason.trim();
     if (req.body.orderNote !== undefined) order.orderNote = req.body.orderNote.trim();
@@ -495,11 +554,12 @@ router.put('/:id/status', withOrderMutation(async (req, res) => {
     // COD được thu khi giao xong; đơn tại quầy và demo có bước xác nhận riêng.
     if (status === 'COMPLETED') {
       if (order.orderType === 'ONLINE' && order.paymentMethod === 'COD') {
-        await Payment.findOneAndUpdate(
-          { order: order._id, status: 'PENDING', paymentMethod: 'CASH' },
-          { $set: { status: 'SUCCESS', paidAt: new Date(), receivedBy: req.user._id, paymentNote: 'Thu tiền COD khi giao hàng hoàn tất' } },
+        const collected = await Payment.findOneAndUpdate(
+          { order: order._id, status: 'PENDING', paymentMethod: 'CASH', amount: order.finalAmount },
+          { $set: { status: 'SUCCESS', paidAt: new Date(), receivedBy: order.shipper, paymentNote: 'Thu tiền COD khi giao hàng hoàn tất' } },
           { returnDocument: 'after' }
         );
+        if (!collected) return res.status(409).json({ message: 'Khoản thu COD không khớp hoặc không còn chờ thu.' });
       }
     }
 

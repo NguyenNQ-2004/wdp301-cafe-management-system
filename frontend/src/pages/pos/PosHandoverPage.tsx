@@ -52,6 +52,7 @@ interface HandoverDetail {
   resubmittedAt?: string | null;
   openingCash: number | null;
   cashRevenue: number;
+  cashRefunds?: number;
   codReceipts: number;
   paymentCount: number;
   unattributedCash: number;
@@ -235,7 +236,7 @@ export default function PosHandoverPage() {
     }
   };
 
-  const expectedPreview = detail?.expectedCash ?? (detail?.openingCash === null && validMoney(openingCash) ? Number(openingCash) + detail.cashRevenue + detail.codReceipts : null);
+  const expectedPreview = detail?.expectedCash ?? (detail?.openingCash === null && validMoney(openingCash) ? Number(openingCash) + detail.cashRevenue + detail.codReceipts - (detail.cashRefunds || 0) : null);
   const differencePreview = expectedPreview !== null && validMoney(actualCash) ? Number(actualCash) - expectedPreview : null;
   const isDiff = differencePreview !== null && differencePreview !== 0;
 
@@ -506,7 +507,7 @@ export default function PosHandoverPage() {
                             <strong className="text-xs font-bold text-emerald-700 block mt-0.5">{formatVnd(detail.codReceipts || 0)}</strong>
                           </div>
                           <div className="rounded-lg bg-white p-2.5 border border-red-200 shadow-2xs">
-                            <span className="text-[10px] font-bold text-primary block uppercase">= Phải có trong két</span>
+                            <span className="text-[10px] font-bold text-primary block uppercase">− Hoàn tiền mặt: {formatVnd(detail.cashRefunds || 0)} · = Phải có trong két</span>
                             <strong className="text-xs font-black text-primary block mt-0.5">
                               {expectedPreview !== null ? formatVnd(expectedPreview) : '—'}
                             </strong>
@@ -912,6 +913,7 @@ export default function PosHandoverPage() {
                             <div className="flex justify-between"><span>Tiền đầu ca</span><strong>{formatVnd(detail.openingCash || 0)}</strong></div>
                             <div className="flex justify-between"><span>Thu tiền mặt ({methods.CASH.count})</span><strong>{formatVnd(cashSales)}</strong></div>
                             <div className="flex justify-between"><span>Nhận COD từ shipper</span><strong>{formatVnd(detail.codReceipts || 0)}</strong></div>
+                            <div className="flex justify-between"><span>Hoàn tiền mặt</span><strong>−{formatVnd(detail.cashRefunds || 0)}</strong></div>
                             <div className="flex justify-between"><span>Theo hệ thống</span><strong>{formatVnd(detail.expectedCash || 0)}</strong></div>
                             <div className="flex justify-between"><span>Thực tế trong két</span><strong>{formatVnd(detail.actualCash || 0)}</strong></div>
                             <div className="mt-1 flex justify-between border-t border-dashed border-black pt-1">

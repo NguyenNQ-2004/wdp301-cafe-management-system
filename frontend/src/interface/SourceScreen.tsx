@@ -36,6 +36,7 @@ const DATA_LABELS: Record<string, string> = {
   '/api/loyalty-transactions': 'lịch sử điểm thành viên', '/api/orders': 'đơn hàng',
   '/api/payments': 'thông tin thanh toán', '/api/users': 'danh sách khách hàng',
   '/api/users/customers': 'danh sách khách hàng',
+  '/api/delivery-issues': 'lịch sử sự cố giao hàng',
 };
 
 export default function SourceScreen({ screen }: { screen: PageRoute }) {
@@ -90,7 +91,7 @@ export default function SourceScreen({ screen }: { screen: PageRoute }) {
     'admin-products': ['/api/products', '/api/categories'],
     'pos-create': ['/api/products', '/api/categories', '/api/users', '/api/users/customers'],
     'pos-orders': ['/api/orders', '/api/payments'], 'kds-terminal': ['/api/orders'],
-    'delivery-orders': ['/api/orders'], 'delivery-report': ['/api/orders'],
+    'delivery-orders': ['/api/orders'], 'delivery-report': ['/api/orders', '/api/delivery-issues'],
     'delivery-cod': ['/api/orders', '/api/payments'], orders: ['/api/orders'],
     bill: ['/api/orders', '/api/payments', '/api/shop-settings'],
   };

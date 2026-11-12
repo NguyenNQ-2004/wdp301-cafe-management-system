@@ -178,6 +178,7 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
       customer_id: customerId,
       cashier_id: session.cashierId,
       order_type: orderType,
+      payment_method: paymentMethod as 'CASH' | 'BANK_TRANSFER',
       status: 'CONFIRMED',
       table_number: orderType === 'DINE_IN' ? tableNumber.trim() : null,
       order_note: orderNote.trim(),

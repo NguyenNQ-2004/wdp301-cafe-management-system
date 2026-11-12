@@ -1,6 +1,6 @@
 # Counter order update
 
-Branch: `feature/counter-order-update`.
+Original feature branch: `feature/counter-order-update`. The 11 November workflow audit is on `fix/manh-report-workflow-audit`; see [audit evidence](WORKFLOW_AUDIT_2026-11-11.md).
 
 UI reference: https://github.com/NguyenNQ-2004/cafe_system, cloned reference commit `701af25a8d382be368232e31719578b86a669c2a`; preview https://cafe-system-nine.vercel.app/.
 The team's existing `src/pages/pos/PosOrdersPage.tsx` is already integrated under `frontend/src/interface/pages/pos`. This change extends that screen rather than replacing the application or importing the reference's mock database.

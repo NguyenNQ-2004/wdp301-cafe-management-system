@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { PageRoute, Order } from '../../types';
 import { DeliverySidebar } from './DeliverySidebar';
 import { useDb } from '../../data/DbContext';
@@ -20,11 +20,12 @@ interface DeliveryOrdersPageProps {
 }
 
 export const DeliveryScreen: React.FC<DeliveryOrdersPageProps> = ({ onNavigate, onShowToast }) => {
-  const { db, session, saveDeliveryOrder, busy } = useDb();
+  const { db, session, saveDeliveryOrder, acceptDelivery, busy } = useDb();
+  const [historyDate, setHistoryDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }));
   const me = session.shipperId;
   const online = db.orders.filter(o => o.order_type === 'ONLINE').sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
 
-  const myActive = online.filter(o => o.shipper_id === me && (o.status === 'READY' || o.status === 'DELIVERING'));
+  const myActive = online.filter(o => o.shipper_id === me && !['COMPLETED', 'CANCELLED'].includes(o.status));
   const waitingPickup = online.filter(o => o.shipper_id === null && o.status === 'READY');
   const preparing = online.filter(o => o.shipper_id === null && (o.status === 'CONFIRMED' || o.status === 'PREPARING' || o.status === 'PENDING'));
   const myCompleted = online.filter(o => o.shipper_id === me && o.status === 'COMPLETED');
@@ -33,7 +34,7 @@ export const DeliveryScreen: React.FC<DeliveryOrdersPageProps> = ({ onNavigate, 
   // Tiền mặt COD shipper đang cầm: thanh toán CASH đã thu của đơn mình giao
   const codHolding = myCompleted
     .map(o => paymentOf(db, o.id))
-    .filter(p => p && p.payment_method === 'CASH' && p.status === 'SUCCESS')
+    .filter(p => p && p.payment_method === 'CASH' && p.status === 'SUCCESS' && !p.remittance_id)
     .reduce((s, p) => s + (p?.amount ?? 0), 0);
 
   const codAmount = (o: Order) => {
@@ -48,6 +49,11 @@ export const DeliveryScreen: React.FC<DeliveryOrdersPageProps> = ({ onNavigate, 
   const handleStart = async (o: Order) => {
     if (await saveDeliveryOrder(o.id, { status: 'DELIVERING' })) onShowToast?.(`Bắt đầu giao đơn ${o.order_code}.`);
   };
+  const deliveryButton = (o: Order) => o.status === 'DELIVERING'
+    ? <button disabled={busy} onClick={() => void handleDelivered(o)} className="rounded-xl bg-emerald-700 px-4 py-2 text-white font-bold">Giao thành công</button>
+    : o.delivery?.status !== 'ACCEPTED'
+      ? <button disabled={busy} onClick={async () => { if (await acceptDelivery(o.id)) onShowToast?.(`Đã nhận đơn ${o.order_code}.`); }} className="rounded-xl bg-primary px-4 py-2 text-white font-bold">Xác nhận nhận đơn</button>
+      : <button disabled={busy || o.status !== 'READY'} onClick={() => void handleStart(o)} className="rounded-xl bg-primary px-4 py-2 text-white font-bold disabled:opacity-50">{o.status === 'READY' ? 'Đã lấy hàng, bắt đầu giao' : 'Đã nhận, chờ pha chế xong'}</button>;
 
   const handleDelivered = async (o: Order) => {
     const cod = codAmount(o);
@@ -186,25 +192,7 @@ export const DeliveryScreen: React.FC<DeliveryOrdersPageProps> = ({ onNavigate, 
                   <button onClick={() => onNavigate('delivery-report')} className="px-3 py-2 rounded-xl bg-rose-50 text-rose-700 font-semibold border border-rose-200">
                     Báo sự cố
                   </button>
-                  {spotlight.status === 'READY' ? (
-                    <button
-                      disabled={busy}
-                      onClick={() => void handleStart(spotlight)}
-                      className="px-4 py-2.5 rounded-xl bg-primary hover:bg-primary-container text-white font-bold shadow-xs flex items-center gap-1.5"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">two_wheeler</span>
-                      Đã lấy hàng, bắt đầu giao
-                    </button>
-                  ) : (
-                    <button
-                      disabled={busy}
-                      onClick={() => void handleDelivered(spotlight)}
-                      className="px-4 py-2.5 rounded-xl bg-primary hover:bg-primary-container text-white font-bold shadow-xs flex items-center gap-1.5"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">task_alt</span>
-                      Giao thành công{codAmount(spotlight) > 0 ? ` & thu ${fmtMoney(codAmount(spotlight))}` : ''}
-                    </button>
-                  )}
+                  {deliveryButton(spotlight)}
                 </div>
               </div>
             ) : (
@@ -219,17 +207,7 @@ export const DeliveryScreen: React.FC<DeliveryOrdersPageProps> = ({ onNavigate, 
                 <OrderRow
                   key={o.id}
                   o={o}
-                  action={
-                    o.status === 'READY' ? (
-                      <button disabled={busy} onClick={() => void handleStart(o)} className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-primary hover:text-white font-semibold transition-colors disabled:opacity-50">
-                        Bắt đầu giao
-                      </button>
-                    ) : (
-                      <button disabled={busy} onClick={() => void handleDelivered(o)} className="px-3 py-1.5 rounded-xl bg-emerald-700 text-white font-bold disabled:opacity-50">
-                        Đã giao
-                      </button>
-                    )
-                  }
+                  action={deliveryButton(o)}
                 />
               ))}
           </div>
@@ -259,6 +237,16 @@ export const DeliveryScreen: React.FC<DeliveryOrdersPageProps> = ({ onNavigate, 
             </div>
           </div>
         </div>
+        <section className="rounded-2xl border border-stone-200 bg-white p-5 space-y-3">
+          <label className="flex flex-wrap items-center gap-3 font-bold text-sm">Đơn đã giao theo ngày
+            <input aria-label="Ngày giao thành công" type="date" value={historyDate} onChange={e => setHistoryDate(e.target.value)} className="rounded-lg border p-2" />
+          </label>
+          {myCompleted.filter(o => {
+            const at = o.delivery?.deliveredAt;
+            return (at ? new Date(at).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }) : paymentOf(db, o.id)?.paid_at?.slice(0, 10)) === historyDate;
+          }).map(o => <OrderRow key={o.id} o={o} />)}
+          {myCompleted.length === 0 && <p className="text-xs text-stone-500">Chưa có đơn giao thành công.</p>}
+        </section>
       </main>
     </div>
   );

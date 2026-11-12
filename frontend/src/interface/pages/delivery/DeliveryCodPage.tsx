@@ -22,7 +22,7 @@ interface DeliveryCodPageProps {
 const DENOMS = [500000, 200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100];
 
 export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, onShowToast }) => {
-  const { db, session, remitCod, busy } = useDb();
+  const { db, session, remitCod, busy, rawId } = useDb();
   const me = session.shipperId;
   const schedules = db.work_schedules.filter(s => s.user_id === me).sort((a, b) => (a.work_date < b.work_date ? 1 : -1));
   const [scheduleId, setScheduleId] = useState<number | null>(
@@ -33,15 +33,15 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
   const [note, setNote] = useState('');
   const schedule = schedules.find(s => s.id === scheduleId);
 
-  // COD belongs to the shift when cash was collected, not when the order was created.
+  // An open remittance includes all still-held cash; closed shifts use their claim.
   const myOrders = db.orders
     .filter(o => {
       if (o.order_type !== 'ONLINE' || o.shipper_id !== me || !schedule) return false;
       const payment = paymentOf(db, o.id);
       if (payment?.payment_method === 'CASH' && payment.status === 'SUCCESS' && payment.paid_at) {
-        const paid = Date.parse(payment.paid_at);
-        return !!schedule.check_in_time && paid >= Date.parse(schedule.check_in_time)
-          && (!schedule.check_out_time || paid <= Date.parse(schedule.check_out_time));
+        if (payment.received_by && payment.received_by !== rawId(me)) return false;
+        if (payment.remittance_schedule) return payment.remittance_schedule === rawId(schedule.id);
+        return !schedule.check_out_time && !payment.remittance_id;
       }
       return o.created_at.startsWith(schedule.work_date);
     })
