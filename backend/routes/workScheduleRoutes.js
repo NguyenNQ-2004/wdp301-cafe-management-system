@@ -205,7 +205,8 @@ router.put('/:id/shift-action', async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) throw badRequest('Mã lịch làm việc không hợp lệ.');
     const schedule = await WorkSchedule.findById(req.params.id);
     if (!schedule) return res.status(404).json({ message: 'Không tìm thấy ca làm.' });
-    if (req.user.role !== 'STAFF' || String(schedule.user) !== String(req.user._id)) return res.status(403).json({ message: 'Bạn chỉ được chấm công ca của mình.' });
+    const isAdmin = req.user.role === 'ADMIN';
+    if (!isAdmin && (req.user.role !== 'STAFF' || String(schedule.user) !== String(req.user._id))) return res.status(403).json({ message: 'Bạn chỉ được chấm công ca của mình.' });
     const { action, cash, note } = req.body || {};
     if (!['CHECK_IN', 'CHECK_OUT', 'REMIT_COD'].includes(action)) throw badRequest('Thao tác ca làm không hợp lệ.');
     if (Object.keys(req.body || {}).some((key) => !['action', 'cash', 'note'].includes(key))) throw badRequest('Dữ liệu chấm công không hợp lệ.');
@@ -215,6 +216,11 @@ router.put('/:id/shift-action', async (req, res) => {
     const workDay = schedule.workDate.toISOString().slice(0, 10);
     const today = vietnamDay(now);
     const changes = {};
+    let shiftStart;
+    let shiftEnd;
+    if (action === 'CHECK_IN' || (action === 'CHECK_OUT' && isAdmin)) {
+      [shiftStart, shiftEnd] = (await getShiftTime(schedule)).split('-');
+    }
     if (req.user.position === 'SHIPPER' && ['CHECK_OUT', 'REMIT_COD'].includes(action)) {
       if (await Order.exists({ shipper: req.user._id, orderType: 'ONLINE', status: { $nin: ['COMPLETED', 'CANCELLED'] } })) return res.status(409).json({ message: 'Cần giao xong hoặc trả các đơn được phân công về quán trước khi chốt ca.' });
       if (action === 'CHECK_OUT' && await Payment.exists({ receivedBy: req.user._id, paymentMethod: 'CASH', status: 'SUCCESS', remittanceId: { $exists: false } })) return res.status(409).json({ message: 'Còn tiền COD chưa nộp. Hãy mở Đối soát COD và dùng Nộp tiền & chốt ca.' });
@@ -241,29 +247,40 @@ router.put('/:id/shift-action', async (req, res) => {
       return res.json({ message: 'Đã gửi bảng kê COD và chốt ca giao hàng. Chờ thu ngân xác nhận đã nhận tiền.', schedule: updated, expectedCash });
     }
     if (action === 'CHECK_IN') {
-      const [start, end] = (await getShiftTime(schedule)).split('-');
-      const startMinutes = Number(start.slice(0, 2)) * 60 + Number(start.slice(3));
-      const endMinutes = Number(end.slice(0, 2)) * 60 + Number(end.slice(3));
-      if (today !== workDay || vietnamMinutes(now) < startMinutes - 60 || vietnamMinutes(now) > endMinutes) {
-        return res.status(409).json({ message: 'Chỉ check-in trong ngày được phân ca, từ 60 phút trước giờ bắt đầu đến giờ kết thúc.' });
+      const startMinutes = Number(shiftStart.slice(0, 2)) * 60 + Number(shiftStart.slice(3));
+      const endMinutes = Number(shiftEnd.slice(0, 2)) * 60 + Number(shiftEnd.slice(3));
+      if ((!isAdmin && (today !== workDay || vietnamMinutes(now) < startMinutes - 60 || vietnamMinutes(now) > endMinutes)) || (isAdmin && workDay > today)) {
+        return res.status(409).json({ message: 'Ch\u1ec9 check-in trong ng\u00e0y \u0111\u01b0\u1ee3c ph\u00e2n ca, t\u1eeb 60 ph\u00fat tr\u01b0\u1edbc gi\u1edd b\u1eaft \u0111\u1ea7u \u0111\u1ebfn gi\u1edd k\u1ebft th\u00fac.' });
       }
-      changes.checkInTime = now;
+      if (isAdmin && workDay < today) {
+        const [year, month, day] = workDay.split('-').map(Number);
+        const [hour, minute] = shiftStart.split(':').map(Number);
+        changes.checkInTime = new Date(Date.UTC(year, month - 1, day, hour - 7, minute));
+      } else {
+        changes.checkInTime = now;
+      }
       changes.status = 'PRESENT';
       if (cash !== undefined) changes.startingCash = cash;
     } else {
-      if (today !== workDay && !(today === nextDayKey(workDay) && vietnamMinutes(now) < 360)) {
-        return res.status(409).json({ message: 'Chỉ check-out trong ngày làm việc hoặc trước 06:00 sáng hôm sau.' });
+      if ((!isAdmin && today !== workDay && !(today === nextDayKey(workDay) && vietnamMinutes(now) < 360)) || (isAdmin && workDay > today)) {
+        return res.status(409).json({ message: 'Ch\u1ec9 check-out trong ng\u00e0y l\u00e0m vi\u1ec7c ho\u1eb7c tr\u01b0\u1edbc 06:00 s\u00e1ng h\u00f4m sau.' });
       }
-      if (!schedule.checkInTime || now < schedule.checkInTime) return res.status(409).json({ message: 'Cần check-in trước khi check-out.' });
-      changes.checkOutTime = now;
+      if (!schedule.checkInTime || now < schedule.checkInTime) return res.status(409).json({ message: 'C\u1ea7n check-in tr\u01b0\u1edbc khi check-out.' });
+      if (isAdmin && workDay < today) {
+        const [year, month, day] = workDay.split('-').map(Number);
+        const [hour, minute] = shiftEnd.split(':').map(Number);
+        changes.checkOutTime = new Date(Date.UTC(year, month - 1, day, hour - 7, minute));
+      } else {
+        changes.checkOutTime = now;
+      }
       changes.status = 'COMPLETED';
       if (cash !== undefined) changes.endingCashActual = cash;
     }
     if (note !== undefined) changes.note = note.trim();
-    const expectedStatus = action === 'CHECK_IN' ? 'SCHEDULED' : 'PRESENT';
+    const expectedStatus = action === 'CHECK_IN' && isAdmin ? { $in: ['SCHEDULED', 'ABSENT'] } : action === 'CHECK_IN' ? 'SCHEDULED' : 'PRESENT';
     const guard = action === 'CHECK_IN' ? { checkInTime: { $exists: false } } : { checkOutTime: { $exists: false }, checkInTime: { $exists: true } };
     const updated = await WorkSchedule.findOneAndUpdate(
-      { _id: schedule._id, user: req.user._id, status: expectedStatus, ...guard },
+      { _id: schedule._id, ...(isAdmin ? {} : { user: req.user._id }), status: expectedStatus, ...guard },
       { $set: changes }, { returnDocument: 'after' }
     ).select('user workDate shiftName checkInTime checkOutTime status note').populate('user', 'fullName phone position status');
     if (!updated) return res.status(409).json({ message: 'Ca đã được chấm công hoặc không ở trạng thái phù hợp.' });

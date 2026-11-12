@@ -138,15 +138,15 @@ test('Login route renders the password form', () => {
   assert.match(html, /type="password"/); assert.match(html, /autoComplete="current-password"/i);
   assert.match(html, /type="text"/);
   assert.match(html, /name="email"/);
-  assert.match(html, /Số điện thoại \/ Email \/ Tên đăng nhập/);
+  assert.match(html, />Gmail<\/label>/);
   assert.doesNotMatch(html, /name="phone"/);
 });
 test('Email login payload normalizes email and preserves the account password', () => {
   assert.deepEqual(credentials.loginCredentials(' My.Email@Gmail.com ', ' Case-Sensitive Password '), { email: 'my.email@gmail.com', password: ' Case-Sensitive Password ' });
 });
-test('Phone and local-part identifiers work and malformed identifiers are rejected', () => {
-  for (const identifier of ['0901234567', 'coffee.user']) assert.equal(credentials.loginCredentials(identifier, 'password').email, identifier);
-  for (const identifier of ['user@', 'a b@gmail.com']) assert.throws(() => credentials.loginCredentials(identifier, 'password'));
+test('Only full email identifiers are accepted for login', () => {
+  assert.equal(credentials.loginCredentials(' Coffee.User@GMAIL.com ', 'password').email, 'coffee.user@gmail.com');
+  for (const identifier of ['0901234567', 'coffee.user', 'user@', 'a b@gmail.com']) assert.throws(() => credentials.loginCredentials(identifier, 'password'));
   assert.throws(() => credentials.loginCredentials('valid@gmail.com', ''));
 });
 test('Registration sends email credentials and a separate normalized contact phone', () => {
