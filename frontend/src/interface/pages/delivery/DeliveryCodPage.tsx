@@ -54,7 +54,7 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
     .filter(r => r.o.status === 'COMPLETED' && r.pay && r.pay.payment_method !== 'CASH' && r.pay.status === 'SUCCESS')
     .reduce((s, r) => s + (r.pay?.amount ?? 0), 0);
   const counted = DENOMS.reduce((s, d) => s + d * (denoms[d] ?? 0), 0) + (otherCash ? Number(otherCash) : 0);
-  const isClosed = schedule?.status === 'COMPLETED';
+  const isClosed = schedule?.status === 'COMPLETED' || !!schedule?.remittance_id;
 
   const handleRemit = async () => {
     if (!schedule) {
@@ -66,7 +66,7 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
       onShowToast?.('Số tiền hoặc ghi chú nộp COD không hợp lệ.');
       return;
     }
-    if (!confirm(`Xác nhận nộp ${fmtMoney(counted)} và chốt ca giao hàng?`)) return;
+    if (!confirm(`Xác nhận nộp ${fmtMoney(counted)} COD? Admin sẽ ghi nhận giờ kết thúc ca riêng.`)) return;
     if (await remitCod(schedule.id, counted, note)) onShowToast?.(`Đã gửi đối soát ${fmtMoney(counted)} COD. Thu ngân cần xác nhận đã nhận tiền.`);
   };
 
@@ -78,9 +78,9 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
         <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-2xs space-y-3">
           <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
             <div>
-              <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase">Chốt ca giao hàng</span>
+              <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase">Đối soát COD</span>
               <h1 className="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight mt-1">Đối soát tiền thu hộ COD</h1>
-              <p className="text-xs text-stone-500">Đối chiếu tiền mặt đã thu với payments, sau đó nộp và chốt ca (work_schedules).</p>
+              <p className="text-xs text-stone-500">Đối chiếu tiền mặt đã thu với payments, sau đó nộp COD. Admin ghi nhận giờ kết thúc ca riêng.</p>
             </div>
             <select
               value={scheduleId ?? ''}
@@ -218,7 +218,7 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
               className="w-full py-3 rounded-xl bg-primary hover:bg-primary-container text-white font-bold text-xs sm:text-sm shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-[18px]">check_circle</span>
-              {isClosed ? 'Ca đã chốt' : 'NỘP TIỀN & CHỐT CA GIAO HÀNG'}
+              {schedule?.remittance_id ? 'Đã nộp COD - chờ xác nhận' : isClosed ? 'Ca đã kết thúc' : 'NỘP TIỀN COD'}
             </button>
           </div>
         </div>

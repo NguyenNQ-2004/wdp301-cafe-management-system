@@ -219,7 +219,6 @@ router.post('/:id/confirm', async (req, res) => {
     const updated = await WorkSchedule.findOneAndUpdate(
       { _id: schedule._id, user: req.user._id, status: schedule.status, codLedgerVersion: schedule.codLedgerVersion ? schedule.codLedgerVersion : { $in: [null, 0] }, handoverAt: { $exists: false }, checkInTime: { $exists: true }, ...(schedule.status === 'PRESENT' ? { checkOutTime: { $exists: false } } : { checkOutTime: schedule.checkOutTime }) },
       { $set: {
-        status: 'COMPLETED', checkOutTime: schedule.checkOutTime || new Date(),
         startingCash: openingCash, endingCashSystem: expectedCash, endingCashActual: body.actualCash,
         handoverCashSales: ledger.cashRevenue, handoverCodReceipts: ledger.codReceipts, handoverPaymentCount: ledger.paymentCount,
         handoverUnattributedCash: ledger.unattributedCash, handoverUnattributedCount: ledger.unattributedCount,

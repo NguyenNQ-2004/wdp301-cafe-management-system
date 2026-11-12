@@ -10,7 +10,7 @@ Chạy `npm.cmd run dev` trong thư mục `frontend`, rồi mở địa chỉ Vi
 | Thực đơn, chi tiết món | `/menu`, `/products/:id` |
 | Giỏ hàng, đặt hàng, thanh toán | `/cart`, `/checkout`, `/payment?orderId=...` |
 | Hồ sơ, đơn hàng, hóa đơn, phản hồi | `/profile`, `/orders`, `/bill?orderId=...`, `/feedback` |
-| Thu ngân | `/cashier`, `/cashier/orders`, `/cashier/payments`, `/cashier/shift`, `/cashier/handover` |
+| Thu ngân | `/cashier`, `/cashier/orders`, `/cashier/payments`, `/cashier/handover` |
 | Pha chế | `/barista` |
 | Giao hàng | `/delivery`, `/delivery/problems`, `/delivery/cod` |
 | Báo cáo | `/admin`, `/admin/reports` |
@@ -18,7 +18,7 @@ Chạy `npm.cmd run dev` trong thư mục `frontend`, rồi mở địa chỉ Vi
 | Kho và nhập hàng | `/admin/ingredients`, `/admin/inventory`, `/admin/restock`, `/admin/suppliers`, `/admin/purchases` |
 | Nhân sự | `/admin/employees`, `/admin/shifts`, `/admin/schedules`, `/admin/attendance` |
 | Khách hàng và cài đặt | `/admin/customers`, `/admin/memberships`, `/admin/complaints`, `/admin/settings` |
-| Lịch và chấm công cá nhân | `/my-schedule`, `/my-attendance` |
+| Lịch nhân viên và chấm công Admin | `/my-schedule`, `/admin/attendance` |
 
 Các trang nghiệp vụ yêu cầu đăng nhập và vai trò tương ứng. Luồng đăng nhập dùng API thật; tài khoản giao hàng được chuyển đến `/delivery`.
 

@@ -194,7 +194,7 @@ export default function AdminSchedulesPage() {
               <div className="space-y-2">{items.map((schedule) => <div key={schedule._id} className="rounded-xl border border-[#800020]/15 bg-[#800020]/5 p-2">
                 <strong className="block text-xs text-stone-900">{isAdmin ? schedule.user?.fullName || 'Nhân viên đã xóa' : shift.name}</strong>
                 {isAdmin && <span className="text-[11px] text-stone-500">{schedule.user?.position || ''}</span>}
-                <span className="block text-[11px] text-[#800020]">{statusNames[schedule.status]}</span>
+                {isAdmin && <span className="block text-[11px] text-[#800020]">{statusNames[schedule.status]}</span>}
                 {schedule.note && <p className="mt-1 break-words text-[11px] text-stone-600">{schedule.note}</p>}
                 {isAdmin && schedule.user && schedule.status === 'SCHEDULED' && <div className="mt-2 flex gap-2 text-[11px] font-semibold">
                   <button type="button" onClick={() => openEdit(schedule)} className="text-[#800020]">Sửa</button>

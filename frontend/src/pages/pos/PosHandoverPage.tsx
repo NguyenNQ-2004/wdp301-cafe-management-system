@@ -486,7 +486,7 @@ export default function PosHandoverPage() {
                   <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center">
                     <span className="material-symbols-outlined text-[48px] text-slate-300">event_busy</span>
                     <h3 className="mt-3 text-lg font-bold text-slate-800">Không có ca nào đang chọn để chốt két</h3>
-                    <p className="mt-1 text-sm text-slate-500">Hãy chọn một ca từ danh sách bên trái để thực hiện kiểm đếm và chốt ca.</p>
+                    <p className="mt-1 text-sm text-slate-500">Hãy chọn một ca từ danh sách bên trái để kiểm đếm và chốt két.</p>
                   </div>
                 ) : (
                   <div className="grid gap-6 lg:grid-cols-2">
@@ -667,18 +667,8 @@ export default function PosHandoverPage() {
                       ) : !detail.ready ? (
                         <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center space-y-3">
                           <span className="material-symbols-outlined text-[36px] text-amber-600">schedule</span>
-                          <h4 className="text-base font-extrabold text-amber-900">Chưa đủ điều kiện chốt ca</h4>
-                          <p className="text-xs text-amber-800">Cần check-in trước khi chốt két. Khi bàn giao, hệ thống sẽ đồng thời kết thúc ca đang làm.</p>
-                          {canConfirm && (
-                            <button
-                              type="button"
-                              onClick={() => navigate('/my-attendance')}
-                              className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-700 px-4 py-2 text-xs font-bold text-white hover:bg-amber-800 transition-colors"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">how_to_reg</span>
-                              <span>Mở màn hình chấm công</span>
-                            </button>
-                          )}
+                          <h4 className="text-base font-extrabold text-amber-900">Chưa đủ điều kiện chốt két</h4>
+                          <p className="text-xs text-amber-800">Cần Admin ghi nhận vào ca trước khi chốt két. Chốt két không thay thế việc Admin ghi nhận giờ kết thúc ca.</p>
                         </div>
                       ) : (
                         <form onSubmit={confirm} className="space-y-4">
@@ -779,7 +769,7 @@ export default function PosHandoverPage() {
                             className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-extrabold text-white shadow-xs hover:bg-red-800 transition-colors disabled:opacity-50"
                           >
                             <span className="material-symbols-outlined text-[18px]">verified_user</span>
-                            <span>{busy ? 'Đang lưu biên bản...' : 'Chốt ca và hoàn tất bàn giao'}</span>
+                            <span>{busy ? 'Đang lưu biên bản...' : 'Chốt két và gửi biên bản'}</span>
                           </button>
                         </form>
                       )}
@@ -799,7 +789,7 @@ export default function PosHandoverPage() {
                     <span className="material-symbols-outlined text-[48px] text-amber-400">assignment_late</span>
                     <h3 className="text-lg font-bold text-slate-800">Chưa có ca nào được chốt két để bàn giao</h3>
                     <p className="text-sm text-slate-500 max-w-md mx-auto">
-                      Hãy thực hiện kiểm đếm và chốt ca làm việc trước khi xuất hoặc in biên bản bàn giao.
+                      Hãy kiểm đếm và chốt két trước khi xuất hoặc in biên bản bàn giao. Admin ghi nhận giờ kết thúc ca riêng.
                     </p>
                     <button
                       type="button"
@@ -807,7 +797,7 @@ export default function PosHandoverPage() {
                       className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-white hover:bg-red-800 transition-colors"
                     >
                       <span className="material-symbols-outlined text-[16px]">calculate</span>
-                      <span>Đến màn hình chốt ca</span>
+                      <span>Đến màn hình chốt két</span>
                     </button>
                   </div>
                 ) : (

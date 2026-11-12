@@ -266,13 +266,13 @@ export function DbProvider({ children }: { children: ReactNode }) {
   const remitCod = async (scheduleId: number, cash: number, note: string): Promise<boolean> => {
     if (!user?.token || !Number.isSafeInteger(cash) || cash < 0 || note.trim().length > 300) { setError('Số tiền hoặc ghi chú nộp COD không hợp lệ.'); return false; }
     const schedule = dbRef.current.work_schedules.find(item => item.id === scheduleId);
-    if (!schedule) { setError('Không tìm thấy ca giao hàng cần chốt.'); return false; }
+    if (!schedule) { setError('Không tìm thấy ca giao hàng cần đối soát.'); return false; }
     inFlight.current++; setPending(inFlight.current); setError(''); setNotice('');
     try {
       await shopApi(`/api/work-schedules/${rawId(scheduleId)}/shift-action`, { method: 'PUT', token: user.token, body: { action: 'REMIT_COD', cash, ...(note.trim() ? { note: note.trim() } : {}) } });
       await refresh(); return true;
     } catch (failure) {
-      setError(failure instanceof ShopApiError && failure.status === 404 ? 'Chưa lưu được: API chốt ca giao hàng chưa được kết nối.' : failure instanceof Error ? failure.message : 'Không thể nộp tiền COD.');
+      setError(failure instanceof ShopApiError && failure.status === 404 ? 'Chưa lưu được: API đối soát COD chưa được kết nối.' : failure instanceof Error ? failure.message : 'Không thể nộp tiền COD.');
       return false;
     } finally { inFlight.current--; setPending(inFlight.current); }
   };

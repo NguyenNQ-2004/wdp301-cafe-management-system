@@ -47,15 +47,6 @@ const handleError = (error, res) => {
 };
 const populateUser = (query) => query.populate('user', 'fullName phone position status').sort({ workDate: 1, shiftName: 1 });
 const vietnamDay = (date) => new Date(date.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
-const vietnamMinutes = (date) => {
-  const local = new Date(date.getTime() + 7 * 60 * 60 * 1000);
-  return local.getUTCHours() * 60 + local.getUTCMinutes();
-};
-const nextDayKey = (key) => {
-  const date = parseDay(key);
-  date.setUTCDate(date.getUTCDate() + 1);
-  return date.toISOString().slice(0, 10);
-};
 const getShiftTime = resolveShift;
 
 router.get('/cod-remittances', async (req, res) => {
@@ -97,7 +88,7 @@ router.post('/:id/confirm-cod', async (req, res) => {
   } catch (error) { handleError(error, res); }
 });
 
-router.get('/attendance', async (req, res) => {
+router.get('/attendance', adminOnly, async (req, res) => {
   try {
     const from = parseDay(req.query.from);
     const to = parseDay(req.query.to);
@@ -131,7 +122,9 @@ router.get('/', async (req, res) => {
       if (!mongoose.isValidObjectId(req.query.userId)) throw badRequest('Mã nhân viên không hợp lệ.');
       filter.user = req.query.userId;
     }
-    res.json(await populateUser(WorkSchedule.find(filter)));
+    const schedules = WorkSchedule.find(filter);
+    if (req.user.role === 'STAFF') schedules.select('user workDate shiftName note');
+    res.json(await populateUser(schedules));
   } catch (error) { handleError(error, res); }
 });
 
@@ -205,19 +198,27 @@ router.put('/:id/shift-action', async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) throw badRequest('Mã lịch làm việc không hợp lệ.');
     const schedule = await WorkSchedule.findById(req.params.id);
     if (!schedule) return res.status(404).json({ message: 'Không tìm thấy ca làm.' });
-    if (req.user.role !== 'STAFF' || String(schedule.user) !== String(req.user._id)) return res.status(403).json({ message: 'Bạn chỉ được chấm công ca của mình.' });
+    const isAdmin = req.user.role === 'ADMIN';
+    if (!isAdmin && (req.user.role !== 'STAFF' || String(schedule.user) !== String(req.user._id))) return res.status(403).json({ message: 'Bạn chỉ được chấm công ca của mình.' });
     const { action, cash, note } = req.body || {};
     if (!['CHECK_IN', 'CHECK_OUT', 'REMIT_COD'].includes(action)) throw badRequest('Thao tác ca làm không hợp lệ.');
     if (Object.keys(req.body || {}).some((key) => !['action', 'cash', 'note'].includes(key))) throw badRequest('Dữ liệu chấm công không hợp lệ.');
+    if (!isAdmin && action !== 'REMIT_COD') return res.status(403).json({ message: 'Chỉ Admin được ghi nhận giờ vào và giờ ra ca.' });
     if (cash !== undefined && (typeof cash !== 'number' || !Number.isSafeInteger(cash) || cash < 0)) throw badRequest('Số tiền phải là số nguyên không âm hợp lệ.');
     if (note !== undefined && (typeof note !== 'string' || note.trim().length > 500)) throw badRequest('Ghi chú không hợp lệ.');
     const now = new Date();
     const workDay = schedule.workDate.toISOString().slice(0, 10);
     const today = vietnamDay(now);
     const changes = {};
+    let shiftStart;
+    let shiftEnd;
+    if (action === 'CHECK_IN' || (action === 'CHECK_OUT' && isAdmin)) {
+      [shiftStart, shiftEnd] = (await getShiftTime(schedule)).split('-');
+    }
     if (action === 'REMIT_COD') {
       if (req.user.role !== 'STAFF' || req.user.position !== 'SHIPPER') return res.status(403).json({ message: 'Chỉ shipper được nộp tiền COD của ca giao hàng.' });
       if (schedule.status !== 'PRESENT' || !schedule.checkInTime || schedule.checkOutTime) return res.status(409).json({ message: 'Ca phải đang mở để nộp COD.' });
+      if (schedule.remittanceId) return res.status(409).json({ message: 'Tiền COD của ca này đã được nộp.' });
       if (cash === undefined) throw badRequest('Cần nhập số tiền mặt thực nộp.');
       const orders = await Order.find({ shipper: req.user._id, orderType: 'ONLINE', paymentMethod: 'COD', status: 'COMPLETED' }).select('_id');
       const payments = await Payment.find({ order: { $in: orders.map(order => order._id) }, receivedBy: req.user._id, paidAt: { $gte: schedule.checkInTime, $lte: now }, remittanceId: { $exists: false }, paymentMethod: 'CASH', status: 'SUCCESS' }).select('amount');
@@ -228,37 +229,38 @@ router.put('/:id/shift-action', async (req, res) => {
       const claim = await Payment.updateMany({ _id: { $in: payments.map(payment => payment._id) }, remittanceId: { $exists: false } }, { $set: { remittanceId, remittanceSchedule: schedule._id, remittedAt: now } });
       if (claim.modifiedCount !== payments.length) return res.status(409).json({ message: 'Giao dịch COD vừa được đối soát ở yêu cầu khác.' });
       const updated = await WorkSchedule.findOneAndUpdate(
-        { _id: schedule._id, user: req.user._id, status: 'PRESENT', checkInTime: { $exists: true }, checkOutTime: { $exists: false } },
-        { $set: { remittanceId, codPaymentIds: payments.map(payment => payment._id), endingCashSystem: expectedCash, endingCashActual: cash, checkOutTime: now, status: 'COMPLETED', note: [schedule.note, `Nộp COD ${cash}`, note?.trim()].filter(Boolean).join(' | ') } },
+        { _id: schedule._id, user: req.user._id, status: 'PRESENT', checkInTime: { $exists: true }, checkOutTime: { $exists: false }, remittanceId: { $exists: false } },
+        { $set: { remittanceId, codPaymentIds: payments.map(payment => payment._id), endingCashSystem: expectedCash, endingCashActual: cash, note: [schedule.note, `Nộp COD ${cash}`, note?.trim()].filter(Boolean).join(' | ') } },
         { returnDocument: 'after' }
       ).populate('user', 'fullName phone position status');
       if (!updated) return res.status(409).json({ message: 'Ca đã được chốt hoặc không còn mở.' });
-      return res.json({ message: 'Đã gửi bảng kê COD và chốt ca giao hàng. Chờ thu ngân xác nhận đã nhận tiền.', schedule: updated, expectedCash });
+      return res.json({ message: 'Đã gửi bảng kê COD. Chờ thu ngân xác nhận đã nhận tiền.', schedule: updated, expectedCash });
     }
     if (action === 'CHECK_IN') {
-      const [start, end] = (await getShiftTime(schedule)).split('-');
-      const startMinutes = Number(start.slice(0, 2)) * 60 + Number(start.slice(3));
-      const endMinutes = Number(end.slice(0, 2)) * 60 + Number(end.slice(3));
-      if (today !== workDay || vietnamMinutes(now) < startMinutes - 60 || vietnamMinutes(now) > endMinutes) {
-        return res.status(409).json({ message: 'Chỉ check-in trong ngày được phân ca, từ 60 phút trước giờ bắt đầu đến giờ kết thúc.' });
-      }
-      changes.checkInTime = now;
+      if (workDay > today) return res.status(409).json({ message: 'Chỉ Admin được ghi nhận vào ca trong ngày được phân hoặc ngày đã qua.' });
+      if (workDay < today) {
+        const [year, month, day] = workDay.split('-').map(Number);
+        const [hour, minute] = shiftStart.split(':').map(Number);
+        changes.checkInTime = new Date(Date.UTC(year, month - 1, day, hour - 7, minute));
+      } else changes.checkInTime = now;
       changes.status = 'PRESENT';
       if (cash !== undefined) changes.startingCash = cash;
     } else {
-      if (today !== workDay && !(today === nextDayKey(workDay) && vietnamMinutes(now) < 360)) {
-        return res.status(409).json({ message: 'Chỉ check-out trong ngày làm việc hoặc trước 06:00 sáng hôm sau.' });
-      }
+      if (workDay > today) return res.status(409).json({ message: 'Chỉ Admin được ghi nhận kết thúc ca trong ngày được phân hoặc ngày đã qua.' });
       if (!schedule.checkInTime || now < schedule.checkInTime) return res.status(409).json({ message: 'Cần check-in trước khi check-out.' });
-      changes.checkOutTime = now;
+      if (workDay < today) {
+        const [year, month, day] = workDay.split('-').map(Number);
+        const [hour, minute] = shiftEnd.split(':').map(Number);
+        changes.checkOutTime = new Date(Date.UTC(year, month - 1, day, hour - 7, minute));
+      } else changes.checkOutTime = now;
       changes.status = 'COMPLETED';
       if (cash !== undefined) changes.endingCashActual = cash;
     }
     if (note !== undefined) changes.note = note.trim();
-    const expectedStatus = action === 'CHECK_IN' ? 'SCHEDULED' : 'PRESENT';
+    const expectedStatus = action === 'CHECK_IN' ? { $in: ['SCHEDULED', 'ABSENT'] } : 'PRESENT';
     const guard = action === 'CHECK_IN' ? { checkInTime: { $exists: false } } : { checkOutTime: { $exists: false }, checkInTime: { $exists: true } };
     const updated = await WorkSchedule.findOneAndUpdate(
-      { _id: schedule._id, user: req.user._id, status: expectedStatus, ...guard },
+      { _id: schedule._id, ...(isAdmin ? {} : { user: req.user._id }), status: expectedStatus, ...guard },
       { $set: changes }, { returnDocument: 'after' }
     ).select('user workDate shiftName checkInTime checkOutTime status note').populate('user', 'fullName phone position status');
     if (!updated) return res.status(409).json({ message: 'Ca đã được chấm công hoặc không ở trạng thái phù hợp.' });

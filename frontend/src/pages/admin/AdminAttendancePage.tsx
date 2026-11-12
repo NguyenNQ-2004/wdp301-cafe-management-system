@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { shopApi } from '../../lib/shopApi';
 import useAuthStore from '../../store/authStore';
-import StaffWorkNav from '../../components/StaffWorkNav';
 import { AdminLayout, inputCls } from './AdminUi';
 
 type ShiftName = string;
@@ -34,11 +33,6 @@ const initialRange = () => {
   const sunday = new Date(monday);
   sunday.setUTCDate(monday.getUTCDate() + 6);
   return { from: monday.toISOString().slice(0, 10), to: sunday.toISOString().slice(0, 10) };
-};
-const nextDayKey = (key: string) => {
-  const date = new Date(`${key}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + 1);
-  return date.toISOString().slice(0, 10);
 };
 const formatTime = (iso?: string) => {
   if (!iso) return '—';
@@ -120,7 +114,7 @@ export default function AdminAttendancePage() {
   };
   const changeAttendance = async (record: RecordItem, action: 'CHECK_IN' | 'CHECK_OUT' | 'ABSENT') => {
     if (!token || busyId) return;
-    const recordsCash = action === 'CHECK_IN' && ['CASHIER', 'MANAGER'].includes(user?.position || '');
+    const recordsCash = action === 'CHECK_IN' && ['CASHIER', 'MANAGER'].includes(record.user?.position || '');
     const opening = openingCash[record._id] ?? '0';
     if (recordsCash && (!/^\d+$/.test(opening) || !Number.isSafeInteger(Number(opening)))) {
       setError('Tiền đầu ca phải là số nguyên không âm.');
@@ -140,8 +134,6 @@ export default function AdminAttendancePage() {
 
   const localNow = new Date(clockTick + 7 * 3600000);
   const today = localNow.toISOString().slice(0, 10);
-  const vietnamHour = localNow.getUTCHours();
-  const vietnamMinute = vietnamHour * 60 + localNow.getUTCMinutes();
   const content = <div className="mx-auto max-w-7xl space-y-5">
     <form onSubmit={applyRange} className="flex flex-wrap items-end gap-3 rounded-2xl border border-stone-200 bg-white p-4">
       <label className="text-xs font-semibold text-stone-700">Từ ngày<input type="date" required value={draft.from} onChange={(event) => setDraft({ ...draft, from: event.target.value })} className={`mt-1 ${inputCls}`} /></label>
@@ -166,13 +158,8 @@ export default function AdminAttendancePage() {
           const late = differenceMinutes(record, shift, 'checkInTime');
           const early = differenceMinutes(record, shift, 'checkOutTime');
           const workDay = (record.workDate || '').slice(0, 10);
-          let canCheckIn = workDay === today;
-          if (hasTimeWindow) {
-            const [startHour, startMinute] = shift.startTime.split(':').map(Number);
-            const [endHour, endMinute] = shift.endTime.split(':').map(Number);
-            canCheckIn = workDay === today && vietnamMinute >= startHour * 60 + startMinute - 60 && vietnamMinute <= endHour * 60 + endMinute;
-          }
-          const canCheckOut = workDay === today || (workDay ? nextDayKey(workDay) === today && vietnamHour < 6 : false);
+          const canAdminCheckIn = isAdmin && workDay <= today && ['SCHEDULED', 'ABSENT'].includes(record.status) && !record.checkInTime;
+          const canAdminCheckOut = isAdmin && record.status === 'PRESENT' && workDay <= today && !record.checkOutTime;
           return <tr key={record._id} className="border-t border-stone-100 align-top">
             <td className="p-3 font-semibold">{workDay ? workDay.split('-').reverse().join('/') : '—'}</td>
             {isAdmin && <td className="p-3"><strong className="block">{record.user?.fullName || 'Nhân viên đã xóa'}</strong><span className="text-xs text-stone-500">{record.user?.phone}</span></td>}
@@ -182,11 +169,11 @@ export default function AdminAttendancePage() {
             <td className="p-3 text-xs">{late !== null && late > 0 && <span className="block text-amber-700">Vào trễ {late} phút</span>}{early !== null && early < 0 && <span className="block text-amber-700">Ra sớm {-early} phút</span>}{(late === null || late <= 0) && (early === null || early >= 0) && <span className="text-stone-500">—</span>}</td>
             <td className="p-3"><span className={`rounded-lg px-2 py-1 text-xs font-semibold ${record.status === 'ABSENT' ? 'bg-red-50 text-red-700' : record.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>{statusLabels[record.status]}</span>{record.note && <p className="mt-2 text-xs text-stone-500">{record.note}</p>}</td>
             <td className="p-3">
-              {!isAdmin && record.status === 'SCHEDULED' && canCheckIn && <div className="space-y-2">
-                {['CASHIER', 'MANAGER'].includes(user?.position || '') && <label className="block text-xs font-semibold text-stone-600">Tiền đầu ca (đ)<NumberInput type="number" min="0" step="1" value={openingCash[record._id] ?? '0'} onChange={(event) => setOpeningCash((current) => ({ ...current, [record._id]: event.target.value }))} className="mt-1 w-28 rounded-lg border border-stone-200 px-2 py-1" /></label>}
-                <button disabled={busyId === record._id} onClick={() => void changeAttendance(record, 'CHECK_IN')} className="rounded-lg bg-[#800020] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Check-in</button>
+              {canAdminCheckIn && <div className="space-y-2">
+                {['CASHIER', 'MANAGER'].includes(record.user?.position || '') && <label className="block text-xs font-semibold text-stone-600">Tiền đầu ca (đ)<NumberInput type="number" min="0" step="1" value={openingCash[record._id] ?? '0'} onChange={(event) => setOpeningCash((current) => ({ ...current, [record._id]: event.target.value }))} className="mt-1 w-28 rounded-lg border border-stone-200 px-2 py-1" /></label>}
+                <button disabled={busyId === record._id} onClick={() => void changeAttendance(record, 'CHECK_IN')} className="rounded-lg bg-[#800020] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Ghi nhận vào ca</button>
               </div>}
-              {!isAdmin && record.status === 'PRESENT' && canCheckOut && <button disabled={busyId === record._id} onClick={() => void changeAttendance(record, 'CHECK_OUT')} className="rounded-lg bg-[#800020] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Check-out</button>}
+              {canAdminCheckOut && <button disabled={busyId === record._id} onClick={() => void changeAttendance(record, 'CHECK_OUT')} className="rounded-lg bg-[#800020] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Ghi nhận kết thúc ca</button>}
               {isAdmin && record.status === 'SCHEDULED' && workDay < today && <button disabled={busyId === record._id} onClick={() => void changeAttendance(record, 'ABSENT')} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-50">Đánh dấu vắng</button>}
             </td>
           </tr>;
@@ -198,9 +185,5 @@ export default function AdminAttendancePage() {
     <p className="text-xs text-stone-500">Đối chiếu giờ dự kiến theo khung giờ ca hiện tại của cửa hàng. Thời gian thực tế hiển thị theo giờ Việt Nam.</p>
   </div>;
 
-  if (isAdmin) return <AdminLayout route="admin-attendance" table="work_schedules" title="26. Chấm công nhân sự" subtitle="Theo dõi giờ vào, giờ ra và đối chiếu với ca đã phân.">{content}</AdminLayout>;
-  return <>
-    <StaffWorkNav showCounterPayments={['CASHIER', 'MANAGER'].includes(user?.position || '')} />
-    <div className="mx-auto w-full max-w-7xl p-4 md:p-8"><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold">Chấm công của tôi</h1><p className="text-sm text-stone-600">Check-in và check-out theo ca đã được phân.</p></div></div>{content}</div>
-  </>;
+  return <AdminLayout route="admin-attendance" table="work_schedules" title="26. Chấm công nhân sự" subtitle="Admin ghi nhận giờ vào, giờ ra và theo dõi đối chiếu với ca đã phân.">{content}</AdminLayout>;
 }

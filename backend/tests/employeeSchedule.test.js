@@ -74,7 +74,11 @@ test('UC25 assigns weekly shifts and keeps staff schedules private', async (t) =
   assert.equal((await request('GET', '/api/work-schedules?weekStart=2026-10-13', null, adminToken)).status, 400);
   assert.equal((await request('GET', `/api/work-schedules${week}`, null, adminToken)).data.length, 2);
   assert.deepEqual((await request('GET', `/api/work-schedules${week}&userId=${staffB._id}`, null, adminToken)).data.map((item) => item._id), [second.data._id]);
-  assert.deepEqual((await request('GET', `/api/work-schedules${week}&userId=${staffB._id}`, null, staffToken)).data.map((item) => item._id), [created.data._id]);
+  const ownSchedules = (await request('GET', `/api/work-schedules${week}&userId=${staffB._id}`, null, staffToken)).data;
+  assert.deepEqual(ownSchedules.map((item) => item._id), [created.data._id]);
+  assert.equal('status' in ownSchedules[0], false);
+  assert.equal('checkInTime' in ownSchedules[0], false);
+  assert.equal('checkOutTime' in ownSchedules[0], false);
   assert.deepEqual((await request('GET', `/api/work-schedules${week}`, null, otherToken)).data.map((item) => item._id), [second.data._id]);
   assert.equal((await request('PUT', `/api/work-schedules/${created.data._id}`, { note: 'Đổi quầy' }, staffToken)).status, 403);
   assert.equal((await request('PUT', `/api/work-schedules/${created.data._id}`, { status: 'ABSENT' }, adminToken)).status, 400);
