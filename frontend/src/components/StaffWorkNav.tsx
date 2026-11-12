@@ -19,7 +19,6 @@ export default function StaffWorkNav({ showCounterPayments = false }: StaffWorkN
     : location.pathname === workPath;
   const onCounterPayments = location.pathname === '/cashier/payments';
   const onSchedule = location.pathname === '/my-schedule';
-  const onAttendance = ['/my-attendance', '/staff/attendance', '/cashier/shift'].includes(location.pathname);
   const navLinkClass = (active: boolean) => active ? 'rounded bg-red-50 px-1.5 font-semibold text-red-700' : 'text-stone-600 hover:text-stone-900';
 
   return (
@@ -31,9 +30,6 @@ export default function StaffWorkNav({ showCounterPayments = false }: StaffWorkN
         </Link>
         <Link to="/my-schedule" aria-current={onSchedule ? 'page' : undefined} className={navLinkClass(onSchedule)}>
           Lịch làm của tôi
-        </Link>
-        <Link to="/my-attendance" aria-current={onAttendance ? 'page' : undefined} className={navLinkClass(onAttendance)}>
-          Chấm công của tôi
         </Link>
         <span>{user?.fullName || 'Nhân viên'}</span>
         <button type="button" onClick={() => { logout(); navigate('/', { replace: true }); }} className="font-semibold text-red-700 hover:text-red-800">

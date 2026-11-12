@@ -23,7 +23,6 @@ export type PageRoute =
   | 'admin-shifts'
   | 'admin-schedules'
   | 'my-schedule'
-  | 'my-attendance'
   | 'admin-attendance'
   | 'admin-handover'
   | 'admin-customers'

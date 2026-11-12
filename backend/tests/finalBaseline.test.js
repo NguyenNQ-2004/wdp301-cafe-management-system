@@ -123,7 +123,7 @@ test('Final baseline: checkout identity, rollback, payment integrity and atomic 
   });
 
   let shift, handoverId;
-  await t.test('failed PRESENT close rolls back attendance and handover together', async () => {
+  await t.test('failed PRESENT handover preserves attendance', async () => {
     shift = await WorkSchedule.create({ user: cashier._id, workDate: new Date(), shiftName: 'FINAL', status: 'PRESENT', checkInTime: new Date(Date.now() - 60000), startingCash: 100000 });
     const order = await Order.create({ orderCode: 'FINAL-CASH', orderType: 'DINE_IN', totalAmount: 45000, finalAmount: 45000, cashier: cashier._id });
     await Payment.create({ order: order._id, amount: 45000, paymentMethod: 'CASH', status: 'SUCCESS', paidAt: new Date(), receivedBy: cashier._id });
@@ -134,11 +134,12 @@ test('Final baseline: checkout identity, rollback, payment integrity and atomic 
     assert.equal((await WorkSchedule.findById(shift._id)).checkOutTime, undefined);
     assert.equal(await Handover.countDocuments({ schedule: shift._id }), 0);
   });
-  await t.test('PRESENT close commits COMPLETED and a SUBMITTED cash snapshot together', async () => {
+  await t.test('PRESENT handover saves cash snapshot without closing attendance', async () => {
     const result = await request('POST', `/api/shift-handovers/${shift._id}/confirm`, { actualCash: 145000 }, cashier);
     assert.equal(result.status, 200, JSON.stringify(result.data)); handoverId = result.data.handoverId;
     assert.equal(result.data.expectedCash, 145000); assert.equal(result.data.status, 'SUBMITTED');
-    assert.equal((await WorkSchedule.findById(shift._id)).status, 'COMPLETED');
+    assert.equal((await WorkSchedule.findById(shift._id)).status, 'PRESENT');
+    assert.equal((await WorkSchedule.findById(shift._id)).checkOutTime, undefined);
     assert.equal((await Handover.findById(handoverId)).history.length, 1);
   });
   await t.test('concurrent review accepts one decision and preserves rejection/resubmission history', async () => {

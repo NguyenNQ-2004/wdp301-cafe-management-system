@@ -28,7 +28,9 @@ for (const [url, currentRoute, activeLabel] of [
     const html = renderToString(React.createElement(MemoryRouter, { initialEntries: [url] },
       React.createElement(Context.Provider, { value: { db: { users: [], work_schedules: [] }, session: {} } },
         React.createElement(Header, { currentRoute }))));
-    for (const path of ['/cashier/payments', '/cashier', '/my-schedule', '/my-attendance']) assert.ok(html.includes(`href="${path}"`), html);
+    for (const path of ['/cashier/payments', '/cashier', '/my-schedule']) assert.ok(html.includes(`href="${path}"`), html);
+    assert.ok(!html.includes('href="/my-attendance"'), html);
+    assert.ok(!html.includes('Chấm công của tôi'));
     for (const label of ['Đăng xuất', 'Tạo đơn tại quầy', 'Danh sách đơn', 'Chốt ca', 'Bàn giao ca', 'Đề xuất nhập hàng']) assert.ok(html.includes(label));
     assert.match(html, new RegExp('class="[^"]*bg-primary text-white shadow-xs[^\\n]*?<span>' + activeLabel + '</span>'));
     assert.ok(html.indexOf('<span>Bàn giao ca</span>') < html.indexOf('<span>Đề xuất nhập hàng</span>'));

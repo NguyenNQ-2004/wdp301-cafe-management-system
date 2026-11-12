@@ -147,7 +147,7 @@ const AppLayout = () => {
     }
   }, [user, location.pathname, navigate]);
 
-  const isDedicatedScreen = ['/admin', '/cashier', '/barista', '/delivery', '/my-schedule', '/my-attendance', '/staff/schedule', '/staff/attendance'].some(prefix => location.pathname.startsWith(prefix));
+  const isDedicatedScreen = ['/admin', '/cashier', '/barista', '/delivery', '/my-schedule', '/staff/schedule'].some(prefix => location.pathname.startsWith(prefix));
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
@@ -192,7 +192,8 @@ const AppLayout = () => {
           <Route path="/counter-orders" element={<Navigate to="/cashier/orders" replace />} />
           <Route path="/counter-order" element={<Navigate to="/cashier" replace />} />
           <Route path="/staff/schedule" element={<Navigate to="/my-schedule" replace />} />
-          <Route path="/staff/attendance" element={<Navigate to="/my-attendance" replace />} />
+          <Route path="/staff/attendance" element={<Navigate to="/my-schedule" replace />} />
+          <Route path="/my-attendance" element={<Navigate to="/my-schedule" replace />} />
 
           {/* Main User Routes */}
           <Route path="/menu" element={<SourceScreen screen="menu" />} />
@@ -316,10 +317,6 @@ const AppLayout = () => {
             path="/admin/attendance"
             element={user?.role === 'ADMIN' ? <AdminAttendancePage /> : <Navigate to="/" />}
           />
-          <Route
-            path="/my-attendance"
-            element={user?.role === 'STAFF' ? <AdminAttendancePage /> : <Navigate to="/" />}
-          />
           <Route path="/admin/handovers" element={user?.role === 'ADMIN' ? <AdminHandoversPage /> : <Navigate to="/" />} />
           <Route path="/admin/handover" element={<Navigate to="/admin/handovers" replace />} />
           <Route
@@ -399,7 +396,7 @@ const AppLayout = () => {
           <Route path="/customize" element={<SourceScreen screen="customize" />} />
           <Route path="/bill" element={user ? <SourceScreen screen="bill" /> : <Navigate to="/login" />} />
           <Route path="/cashier/orders" element={user?.role === 'ADMIN' || (user?.role === 'STAFF' && ['CASHIER','MANAGER','BARISTA'].includes(user.position || '')) ? <SourceScreen screen="pos-orders" /> : <Navigate to="/" />} />
-          <Route path="/cashier/shift" element={user?.role === 'STAFF' || user?.role === 'ADMIN' ? <AdminAttendancePage /> : <Navigate to="/" />} />
+          <Route path="/cashier/shift" element={<Navigate to={user?.role === 'ADMIN' ? '/admin/attendance' : '/my-schedule'} replace />} />
           <Route path="/delivery" element={user?.role === 'ADMIN' || (user?.role === 'STAFF' && user.position === 'SHIPPER') ? <SourceScreen screen="delivery-orders" /> : <Navigate to="/" />} />
           <Route path="/delivery/problems" element={user?.role === 'ADMIN' || (user?.role === 'STAFF' && user.position === 'SHIPPER') ? <SourceScreen screen="delivery-report" /> : <Navigate to="/" />} />
           <Route path="/delivery/cod" element={user?.role === 'ADMIN' || (user?.role === 'STAFF' && user.position === 'SHIPPER') ? <SourceScreen screen="delivery-cod" /> : <Navigate to="/" />} />

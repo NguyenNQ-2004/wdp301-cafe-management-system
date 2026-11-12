@@ -40,6 +40,7 @@ export interface WorkSchedule {
   starting_cash: number | null;
   ending_cash_system: number | null;
   ending_cash_actual: number | null;
+  remittance_id?: string | null;
   cod_received_at?: string | null;
   cod_received_amount?: number | null;
   status: ScheduleStatus;
