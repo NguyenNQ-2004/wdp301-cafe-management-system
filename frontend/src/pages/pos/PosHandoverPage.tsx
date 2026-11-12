@@ -1,3 +1,4 @@
+import CashierWorkHeader from '../../components/CashierWorkHeader';
 import { NumberInput } from '../../components/NumberInput';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -252,79 +253,13 @@ export default function PosHandoverPage() {
 
   return (
     <div className="min-h-[calc(100vh-5rem)] bg-[#f8fafc] text-slate-800">
-      {/* Top Cashier Topbar with Navigation Tabs */}
-      <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b border-slate-200 bg-white px-4 md:px-6 shadow-xs">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate(user?.role === 'ADMIN' ? '/admin' : '/cashier')}
-            className="flex items-center gap-1.5 text-sm font-bold text-primary hover:text-red-900 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            <span className="hidden sm:inline">Quay lại</span>
-          </button>
-          <div className="h-4 w-[1px] bg-slate-300" />
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-[20px]">point_of_sale</span>
-            <span className="text-sm font-extrabold uppercase tracking-tight text-primary">Aura Café POS</span>
-          </div>
-        </div>
-
-        {/* 4 Navigation Tabs matching SWP Cashier Header */}
-        <nav className="flex items-center gap-1 rounded-lg bg-slate-100 p-1 border border-slate-200 text-xs sm:text-sm font-semibold">
-          <button
-            type="button"
-            onClick={() => navigate('/cashier')}
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-slate-600 hover:text-slate-900 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[17px]">point_of_sale</span>
-            <span className="hidden md:inline">Tạo đơn tại quầy</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/cashier/orders')}
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-slate-600 hover:text-slate-900 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[17px]">receipt_long</span>
-            <span className="hidden md:inline">Đơn hôm nay</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setSearchParams({ mode: 'close', ...(selectedId ? { scheduleId: selectedId } : {}) })}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-all ${
-              currentMode === 'close' ? 'bg-white text-primary shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[17px]">calculate</span>
-            <span>Chốt ca</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setSearchParams({ mode: 'handover', ...(selectedId ? { scheduleId: selectedId } : {}) })}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-all ${
-              currentMode === 'handover' ? 'bg-white text-primary shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[17px]">assignment_turned_in</span>
-            <span>Bàn giao ca</span>
-          </button>
-          {user?.role === 'STAFF' && user.position === 'CASHIER' && <button type="button" onClick={() => navigate('/cashier/restock-requests')} className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-slate-600"><span className="material-symbols-outlined text-[17px]">inventory_2</span><span>Đề xuất nhập hàng</span></button>}
-        </nav>
-
-        <div className="flex items-center gap-3">
-          <span className="hidden lg:block text-xs font-semibold text-slate-600">
-            {user?.fullName || 'Thu ngân'}
-          </span>
-          <button
-            onClick={() => setReloadKey((k) => k + 1)}
-            className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:text-primary hover:border-red-200 transition-colors"
-            title="Làm mới dữ liệu"
-          >
-            <span className="material-symbols-outlined text-[18px]">refresh</span>
-          </button>
-        </div>
-      </header>
+      <CashierWorkHeader currentRoute={currentMode === 'close' ? 'pos-shift' : 'pos-handover'} onNavigate={route => {
+        if (route === 'pos-shift' || route === 'pos-handover') setSearchParams({ mode: route === 'pos-shift' ? 'close' : 'handover', ...(selectedId ? { scheduleId: selectedId } : {}) });
+        else navigate(route === 'pos-orders' ? '/cashier/orders' : route === 'pos-restock' ? '/cashier/restock-requests' : '/cashier');
+      }} />
 
       <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 space-y-6">
+        <div className="flex justify-end"><button type="button" onClick={() => setReloadKey(key => key + 1)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">↻ Làm mới dữ liệu</button></div>
         {/* Flash Notifications */}
         {error && (
           <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">

@@ -97,7 +97,7 @@ const login = async (req, res) => {
     const email = req.body.identifier ?? req.body.email;
     const loginEmail = normalizeEmail(email);
     if (!validLogin(loginEmail) || typeof password !== 'string' || !password) {
-      return res.status(400).json({ message: 'Vui lòng nhập số điện thoại, email hoặc tên email và mật khẩu.' });
+      return res.status(400).json({ message: 'Vui lòng nhập email hợp lệ và mật khẩu.' });
     }
 
     const matches = await User.find(loginFilter(loginEmail)).limit(2);

@@ -288,7 +288,7 @@ export const AdminComplaintsPage: React.FC = () => {
                 <th className="p-3.5">Mã phiếu</th>
                 <th className="p-3.5">Đơn hàng</th>
                 <th className="p-3.5">Khách hàng</th>
-                <th className="p-3.5">Phân loại</th>
+                <th className="min-w-[110px] whitespace-nowrap p-3.5">Phân loại</th>
                 <th className="p-3.5">Đánh giá sao</th>
                 <th className="p-3.5 max-w-xs">Nội dung phản ánh</th>
                 <th className="p-3.5 max-w-xs">Phản hồi của Cửa hàng</th>
@@ -338,8 +338,8 @@ export const AdminComplaintsPage: React.FC = () => {
                         <span className="font-mono text-stone-400 text-[11px] block">{r.customer?.phone}</span>
                       </td>
 
-                      <td className="p-3.5">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] ${typeCfg.cls}`}>
+                      <td className="p-3.5 whitespace-nowrap">
+                        <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-[10px] ${typeCfg.cls}`}>
                           {typeCfg.label}
                         </span>
                       </td>
