@@ -16,40 +16,30 @@ const { atomicRouter } = require('../utils/atomicRoute');
 const router = atomicRouter(express.Router(), ['POST /order/:orderId/gateway']);
 const canManageCounter = (user) => user.role === 'ADMIN' || (user.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user.position));
 router.get('/config', (_req, res) => res.json({ demoEnabled: demoPaymentsEnabled(), gatewayEnabled: gateway.enabled() }));
-// The gateway authenticates callbacks with HMAC, independently of browser JWTs.
-router.post('/callback', async (req, res) => {
-  let unlock;
-  try {
-    const body = req.body;
-    if (!body || typeof body !== 'object' || !gateway.verify(body)) return res.status(401).json({ accepted: false, message: 'Chữ ký callback không hợp lệ.' });
-    const amount = Number(body.amount);
-    if (!Number.isSafeInteger(amount) || amount < 0 || !['SUCCESS', 'FAILED'].includes(String(body.status).toUpperCase())) return res.status(400).json({ accepted: false, message: 'Dữ liệu callback không hợp lệ.' });
-    const order = await Order.findOne({ orderCode: body.orderCode, paymentMethod: 'BANK_TRANSFER' });
-    if (!order) return res.status(404).json({ accepted: false, message: 'Không tìm thấy giao dịch.' });
-    unlock = lockOrder(order._id);
-    // Reload after acquiring the same lock used by order cancellation.
-    const current = await Order.findById(order._id);
-    if (!current || current.status === 'CANCELLED' || current.finalAmount !== amount) return res.status(409).json({ accepted: false, message: 'Đơn đã hủy hoặc số tiền không khớp.' });
-    const payment = await Payment.findOne({ order: order._id, paymentMethod: 'BANK_TRANSFER', transactionCode: body.transactionCode, amount });
-    if (!payment) return res.status(409).json({ accepted: false, message: 'Mã giao dịch không khớp.' });
-    if (payment.status === 'SUCCESS') {
-      if (String(body.status).toUpperCase() !== 'SUCCESS') return res.status(409).json({ accepted: false, message: 'Giao dịch đã thanh toán.' });
-    } else {
-      if (payment.status !== 'PENDING') return res.status(409).json({ accepted: false, message: 'Giao dịch không còn chờ xử lý.' });
-      const status = String(body.status).toUpperCase();
-      await Payment.updateOne({ _id: payment._id, status: 'PENDING' }, { $set: { status, ...(status === 'SUCCESS' ? { paidAt: new Date() } : {}), paymentNote: 'Xác nhận qua callback có chữ ký của cổng thanh toán' } });
-    }
-    if (String(body.status).toUpperCase() === 'SUCCESS') {
-      await Order.updateOne({ _id: order._id, status: 'PENDING' }, { $set: { status: 'CONFIRMED' } });
-      await awardOrderPoints(order._id);
-      if (order.orderType === 'ONLINE') await clearCheckoutCart(order);
-    }
-    return res.json({ accepted: true, successful: String(body.status).toUpperCase() === 'SUCCESS' });
-  } catch (failure) {
-    if (failure.hasErrorLabel?.('TransientTransactionError')) throw failure;
-    return res.status(failure.status || 500).json({ accepted: false, message: 'Không thể xử lý callback thanh toán.' });
-  }
-  finally { unlock?.(); }
+// SePay sends one bank-credit event per transfer; only this endpoint may mark a QR payment paid.
+router.post('/sepay-webhook', async (req, res) => {
+  if (!gateway.verify(req)) return res.status(401).json({ success: false });
+  const body = req.body || {};
+  const matches = String(body.content || '').toUpperCase().match(/\bAU[0-9A-F]{24}\b/g) || [];
+  const code = String(body.code || '').toUpperCase();
+  if (body.transferType !== 'in' || matches.length !== 1 || (code && code !== matches[0]) ||
+      ![body.accountNumber, body.subAccount].some(account => String(account || '') === String(process.env.PAYMENT_ACCOUNT_NO)) ||
+      !Number.isSafeInteger(body.transferAmount) || body.transferAmount <= 0 ||
+      !Number.isSafeInteger(body.id) || body.id <= 0) return res.status(400).json({ success: false });
+  const payment = await Payment.findById(matches[0].slice(2));
+  if (!payment || payment.paymentMethod !== 'BANK_TRANSFER' || payment.amount !== body.transferAmount) return res.status(409).json({ success: false });
+  const sepayTransactionId = String(body.id);
+  const existing = await Payment.findOne({ sepayTransactionId });
+  if (existing && !existing._id.equals(payment._id)) return res.status(409).json({ success: false });
+  if (payment.status === 'SUCCESS') return res.status(payment.sepayTransactionId === sepayTransactionId ? 200 : 409).json({ success: payment.sepayTransactionId === sepayTransactionId });
+  const order = await Order.findById(payment.order);
+  if (!order || payment.status !== 'PENDING' || order.status !== 'PENDING' || order.paymentMethod !== 'BANK_TRANSFER' || order.finalAmount !== body.transferAmount) return res.status(409).json({ success: false });
+  const updated = await Payment.updateOne({ _id: payment._id, status: 'PENDING' }, { $set: { status: 'SUCCESS', paidAt: new Date(), sepayTransactionId, paymentNote: 'SePay xác nhận tiền vào tài khoản ngân hàng' } });
+  if (updated.modifiedCount !== 1) return res.status(409).json({ success: false });
+  await Order.updateOne({ _id: order._id, status: 'PENDING' }, { $set: { status: 'CONFIRMED' } });
+  await awardOrderPoints(order._id);
+  if (order.orderType === 'ONLINE') await clearCheckoutCart(order);
+  return res.json({ success: true });
 });
 router.use(protect);
 
@@ -116,8 +106,8 @@ router.post('/order/:orderId/gateway', async (req, res) => {
     if (!order || !(order.orderType === 'ONLINE' && req.user.role === 'CUSTOMER' && String(order.customer) === String(req.user._id)) && !(order.orderType !== 'ONLINE' && canManageCounter(req.user))) return res.status(404).json({ message: 'Không tìm thấy đơn hàng.' });
     const payment = await Payment.findOne({ order: order._id, paymentMethod: 'BANK_TRANSFER', status: 'PENDING' });
     if (!payment || order.paymentMethod !== 'BANK_TRANSFER' || order.status !== 'PENDING') return res.status(409).json({ message: 'Giao dịch không còn chờ thanh toán.' });
-    await gateway.register(order, payment);
-    res.json(gateway.info(order));
+    if (!gateway.enabled()) return res.status(503).json({ message: 'SePay chưa được cấu hình.' });
+    res.json(gateway.info(order, payment));
   } catch (failure) { res.status(failure.status || 502).json({ message: failure.status ? failure.message : 'Không kết nối được cổng thanh toán. Vui lòng thử lại.' }); }
 });
 
@@ -155,7 +145,7 @@ router.get('/order/:orderId', async (req, res) => {
     if (req.user.role === 'CUSTOMER' ? String(order.customer) !== String(req.user._id) : !canManageCounter(req.user)) return res.status(403).json({ message: 'Không có quyền xem thanh toán này.' });
     const payment = await Payment.findOne({ order: order._id });
     if (!payment) return res.status(404).json({ message: 'Chưa có giao dịch thanh toán cho đơn hàng.' });
-    res.json({ order: { _id: order._id, orderCode: order.orderCode, finalAmount: order.finalAmount, totalAmount: order.totalAmount, discountAmount: order.discountAmount, deliveryFee: order.deliveryFee, pointsRedeemed: order.pointsRedeemed, recipientName: order.recipientName, recipientPhone: order.recipientPhone, deliveryAddress: order.deliveryAddress, createdAt: order.createdAt, items: order.items.map(item => ({ product: item.product, productNameAtTime: item.productNameAtTime, quantity: item.quantity, unitPrice: item.unitPrice, subtotal: item.subtotal, customization: item.customization })), orderType: order.orderType, status: order.status, paymentMethod: order.paymentMethod }, payment, demoEnabled: demoPaymentsEnabled(), gateway: gateway.enabled() && order.paymentMethod === 'BANK_TRANSFER' ? gateway.info(order) : null });
+    res.json({ order: { _id: order._id, orderCode: order.orderCode, finalAmount: order.finalAmount, totalAmount: order.totalAmount, discountAmount: order.discountAmount, deliveryFee: order.deliveryFee, pointsRedeemed: order.pointsRedeemed, recipientName: order.recipientName, recipientPhone: order.recipientPhone, deliveryAddress: order.deliveryAddress, createdAt: order.createdAt, items: order.items.map(item => ({ product: item.product, productNameAtTime: item.productNameAtTime, quantity: item.quantity, unitPrice: item.unitPrice, subtotal: item.subtotal, customization: item.customization })), orderType: order.orderType, status: order.status, paymentMethod: order.paymentMethod }, payment, demoEnabled: demoPaymentsEnabled(), gateway: gateway.enabled() && order.paymentMethod === 'BANK_TRANSFER' ? gateway.info(order, payment) : null });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

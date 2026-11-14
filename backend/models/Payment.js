@@ -4,6 +4,7 @@ const paymentSchema = new mongoose.Schema({
   paymentMethod: { type: String, enum: ['CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER', 'DEMO_ONLINE'], required: true },
   demoProvider: { type: String, enum: ['MOMO', 'VNPAY', 'BANK_TRANSFER'] },
   transactionCode: { type: String },
+  sepayTransactionId: { type: String },
   amount: { type: Number, required: true },
   status: { type: String, enum: ['PENDING', 'SUCCESS', 'FAILED', 'REFUNDED'], default: 'PENDING' },
   paidAt: { type: Date },
@@ -22,4 +23,5 @@ const paymentSchema = new mongoose.Schema({
   paymentNote: { type: String }
 }, { timestamps: true });
 paymentSchema.index({ status: 1, paymentMethod: 1, paidAt: 1 });
+paymentSchema.index({ sepayTransactionId: 1 }, { unique: true, sparse: true });
 module.exports = mongoose.model('Payment', paymentSchema);
