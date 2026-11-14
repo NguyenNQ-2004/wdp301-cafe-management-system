@@ -98,4 +98,4 @@ async function priceUnvaluedStock(id, totalCost, userId) {
     return { currentStock: ingredient.currentStock, stockValuation: { quantity: amount, totalCost, updatedAt: new Date(), updatedBy: userId } };
   });
 }
-module.exports = { lockIngredients, normalizedLots, moveStock, undoStockMove, priceUnvaluedStock, quantity, money };
+module.exports = { lockIngredients, normalizedLots, mutateLots, moveStock, undoStockMove, priceUnvaluedStock, quantity, money };

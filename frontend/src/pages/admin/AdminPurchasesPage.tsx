@@ -27,7 +27,6 @@ export default function AdminPurchasesPage() {
   const [detail, setDetail] = useState<Order | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [supplierId, setSupplierId] = useState('');
-  const [initialStatus, setInitialStatus] = useState<'DRAFT' | 'ORDERED' | 'RECEIVED'>('RECEIVED');
   const [note, setNote] = useState('');
   const [items, setItems] = useState<FormItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +64,7 @@ export default function AdminPurchasesPage() {
     const firstIngredient = ingredients.find((ingredient) => ingredient.supplier?._id === firstSupplier?._id);
     setSupplierId(firstSupplier?._id || '');
     setItems(firstIngredient ? [itemForIngredient(firstIngredient)] : []);
-    setInitialStatus('RECEIVED'); setMessage('');
+    setMessage('');
     setNote('');
     setCreateOpen(true);
   };
@@ -81,7 +80,7 @@ export default function AdminPurchasesPage() {
     if (!token || !supplierId || items.length === 0 || saving) return;
     setSaving(true);
     try {
-      await shopApi<Order>('/api/purchase-orders', { method: 'POST', token, body: { supplier: supplierId, items: purchaseItemsPayload(items, ingredients), note, status: initialStatus } });
+      await shopApi<Order>('/api/purchase-orders', { method: 'POST', token, body: { supplier: supplierId, items: purchaseItemsPayload(items, ingredients), note, status: 'DRAFT' } });
       setCreateOpen(false);
       setMessage('Đã tạo phiếu nhập hàng trong cơ sở dữ liệu.');
       await loadData();
@@ -118,7 +117,7 @@ export default function AdminPurchasesPage() {
     {createOpen ? <Modal title="Nhập hàng: số lượng và tổng tiền" onClose={() => setCreateOpen(false)} wide><form onSubmit={createOrder} className="space-y-4 text-xs">
       {message && <p role="alert" className="text-rose-700">{message}</p>}
       <div className="grid gap-4 sm:grid-cols-2"><Field label="Nhà cung cấp"><select required className={inputCls} value={supplierId} onChange={(event) => changeSupplier(event.target.value)}>{suppliers.map((supplier) => <option key={supplier._id} value={supplier._id}>{supplier.name}</option>)}</select></Field>
-      <Field label="Trạng thái"><select className={inputCls} value={initialStatus} onChange={(event) => setInitialStatus(event.target.value as typeof initialStatus)}><option value="RECEIVED">Đã nhận hàng · cộng tồn kho</option><option value="DRAFT">Nháp / Đề xuất</option><option value="ORDERED">Đã đặt, chưa nhận hàng</option></select></Field></div>
+      <Field label="Trạng thái"><input className={inputCls} value={META.DRAFT[0]} readOnly /></Field></div>
       <p>Nhập lượng mua và tổng tiền cho từng nguyên liệu. Hệ thống tự đổi đơn vị và tính đơn giá.</p>
       {items.map((item, index) => <PurchaseLineEditor key={index} line={item} index={index} ingredients={supplierIngredients} onChange={(patch) => updateItem(index, patch)} onRemove={items.length > 1 ? () => setItems((current) => current.filter((_, i) => i !== index)) : undefined} disabled={saving} />)}
       <GhostButton disabled={!supplierIngredients.length} onClick={() => setItems((current) => [...current, itemForIngredient(supplierIngredients[0])])}>+ Thêm nguyên liệu</GhostButton>

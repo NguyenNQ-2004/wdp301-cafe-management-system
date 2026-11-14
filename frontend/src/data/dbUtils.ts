@@ -176,8 +176,8 @@ export const fmtNumber = (value: number | undefined | null): string => {
 
 const refId = (value: any): string => String(value?._id ?? value?.id ?? value ?? '');
 
-const latestPurchaseLine = (db: any, ingredientId: any, statuses: string[]): any | null => {
-  if (!db) return null;
+export const purchaseLines = (db: any, ingredientId: any, statuses: string[]): any[] => {
+  if (!db) return [];
   const orders = db.purchase_orders ?? [];
   const rows = orders.length
     ? orders.filter((order: any) => statuses.includes(order.status)).flatMap((order: any) => {
@@ -185,13 +185,15 @@ const latestPurchaseLine = (db: any, ingredientId: any, statuses: string[]): any
       return items.map((item: any) => ({ ...item, status: order.status, purchasedAt: order.createdAt ?? order.created_at, orderId: order._id ?? order.id }));
     })
     : (db.purchase_order_items ?? []).filter((item: any) => statuses.includes(item.status) || (statuses.includes('RECEIVED') && !item.status));
-  const latest = rows.filter((item: any) => refId(item.ingredient_id ?? item.ingredient) === refId(ingredientId))
+  return rows.filter((item: any) => refId(item.ingredient_id ?? item.ingredient) === refId(ingredientId))
     .sort((a: any, b: any) => {
       const time = (row: any) => Date.parse(row.purchasedAt ?? row.createdAt ?? row.created_at ?? '') || 0;
       return time(b) - time(a) || refId(b.orderId ?? b._id).localeCompare(refId(a.orderId ?? a._id));
-    }).find((item: any) => typeof (item.unitPrice ?? item.unit_price) === 'number' && Number.isFinite(item.unitPrice ?? item.unit_price));
-  return latest ?? null;
+    }).filter((item: any) => typeof (item.unitPrice ?? item.unit_price) === 'number' && Number.isFinite(item.unitPrice ?? item.unit_price));
 };
+
+const latestPurchaseLine = (db: any, ingredientId: any, statuses: string[]) =>
+  purchaseLines(db, ingredientId, statuses)[0] ?? null;
 
 export const lastOrderedPrice = (db: any, ingredientId: any): number | null => {
   const line = latestPurchaseLine(db, ingredientId, ['ORDERED']);

@@ -8,7 +8,7 @@ const PurchaseOrderItem = require('../models/PurchaseOrderItem');
 const InventoryTransaction = require('../models/InventoryTransaction');
 const { protect, adminOnly } = require('../middlewares/authMiddleware');
 const { invalid, objectBody, objectId, text, nonnegative, sendError } = require('../utils/adminValidation');
-const { lockIngredients, priceUnvaluedStock } = require('../utils/stockLots');
+const { lockIngredients, mutateLots, money, priceUnvaluedStock } = require('../utils/stockLots');
 const { editIngredient } = require('../utils/editIngredient');
 const { atomicRouter } = require('../utils/atomicRoute');
 const router = atomicRouter(express.Router());
@@ -55,6 +55,51 @@ router.get('/:id', async (req, res) => {
 router.post('/', adminOnly, async (req, res) => {
   try { res.status(201).json(await Ingredient.create(await parse(req.body, true))); }
   catch (error) { sendError(res, error); }
+});
+router.put('/:id/purchase-price/:orderId', adminOnly, async (req, res) => {
+  let release;
+  try {
+    const id = objectId(req.params.id);
+    const orderId = objectId(req.params.orderId);
+    objectBody(req.body);
+    const { totalCost, expectedUnitPrice } = req.body;
+    if (!Number.isSafeInteger(totalCost) || totalCost < 0) throw invalid('Tổng tiền phải là số nguyên không âm.');
+    release = lockIngredients([id]);
+    const order = await PurchaseOrder.findOne({ _id: orderId, status: { $in: ['ORDERED', 'RECEIVED'] } });
+    const item = order?.items.find(row => String(row.ingredient) === id);
+    if (!item || !(item.quantity > 0)) throw invalid('Không tìm thấy dòng nguyên liệu trên phiếu.', 404);
+    const previousPrice = item.unitPrice;
+    if (previousPrice !== expectedUnitPrice) throw invalid('Đơn giá vừa thay đổi. Vui lòng tải lại dữ liệu.', 409);
+    if (item.totalCost === totalCost) return res.json({ message: 'Giá nhập đã được lưu.' });
+    const unitPrice = totalCost / item.quantity;
+    item.set({ unitPrice, totalCost });
+    order.totalCost = order.items.reduce((sum, row) => sum + (row.totalCost ?? row.unitPrice * row.quantity), 0);
+    await order.save();
+    await PurchaseOrderItem.updateMany({ purchaseOrder: orderId, ingredient: id }, { $set: { unitPrice, totalCost } });
+    if (order.status === 'RECEIVED') {
+      const movement = await mutateLots(id, (ingredient, lots) => {
+        let valueBefore = 0;
+        let valueAfter = 0;
+        for (const lot of lots) {
+          if (lot.sourceType !== 'PURCHASE' || String(lot.sourceId) !== orderId || lot.remainingQuantity <= 0) continue;
+          valueBefore += lot.remainingQuantity * (lot.unitCost ?? 0);
+          valueAfter += lot.remainingQuantity * unitPrice;
+          lot.unitCost = unitPrice;
+        }
+        return { currentStock: ingredient.currentStock, valueBefore: money(valueBefore), valueAfter: money(valueAfter) };
+      });
+      await InventoryTransaction.create({
+        ingredient: id, transactionType: 'ADJUSTMENT', quantity: 0, stockDelta: 0,
+        referenceType: 'PURCHASE_ORDER', referenceId: orderId, createdBy: req.user._id,
+        stockBefore: movement.currentStock, stockAfter: movement.currentStock,
+        valueBefore: movement.valueBefore, valueAfter: movement.valueAfter,
+        costTotal: money(movement.valueAfter - movement.valueBefore),
+        note: `Sửa đơn giá phiếu nhập từ ${previousPrice} thành ${unitPrice}.`
+      });
+    }
+    res.json({ message: 'Đã cập nhật giá nhập.' });
+  } catch (error) { sendError(res, error); }
+  finally { release?.(); }
 });
 router.put('/:id/unpriced-stock-cost', adminOnly, async (req, res) => {
   let release;
