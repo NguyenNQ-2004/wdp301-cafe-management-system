@@ -132,4 +132,13 @@ test('UC26 reserves attendance recording for admins while preserving staff COD r
   const customRecord = customAttendance.data.find((item) => item.shiftName === 'a');
   assert.ok(customRecord);
   assert.deepEqual(customRecord.shiftInfo, { code: 'a', name: 'a', startTime: '06:30', endTime: '11:30' });
+
+  const overnightWeek = mondayOf(yesterday);
+  await WorkShift.create({ weekStart: overnightWeek, shiftName: 'Ca đêm', startTime: '23:00', endTime: '00:00' });
+  const overnightSchedule = await WorkSchedule.create({ user: staffA._id, workDate: new Date(yesterday), shiftName: 'Ca đêm' });
+  const overnightCheckIn = await request('PUT', `/api/work-schedules/${overnightSchedule._id}/shift-action`, { action: 'CHECK_IN' }, adminToken);
+  assert.equal(overnightCheckIn.status, 200);
+  const overnightCheckOut = await request('PUT', `/api/work-schedules/${overnightSchedule._id}/shift-action`, { action: 'CHECK_OUT' }, adminToken);
+  assert.equal(overnightCheckOut.status, 200);
+  assert.equal(new Date(overnightCheckOut.data.schedule.checkOutTime).getTime() - new Date(overnightCheckIn.data.schedule.checkInTime).getTime(), 60 * 60 * 1000);
 });

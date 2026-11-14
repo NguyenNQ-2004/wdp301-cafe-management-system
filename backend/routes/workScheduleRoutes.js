@@ -103,7 +103,7 @@ router.get('/attendance', adminOnly, async (req, res) => {
       filter.user = req.query.userId;
     }
     const records = await WorkSchedule.find(filter)
-      .select('user workDate shiftName checkInTime checkOutTime status note')
+      .select('user workDate shiftName shiftStartTime shiftEndTime checkInTime checkOutTime status note')
       .populate('user', 'fullName phone position status')
       .sort({ workDate: -1, shiftName: 1 });
     res.json(await attachShiftInfo(records));
@@ -123,8 +123,8 @@ router.get('/', async (req, res) => {
       filter.user = req.query.userId;
     }
     const schedules = WorkSchedule.find(filter);
-    if (req.user.role === 'STAFF') schedules.select('user workDate shiftName note');
-    res.json(await populateUser(schedules));
+    if (req.user.role === 'STAFF') schedules.select('user workDate shiftName shiftStartTime shiftEndTime note');
+    res.json(await attachShiftInfo(await populateUser(schedules)));
   } catch (error) { handleError(error, res); }
 });
 
@@ -136,7 +136,7 @@ router.post('/', adminOnly, async (req, res) => {
     const schedule = await withWeekLock(mondayOf(data.workDate), async () => {
       const shift = await WorkShift.findOne({ weekStart: mondayOf(data.workDate), shiftName: data.shiftName });
       if (!shift) throw badRequest('Ca làm không tồn tại trong tuần của ngày làm việc.');
-      return WorkSchedule.create({ ...data, shift: shift._id });
+      return WorkSchedule.create({ ...data, shift: shift._id, shiftStartTime: shift.startTime, shiftEndTime: shift.endTime });
     });
     await schedule.populate('user', 'fullName phone position status');
     res.status(201).json(schedule);
@@ -158,7 +158,7 @@ router.put('/:id', adminOnly, async (req, res) => {
     await withWeekLock(mondayOf(targetDate), async () => {
       const shift = await WorkShift.findOne({ weekStart: mondayOf(targetDate), shiftName: changes.shiftName || schedule.shiftName });
       if (!shift) throw badRequest('Ca làm không tồn tại trong tuần của ngày làm việc.');
-      Object.assign(schedule, changes, { shift: shift._id });
+      Object.assign(schedule, changes, { shift: shift._id, shiftStartTime: shift.startTime, shiftEndTime: shift.endTime });
       await schedule.save();
     });
     await schedule.populate('user', 'fullName phone position status');
@@ -215,13 +215,18 @@ router.put('/:id/shift-action', async (req, res) => {
     if (action === 'CHECK_IN' || (action === 'CHECK_OUT' && isAdmin)) {
       [shiftStart, shiftEnd] = (await getShiftTime(schedule)).split('-');
     }
+    if (req.user.position === 'SHIPPER' && ['CHECK_OUT', 'REMIT_COD'].includes(action)) {
+      if (await Order.exists({ shipper: req.user._id, orderType: 'ONLINE', status: { $nin: ['COMPLETED', 'CANCELLED'] } })) return res.status(409).json({ message: 'Cần giao xong hoặc trả các đơn được phân công về quán trước khi chốt ca.' });
+      if (action === 'CHECK_OUT' && await Payment.exists({ receivedBy: req.user._id, paymentMethod: 'CASH', status: 'SUCCESS', remittanceId: { $exists: false } })) return res.status(409).json({ message: 'Còn tiền COD chưa nộp. Hãy mở Đối soát COD và dùng Nộp tiền & chốt ca.' });
+    }
     if (action === 'REMIT_COD') {
       if (req.user.role !== 'STAFF' || req.user.position !== 'SHIPPER') return res.status(403).json({ message: 'Chỉ shipper được nộp tiền COD của ca giao hàng.' });
       if (schedule.status !== 'PRESENT' || !schedule.checkInTime || schedule.checkOutTime) return res.status(409).json({ message: 'Ca phải đang mở để nộp COD.' });
       if (schedule.remittanceId) return res.status(409).json({ message: 'Tiền COD của ca này đã được nộp.' });
       if (cash === undefined) throw badRequest('Cần nhập số tiền mặt thực nộp.');
       const orders = await Order.find({ shipper: req.user._id, orderType: 'ONLINE', paymentMethod: 'COD', status: 'COMPLETED' }).select('_id');
-      const payments = await Payment.find({ order: { $in: orders.map(order => order._id) }, receivedBy: req.user._id, paidAt: { $gte: schedule.checkInTime, $lte: now }, remittanceId: { $exists: false }, paymentMethod: 'CASH', status: 'SUCCESS' }).select('amount');
+      // Include older cash still held by this shipper; a new shift must not strand it.
+      const payments = await Payment.find({ order: { $in: orders.map(order => order._id) }, receivedBy: req.user._id, paidAt: { $lte: now }, remittanceId: { $exists: false }, paymentMethod: 'CASH', status: 'SUCCESS' }).select('amount');
       const expectedCash = payments.reduce((sum, payment) => sum + payment.amount, 0);
       if (!Number.isSafeInteger(expectedCash) || expectedCash < 0) throw badRequest('Tổng tiền COD không hợp lệ.');
       if (cash !== expectedCash && !note?.trim()) throw badRequest('Cần ghi lý do chênh lệch tiền COD.');
@@ -251,7 +256,9 @@ router.put('/:id/shift-action', async (req, res) => {
       if (workDay < today) {
         const [year, month, day] = workDay.split('-').map(Number);
         const [hour, minute] = shiftEnd.split(':').map(Number);
-        changes.checkOutTime = new Date(Date.UTC(year, month - 1, day, hour - 7, minute));
+        const checkOutDay = new Date(Date.UTC(year, month - 1, day));
+        if (shiftEnd <= shiftStart) checkOutDay.setUTCDate(checkOutDay.getUTCDate() + 1);
+        changes.checkOutTime = new Date(Date.UTC(checkOutDay.getUTCFullYear(), checkOutDay.getUTCMonth(), checkOutDay.getUTCDate(), hour - 7, minute));
       } else changes.checkOutTime = now;
       changes.status = 'COMPLETED';
       if (cash !== undefined) changes.endingCashActual = cash;

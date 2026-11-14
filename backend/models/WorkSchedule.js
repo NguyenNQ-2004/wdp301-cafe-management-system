@@ -4,6 +4,8 @@ const workScheduleSchema = new mongoose.Schema({
   workDate: { type: Date, required: true },
   shiftName: { type: String, trim: true, maxlength: 50, required: true },
   shift: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkShift' },
+  shiftStartTime: String,
+  shiftEndTime: String,
   checkInTime: { type: Date },
   checkOutTime: { type: Date },
   startingCash: { type: Number },
@@ -23,6 +25,7 @@ const workScheduleSchema = new mongoose.Schema({
   codReceivingSchedule: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkSchedule' },
   codLedgerVersion: { type: Number, default: 0 },
   handoverCodReceipts: { type: Number, min: 0 },
+  handoverCashRefunds: { type: Number, min: 0 },
   handoverNote: { type: String, maxlength: 500 },
   status: { type: String, enum: ['SCHEDULED', 'PRESENT', 'ABSENT', 'COMPLETED'], default: 'SCHEDULED' },
   note: { type: String }

@@ -18,7 +18,7 @@ Admin mở `/admin/employees` từ sidebar hoặc dashboard để xem, tìm ki�
 
 ## Khung giờ ca làm (màn hình 24)
 
-Admin mở `/admin/shifts` để chỉnh giờ bắt đầu và kết thúc của ca sáng, chiều, tối. Hệ thống lưu vào các khóa `shift_morning`, `shift_afternoon`, `shift_evening` trong bảng `shop_settings` hiện có; không cần chạy lại seed. Khi chưa có dữ liệu, màn hình dùng mặc định `07:00-12:00`, `12:00-17:00`, `17:00-22:00`. Admin lưu đủ ba ca cùng lúc; API từ chối giờ sai định dạng, giờ kết thúc không sau giờ bắt đầu hoặc các ca chồng lấn. Nhân viên có thể đọc khung giờ qua `GET /api/work-shifts`; chỉ Admin được cập nhật qua `PUT /api/work-shifts`. Chạy `cd backend && npm run test:work-shifts` để kiểm tra.
+Admin mở `/admin/shifts` để chỉnh khung giờ ca theo từng tuần. Hệ thống lưu trong bảng `work_shifts` hiện có; không cần chạy lại seed. Admin có thể tạo ca qua nửa đêm (ví dụ `23:00-00:00`); giờ kết thúc sớm hơn giờ bắt đầu được hiểu là ngày hôm sau. Giờ sai định dạng, giờ bắt đầu trùng giờ kết thúc hoặc khung giờ chồng lấn đều bị từ chối. Nhân viên có thể đọc khung giờ qua `GET /api/work-shifts`; chỉ Admin được quản lý ca. Chạy `cd backend && npm run test:work-shifts` để kiểm tra.
 
 ## Lịch phân ca (màn hình 25)
 

@@ -83,7 +83,7 @@ test('UC24 configures three non-overlapping shifts in shop settings', async (t) 
   assert.equal(changed.status, 200);
   assert.equal((await ShopSetting.findOne({ settingKey: 'shift_morning' })).settingValue, '07:00-11:30');
   assert.equal(await ShopSetting.countDocuments(), 3);
-  await t.test('weekly custom shifts validate overlaps, copy and protect assigned or past frames', async () => {
+  await t.test('weekly shifts can edit assignments and delete closed frames while preserving attendance', async () => {
     const { currentWeek } = require('../utils/weeklyShifts');
     const weekStart = currentWeek().toISOString().slice(0, 10);
     const body = { weekStart, shiftName: 'Ca mở cửa', startTime: '06:00', endTime: '10:00' };
@@ -92,13 +92,26 @@ test('UC24 configures three non-overlapping shifts in shop settings', async (t) 
     assert.equal(created.status, 201, JSON.stringify(created.data));
     assert.equal((await request('POST', '/api/work-shifts', body, adminToken)).status, 409);
     assert.equal((await request('POST', '/api/work-shifts', { ...body, shiftName: 'Trùng giờ', startTime: '09:00' }, adminToken)).status, 409);
-    assert.equal((await request('POST', '/api/work-shifts', { ...body, endTime: '05:00' }, adminToken)).status, 400);
-    assert.equal((await request('GET', `/api/work-shifts?weekStart=${weekStart}`, null, staffToken)).data.shifts.length, 1);
+    assert.equal((await request('POST', '/api/work-shifts', { ...body, endTime: '06:00' }, adminToken)).status, 400);
+    const overnight = await request('POST', '/api/work-shifts', { ...body, shiftName: 'Ca đêm', startTime: '23:00', endTime: '00:00' }, adminToken);
+    assert.equal(overnight.status, 201, JSON.stringify(overnight.data));
+    assert.equal((await request('POST', '/api/work-shifts', { ...body, shiftName: 'Ca đêm trùng', startTime: '23:30', endTime: '00:30' }, adminToken)).status, 409);
+    assert.equal((await request('POST', '/api/work-shifts', { ...body, shiftName: 'Ca 24 giờ', startTime: '23:00', endTime: '23:00' }, adminToken)).status, 400);
+    assert.equal((await request('GET', `/api/work-shifts?weekStart=${weekStart}`, null, staffToken)).data.shifts.length, 2);
     const path = `/api/work-shifts/${created.data._id}`;
     assert.equal((await request('PUT', path, { ...body, shiftName: 'Ca sáng linh hoạt' }, adminToken)).status, 200);
     const WorkSchedule = require('../models/WorkSchedule');
     const assigned = await WorkSchedule.create({ user: staff._id, workDate: new Date(weekStart), shiftName: 'Ca sáng linh hoạt' });
-    assert.equal((await request('PUT', path, body, adminToken)).status, 409);
+    const updatedBody = { ...body, shiftName: 'Ca sáng linh hoạt', startTime: '07:00', endTime: '11:00' };
+    assert.equal((await request('PUT', path, updatedBody, adminToken)).status, 200);
+    const scheduled = await WorkSchedule.findById(assigned._id);
+    assert.equal(scheduled.shiftStartTime, '07:00');
+    assert.equal(scheduled.shiftEndTime, '11:00');
+    // A checked-in employee keeps the original scheduled hours after later edits.
+    const checkInTime = new Date(weekStart + 'T00:00:00Z');
+    await WorkSchedule.updateOne({ _id: assigned._id }, { $set: { status: 'PRESENT', checkInTime } });
+    assert.equal((await request('PUT', path, { ...updatedBody, startTime: '08:00', endTime: '12:00' }, adminToken)).status, 200);
+    assert.equal((await WorkSchedule.findById(assigned._id)).shiftStartTime, '07:00');
     assert.equal((await request('DELETE', path, null, adminToken)).status, 409);
     const next = currentWeek(); next.setUTCDate(next.getUTCDate() + 7);
     const target = { weekStart: next.toISOString().slice(0, 10) };
@@ -106,8 +119,26 @@ test('UC24 configures three non-overlapping shifts in shop settings', async (t) 
     assert.equal(copied.status, 201);
     assert.equal(copied.data.shifts[0].name, 'Ca sáng linh hoạt');
     assert.equal((await request('POST', '/api/work-shifts/copy', target, adminToken)).status, 409);
-    await assigned.deleteOne();
+    const checkOutTime = new Date(weekStart + 'T04:00:00Z');
+    await WorkSchedule.updateOne({ _id: assigned._id }, { $set: { status: 'COMPLETED', checkOutTime, remittanceId: 'preserved-cod', endingCashActual: 71000 } });
     assert.equal((await request('DELETE', path, null, adminToken)).status, 200);
+    const history = await WorkSchedule.findById(assigned._id);
+    assert.equal(history.status, 'COMPLETED');
+    assert.equal(history.shift, undefined);
+    assert.equal(history.shiftStartTime, '07:00');
+    assert.equal(history.shiftEndTime, '11:00');
+    assert.equal(+history.checkInTime, +checkInTime);
+    assert.equal(+history.checkOutTime, +checkOutTime);
+    assert.equal(history.remittanceId, 'preserved-cod');
+    assert.equal(history.endingCashActual, 71000);
+    const { attachShiftInfo, resolveShift } = require('../utils/weeklyShifts');
+    assert.equal(await resolveShift(history), '07:00-11:00');
+    assert.equal((await attachShiftInfo([history]))[0].shiftInfo.startTime, '07:00');
+    // Reusing the old name does not reattach or overwrite historical attendance.
+    const recreated = await request('POST', '/api/work-shifts', { ...updatedBody, startTime: '09:00', endTime: '13:00' }, adminToken);
+    assert.equal(recreated.status, 201);
+    assert.equal((await request('DELETE', `/api/work-shifts/${recreated.data._id}`, null, adminToken)).status, 200);
+    assert.equal((await WorkSchedule.findById(assigned._id)).shiftStartTime, '07:00');
     const past = currentWeek(); past.setUTCDate(past.getUTCDate() - 7);
     const historic = await require('../models/WorkShift').create({ ...body, weekStart: past });
     assert.equal((await request('DELETE', `/api/work-shifts/${historic._id}`, null, adminToken)).status, 409);

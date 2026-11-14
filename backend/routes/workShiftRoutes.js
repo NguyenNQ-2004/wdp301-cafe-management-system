@@ -5,6 +5,7 @@ const WorkShift = require('../models/WorkShift');
 const WorkSchedule = require('../models/WorkSchedule');
 const { invalid, parseWeek, assertEditable, withWeekLock, shiftJson } = require('../utils/weeklyShifts');
 const { protect, adminOnly, authorize } = require('../middlewares/authMiddleware');
+const { atomicRoute } = require('../utils/atomicRoute');
 
 const router = express.Router();
 router.use(protect);
@@ -20,6 +21,11 @@ const minutes = (time) => {
   const [hour, minute] = time.split(':').map(Number);
   return hour * 60 + minute;
 };
+
+const shiftInterval = (start, end) => ({ start, end: end <= start ? end + 1440 : end });
+const intervalsOverlap = (first, second) => [-1440, 0, 1440].some((offset) =>
+  first.start < second.end + offset && first.end > second.start + offset
+);
 
 const toShift = (definition, range) => {
   const [startTime, endTime] = range.split('-');
@@ -49,15 +55,37 @@ const parseShift = (body) => {
   if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => !['weekStart', 'shiftName', 'startTime', 'endTime'].includes(key))) throw invalid('Dữ liệu ca làm không hợp lệ.');
   if (typeof body.shiftName !== 'string' || !body.shiftName.trim() || body.shiftName.trim().length > 50) throw invalid('Tên ca phải từ 1 đến 50 ký tự.');
   const start = minutes(body.startTime), end = minutes(body.endTime);
-  if (start === null || end === null || start >= end) throw invalid('Giờ bắt đầu phải trước giờ kết thúc (HH:mm).');
+  if (start === null || end === null || start === end) throw invalid('Giờ bắt đầu và kết thúc phải đúng định dạng HH:mm và không được trùng nhau.');
   return { weekStart: parseWeek(body.weekStart), shiftName: body.shiftName.trim(), startTime: body.startTime, endTime: body.endTime };
 };
 const assertNoOverlap = async (data, except) => {
-  if (await WorkShift.exists({ weekStart: data.weekStart, ...(except ? { _id: { $ne: except } } : {}), startTime: { $lt: data.endTime }, endTime: { $gt: data.startTime } })) throw invalid('Khung giờ ca làm bị chồng lấn.', 409);
+  const start = minutes(data.startTime), end = minutes(data.endTime);
+  const candidate = shiftInterval(start, end);
+  const shifts = await WorkShift.find({ weekStart: data.weekStart, ...(except ? { _id: { $ne: except } } : {}) }).select('startTime endTime').lean();
+  if (shifts.some((shift) => intervalsOverlap(candidate, shiftInterval(minutes(shift.startTime), minutes(shift.endTime))))) {
+    throw invalid('Khung giờ ca làm bị chồng lấn.', 409);
+  }
 };
-const hasSchedules = (shift) => {
+const scheduleFilter = (shift) => {
   const end = new Date(shift.weekStart); end.setUTCDate(end.getUTCDate() + 7);
-  return WorkSchedule.exists({ workDate: { $gte: shift.weekStart, $lt: end }, shiftName: shift.shiftName });
+  return { $or: [{ shift: shift._id }, { workDate: { $gte: shift.weekStart, $lt: end }, shiftName: shift.shiftName, shift: { $exists: false }, shiftStartTime: { $exists: false } }] };
+};
+const preserveScheduleTimes = async (shift, data) => {
+  const schedules = await WorkSchedule.find(scheduleFilter(shift));
+  for (const schedule of schedules) {
+    const unstarted = schedule.status === 'SCHEDULED' && !schedule.checkInTime && !schedule.checkOutTime;
+    schedule.shiftStartTime ||= shift.startTime;
+    schedule.shiftEndTime ||= shift.endTime;
+    schedule.shift ||= shift._id;
+    if (data && unstarted) {
+      schedule.shiftName = data.shiftName;
+      schedule.shiftStartTime = data.startTime;
+      schedule.shiftEndTime = data.endTime;
+      schedule.shift = shift._id;
+    }
+    if (!data) schedule.shift = undefined;
+    await schedule.save();
+  }
 };
 router.post('/copy', adminOnly, async (req, res) => {
   try {
@@ -82,7 +110,7 @@ router.post('/', adminOnly, async (req, res) => {
     res.status(201).json(shiftJson(shift));
   } catch (error) { weeklyError(error, res); }
 });
-router.put('/:id', adminOnly, async (req, res) => {
+router.put('/:id', adminOnly, atomicRoute(async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) throw invalid('Mã ca không hợp lệ.');
     const existing = await WorkShift.findById(req.params.id);
@@ -93,14 +121,14 @@ router.put('/:id', adminOnly, async (req, res) => {
     const shift = await withWeekLock(existing.weekStart, async () => {
       const current = await WorkShift.findById(existing._id);
       if (!current) throw invalid('Ca đã được xóa.', 409);
-      if (await hasSchedules(current)) throw invalid('Ca đã có nhân viên được phân công.', 409);
       await assertNoOverlap(data, existing._id);
+      await preserveScheduleTimes(current, data);
       Object.assign(current, data); return current.save();
     });
     res.json(shiftJson(shift));
   } catch (error) { weeklyError(error, res); }
-});
-router.delete('/:id', adminOnly, async (req, res) => {
+}));
+router.delete('/:id', adminOnly, atomicRoute(async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) throw invalid('Mã ca không hợp lệ.');
     const shift = await WorkShift.findById(req.params.id);
@@ -109,12 +137,13 @@ router.delete('/:id', adminOnly, async (req, res) => {
     await withWeekLock(shift.weekStart, async () => {
       const current = await WorkShift.findById(shift._id);
       if (!current) throw invalid('Ca đã được xóa.', 409);
-      if (await hasSchedules(current)) throw invalid('Ca đã có nhân viên được phân công.', 409);
+      if (await WorkSchedule.exists({ ...scheduleFilter(current), status: { $nin: ['COMPLETED', 'ABSENT'] } })) throw invalid('Chỉ xóa khung ca khi tất cả nhân viên đã hoàn thành hoặc được ghi nhận vắng. Vui lòng kết thúc các ca đang làm trước.', 409);
+      await preserveScheduleTimes(current);
       await current.deleteOne();
     });
     res.json({ message: 'Đã xóa ca làm việc.' });
   } catch (error) { weeklyError(error, res); }
-});
+}));
 
 router.put('/', adminOnly, async (req, res) => {
   try {

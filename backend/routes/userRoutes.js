@@ -10,10 +10,14 @@ const { invalid, objectBody, objectId, text } = require('../utils/adminValidatio
 const { validEmail, normalizeEmail } = require('../utils/accountEmail');
 const PurchaseOrder = require('../models/PurchaseOrder');
 const WorkSchedule = require('../models/WorkSchedule');
+const Payment = require('../models/Payment');
+const { atomicRouter } = require('../utils/atomicRoute');
 const { passwordError } = require('../utils/passwordPolicy');
 
 function validateCustomer(body, creating) {
   objectBody(body);
+  const fields = creating ? ['fullName', 'phone', 'email', 'password', 'birthday', 'address', 'initialPoints'] : ['fullName', 'email', 'birthday', 'address', 'status'];
+  if (Object.keys(body).some(key => !fields.includes(key))) throw invalid('Dữ liệu khách hàng chứa trường không được phép cập nhật.');
   const passwordValidationError = creating ? passwordError(body.password) : null;
   if (passwordValidationError) throw invalid(passwordValidationError);
   if (creating && (typeof body.password !== 'string' || body.password.length < 8 || Buffer.byteLength(body.password, 'utf8') > 72)) throw invalid('Mật khẩu phải có ít nhất 8 ký tự và tối đa 72 byte.');
@@ -32,8 +36,17 @@ function validateCustomer(body, creating) {
   }
 }
 
-const router = express.Router();
+const router = atomicRouter(express.Router());
 router.use(protect);
+
+// Spending follows settled payments, including paid orders awaiting handover.
+const customerSpending = (customerIds) => Payment.aggregate([
+  { $match: { status: 'SUCCESS' } },
+  { $lookup: { from: Order.collection.name, localField: 'order', foreignField: '_id', as: 'order' } },
+  { $unwind: '$order' },
+  { $match: { 'order.customer': { $in: customerIds }, 'order.status': { $ne: 'CANCELLED' }, $expr: { $eq: ['$amount', '$order.finalAmount'] } } },
+  { $group: { _id: '$order.customer', totalSpent: { $sum: '$amount' } } }
+]);
 
 // ==========================================
 // SCREEN 28: CUSTOMER MANAGEMENT APIS (CRM)
@@ -72,6 +85,7 @@ router.get('/customers', adminOrCashier, async (req, res) => {
 
     // Aggregate orders for these customers to compute totalSpent & orderCount accurately
     const customerIds = customers.map(c => c._id);
+    const spending = new Map((await customerSpending(customerIds)).map(row => [String(row._id), row.totalSpent]));
     const orderAggregations = await Order.aggregate([
       { $match: { customer: { $in: customerIds } } },
       {
@@ -100,7 +114,7 @@ router.get('/customers', adminOrCashier, async (req, res) => {
         ...c.toObject(),
         totalOrders: stats.totalOrders,
         completedOrders: stats.completedOrders,
-        totalSpent: stats.totalSpent,
+        totalSpent: spending.get(String(c._id)) || 0,
         lastOrderDate: stats.lastOrderDate
       };
     });
@@ -113,10 +127,7 @@ router.get('/customers', adminOrCashier, async (req, res) => {
         { $match: { role: 'CUSTOMER' } },
         { $group: { _id: null, totalPoints: { $sum: '$totalPoints' } } }
       ]),
-      Order.aggregate([
-        { $match: { customer: { $exists: true, $ne: null }, status: 'COMPLETED' } },
-        { $group: { _id: null, totalRevenue: { $sum: '$finalAmount' } } }
-      ])
+      customerSpending(await User.distinct('_id', { role: 'CUSTOMER' }))
     ]);
 
     res.json({
@@ -128,7 +139,7 @@ router.get('/customers', adminOrCashier, async (req, res) => {
         totalCustomers: totalCustomersCount,
         activeCustomers: activeCustomersCount,
         totalPoints: pointsStats[0]?.totalPoints || 0,
-        totalMemberRevenue: revenueStats[0]?.totalRevenue || 0
+        totalMemberRevenue: revenueStats.reduce((total, row) => total + row.totalSpent, 0)
       }
     });
   } catch (error) {
@@ -139,6 +150,7 @@ router.get('/customers', adminOrCashier, async (req, res) => {
 // 2. GET SINGLE CUSTOMER DETAILS & ORDER HISTORY
 router.get('/customers/:id', adminOrCashier, async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã khách hàng không hợp lệ.' });
     const customer = await User.findOne({ _id: req.params.id, role: 'CUSTOMER' }).select('-passwordHash');
     if (!customer) {
       return res.status(404).json({ message: 'Không tìm thấy khách hàng.' });
@@ -157,7 +169,8 @@ router.get('/customers/:id', adminOrCashier, async (req, res) => {
 
     const totalOrders = orders.length;
     const completedOrders = orders.filter(o => o.status === 'COMPLETED');
-    const totalSpent = completedOrders.reduce((sum, o) => sum + (o.finalAmount || 0), 0);
+    const [spending] = await customerSpending([customer._id]);
+    const totalSpent = spending?.totalSpent || 0;
 
     res.json({
       customer,
@@ -228,6 +241,7 @@ router.post('/customers', adminOrCashier, async (req, res) => {
 // 4. UPDATE CUSTOMER
 router.put('/customers/:id', adminOrCashier, async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã khách hàng không hợp lệ.' });
     validateCustomer(req.body, false);
     const { fullName, email, birthday, address, status } = req.body;
     const customer = await User.findOne({ _id: req.params.id, role: 'CUSTOMER' });
@@ -253,6 +267,7 @@ router.put('/customers/:id', adminOrCashier, async (req, res) => {
 // 5. TOGGLE LOCK / UNLOCK CUSTOMER STATUS
 router.patch('/customers/:id/toggle-lock', adminOrCashier, async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã khách hàng không hợp lệ.' });
     const customer = await User.findOne({ _id: req.params.id, role: 'CUSTOMER' });
     if (!customer) {
       return res.status(404).json({ message: 'Không tìm thấy khách hàng.' });
@@ -374,7 +389,12 @@ router.delete('/:id', adminOnly, async (req, res) => {
   try {
     const id = objectId(req.params.id);
     if (String(id) === String(req.user._id)) return res.status(409).json({ message: 'Không thể tự xóa tài khoản đang sử dụng.' });
-    const references = await Promise.all([Order.exists({ $or: [{ customer: id }, { cashier: id }, { shipper: id }] }), PurchaseOrder.exists({ creator: id }), WorkSchedule.exists({ user: id }), LoyaltyTransaction.exists({ customer: id })]);
+    // Sequential: concurrent operations cannot share one MongoDB transaction session.
+    const references = [];
+    references.push(await Order.exists({ $or: [{ customer: id }, { cashier: id }, { shipper: id }] }));
+    references.push(await PurchaseOrder.exists({ creator: id }));
+    references.push(await WorkSchedule.exists({ user: id }));
+    references.push(await LoyaltyTransaction.exists({ customer: id }));
     if (references.some(Boolean)) return res.status(409).json({ message: 'Tài khoản đã có lịch sử giao dịch hoặc phân ca. Hãy chuyển sang trạng thái ngừng hoạt động.' });
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ message: 'Không tìm thấy người dùng.' });

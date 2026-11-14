@@ -175,17 +175,24 @@ export const fmtNumber = (value: number | undefined | null): string => {
 };
 
 const refId = (value: any): string => String(value?._id ?? value?.id ?? value ?? '');
+const sameRef = (left: any, right: any): boolean => {
+  const aliases = (value: any): string[] => value && typeof value === 'object'
+    ? [value._id, value.id].filter(id => id !== undefined && id !== null).map(String)
+    : [String(value ?? '')];
+  return aliases(left).some(id => aliases(right).includes(id));
+};
 
 const latestPurchaseLine = (db: any, ingredientId: any, statuses: string[]): any | null => {
   if (!db) return null;
   const orders = db.purchase_orders ?? [];
   const rows = orders.length
     ? orders.filter((order: any) => statuses.includes(order.status)).flatMap((order: any) => {
-      const items = order.items ?? (db.purchase_order_items ?? []).filter((item: any) => refId(item.po_id ?? item.order_id ?? item.purchaseOrder) === refId(order));
+      const items = order.items ?? (db.purchase_order_items ?? []).filter((item: any) => sameRef(item.po_id ?? item.order_id ?? item.purchaseOrder, order));
       return items.map((item: any) => ({ ...item, status: order.status, purchasedAt: order.createdAt ?? order.created_at, orderId: order._id ?? order.id }));
     })
     : (db.purchase_order_items ?? []).filter((item: any) => statuses.includes(item.status) || (statuses.includes('RECEIVED') && !item.status));
-  const latest = rows.filter((item: any) => refId(item.ingredient_id ?? item.ingredient) === refId(ingredientId))
+  const identity = db.ingredients?.find((item: any) => sameRef(item, ingredientId)) ?? ingredientId;
+  const latest = rows.filter((item: any) => sameRef(item.ingredient_id ?? item.ingredient, identity))
     .sort((a: any, b: any) => {
       const time = (row: any) => Date.parse(row.purchasedAt ?? row.createdAt ?? row.created_at ?? '') || 0;
       return time(b) - time(a) || refId(b.orderId ?? b._id).localeCompare(refId(a.orderId ?? a._id));
@@ -202,7 +209,7 @@ export const lastPurchasePrice = (db: any, ingredientId: any): number | null => 
   if (!db) return null;
   const received = latestPurchaseLine(db, ingredientId, ['RECEIVED']);
   if (received) return received.unitPrice ?? received.unit_price;
-  const ingredient = db.ingredients?.find((item: any) => refId(item) === refId(ingredientId));
+  const ingredient = db.ingredients?.find((item: any) => sameRef(item, ingredientId));
   const price = ingredient?.latestUnitPrice ?? ingredient?.cost_per_unit ?? ingredient?.costPrice;
   return typeof price === 'number' && Number.isFinite(price) ? price : null;
 };
@@ -215,7 +222,7 @@ export const recipeUnitPrice = (db: any, ingredientId: any): { price: number | n
 
 export const recipeLineCost = (db: any, ingredientId: any, amount: number): { cost: number | null; estimated: boolean } => {
   if (!Number.isFinite(amount) || amount < 0) return { cost: null, estimated: false };
-  const ingredient = db?.ingredients?.find((row: any) => refId(row) === refId(ingredientId));
+  const ingredient = db?.ingredients?.find((row: any) => sameRef(row, ingredientId));
   const lots = ingredient?.stockLots ?? ingredient?.stock_lots;
   const quote = recipeUnitPrice(db, ingredientId);
   if (!Array.isArray(lots)) return { cost: quote.price === null ? null : amount * quote.price, estimated: quote.estimated || (quote.price !== null && Number(ingredient?.currentStock ?? ingredient?.current_stock ?? 0) > 0) };
@@ -241,8 +248,8 @@ export const recipeLineCost = (db: any, ingredientId: any, amount: number): { co
 
 export const productCostDetails = (db: any, productId: any): { cost: number | null; estimated: boolean } => {
   if (!db) return { cost: null, estimated: false };
-  const links = db.product_ingredients?.filter((line: any) => refId(line.product_id ?? line.productId ?? line.product) === refId(productId)) ?? [];
-  const product = db.products?.find((item: any) => refId(item) === refId(productId));
+  const product = db.products?.find((item: any) => sameRef(item, productId));
+  const links = db.product_ingredients?.filter((line: any) => sameRef(line.product_id ?? line.productId ?? line.product, product ?? productId)) ?? [];
   const recipe = links.length ? links : product?.recipe ?? [];
   if (!recipe.length) return { cost: null, estimated: false };
   let total = 0;

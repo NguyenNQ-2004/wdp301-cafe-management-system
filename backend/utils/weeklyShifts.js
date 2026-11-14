@@ -40,6 +40,7 @@ const VALID_TIME_RANGE = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/;
 
 const shiftJson = (shift) => ({ _id: shift._id, weekStart: shift.weekStart, code: shift.shiftName, name: shift.shiftName, startTime: shift.startTime, endTime: shift.endTime });
 async function resolveShift(schedule) {
+  if (schedule.shiftStartTime && schedule.shiftEndTime) return `${schedule.shiftStartTime}-${schedule.shiftEndTime}`;
   const week = mondayOf(schedule.workDate);
   const shift = await WorkShift.findOne({ weekStart: week, shiftName: schedule.shiftName });
   if (shift) return `${shift.startTime}-${shift.endTime}`;
@@ -76,6 +77,10 @@ async function attachShiftInfo(schedules) {
 
   return items.map((obj) => {
     const name = obj.shiftName || '';
+    if (obj.shiftStartTime && obj.shiftEndTime) {
+      obj.shiftInfo = { code: name, name: DEFAULT_SHIFT_LABELS[name] || name, startTime: obj.shiftStartTime, endTime: obj.shiftEndTime };
+      return obj;
+    }
     let weekKey = '';
     if (obj.workDate && !Number.isNaN(new Date(obj.workDate).getTime())) {
       weekKey = mondayOf(obj.workDate).toISOString().slice(0, 10);

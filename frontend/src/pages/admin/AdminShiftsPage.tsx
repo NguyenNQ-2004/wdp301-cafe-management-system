@@ -41,7 +41,7 @@ export default function AdminShiftsPage() {
     }catch(err){setError((err as Error).message);}finally{setBusy(false);}
   };
   const remove=async(shift:Shift)=>{
-    if(!token||busy||!window.confirm(`Xóa ca ${shift.name} trong tuần này?`))return;
+    if(!token||busy||!window.confirm(`Xóa khung ca ${shift.name} trong tuần này? Chỉ xóa khi các phân công đã hoàn thành hoặc vắng mặt. Lịch sử chấm công và COD vẫn được giữ lại.`))return;
     setBusy(true);setError('');
     try{await shopApi(`/api/work-shifts/${shift._id}`,{token,method:'DELETE'});setRevision(x=>x+1);}
     catch(err){setError((err as Error).message);}finally{setBusy(false);}
@@ -52,7 +52,7 @@ export default function AdminShiftsPage() {
     try{const result=await shopApi<ShiftResponse>('/api/work-shifts/copy',{token,method:'POST',body:{weekStart}});setShifts(result.shifts);setNotice('Đã sao chép các ca của tuần gần nhất.');}
     catch(err){setError((err as Error).message);}finally{setBusy(false);}
   };
-  return <AdminLayout route="admin-shifts" table="work_shifts" title="Quản lý ca làm việc" subtitle="Mỗi tuần có khung giờ riêng; tuần đã qua chỉ được xem.">
+  return <AdminLayout route="admin-shifts" table="work_shifts" title="Quản lý ca làm việc" subtitle="Có thể sửa ca đã phân công; lịch chưa bắt đầu nhận giờ mới. Lịch sử chấm công giữ nguyên. Tuần đã qua chỉ được xem.">
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-4">
         <h2 className="font-bold">Tuần từ {weekStart}</h2>
@@ -76,6 +76,7 @@ export default function AdminShiftsPage() {
           <label>Bắt đầu<input required type="time" value={form.startTime} onChange={e=>setForm({...form,startTime:e.target.value})} className={inputCls}/></label>
           <label>Kết thúc<input required type="time" value={form.endTime} onChange={e=>setForm({...form,endTime:e.target.value})} className={inputCls}/></label>
         </div>
+        <p className="text-sm text-stone-500">Nếu giờ kết thúc sớm hơn giờ bắt đầu, ca được hiểu là kết thúc vào ngày hôm sau.</p>
         <div className="flex gap-3"><button disabled={busy} className="rounded-xl bg-[#800020] px-4 py-2 text-white">{busy?'Đang lưu…':'Lưu ca'}</button><button type="button" onClick={()=>setForm(null)}>Hủy</button></div>
       </form>}
       {loading?<p>Đang tải ca làm…</p>:<div className="overflow-x-auto rounded-2xl border bg-white">
