@@ -3,12 +3,14 @@ import { purchaseQuantity, purchaseUnits } from '../../lib/purchaseCost';
 import type { PurchaseIngredient, PurchaseLine } from '../../lib/purchaseCost';
 import { Field, inputCls } from './AdminUi';
 
+// K-PN: PurchaseLineEditor — Hiển thị một dòng nhập và đơn giá tính từ số lượng đã quy đổi.
 export function PurchaseLineEditor({ line, ingredients, index, onChange, onRemove, disabled = false }: {
   line: PurchaseLine; ingredients: PurchaseIngredient[]; index: number;
   onChange: (patch: Partial<PurchaseLine>) => void; onRemove?: () => void; disabled?: boolean;
 }) {
   const ingredient = ingredients.find(row => row._id === line.ingredient);
   const amount = ingredient ? purchaseQuantity(line, ingredient) : 0;
+  // K-PN: number — Định dạng số với tối đa bốn chữ số thập phân.
   const number = (value: number) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 4 }).format(value);
   return <div className="space-y-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
     <div className="grid gap-3 sm:grid-cols-2">

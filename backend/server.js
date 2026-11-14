@@ -38,11 +38,16 @@ app.use('/api/loyalty-transactions', require('./routes/loyaltyRoutes'));
 app.use('/api/customer-reviews', require('./routes/reviewRoutes'));
 
 // Inventory, purchasing and store configuration.
+// K-NL: Nguyên liệu
 app.use('/api/ingredients', require('./routes/ingredientRoutes'));
+// K-NCC: Nhà cung cấp
 app.use('/api/suppliers', require('./routes/supplierRoutes'));
 app.use('/api/product-ingredients', require('./routes/productIngredientRoutes'));
+// K-XN: Tồn kho và xuất nhập
 app.use('/api/inventory-transactions', require('./routes/inventoryTransactionRoutes'));
+// K-PN: Phiếu nhập hàng
 app.use('/api/purchase-orders', require('./routes/purchaseOrderRoutes'));
+// K-DX: Đề xuất nhập hàng
 app.use('/api/restock-requests', require('./routes/restockRequestRoutes'));
 app.use('/api/shop-settings', require('./routes/shopSettingRoutes'));
 app.use('/api/delivery-areas', require('./routes/deliveryAreaRoutes'));

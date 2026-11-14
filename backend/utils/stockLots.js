@@ -2,10 +2,13 @@ const mongoose = require('mongoose');
 const Ingredient = require('../models/Ingredient');
 const { invalid } = require('./adminValidation');
 const EPSILON = 1e-8;
+// K-XN: quantity — Làm tròn số lượng để hạn chế sai số khi cộng trừ tồn.
 const quantity = value => Math.round(value * 1e9) / 1e9;
+// K-XN: money — Làm tròn giá trị tiền đến hai chữ số thập phân.
 const money = value => Math.round(value * 100) / 100;
 const locks = new Set();
 
+// K-XN: lockIngredients — Khóa cập nhật đồng thời theo ID nguyên liệu trong tiến trình.
 function lockIngredients(ids) {
   const keys = [...new Set(ids.map(String))];
   if (keys.some(key => locks.has(key))) throw invalid('Nguyên liệu đang được cập nhật. Vui lòng thử lại.', 409);
@@ -13,21 +16,24 @@ function lockIngredients(ids) {
   return () => keys.forEach(key => locks.delete(key));
 }
 
+// K-XN: normalizedLots — Bổ sung lô tồn đầu nếu cần và sắp xếp theo thứ tự FIFO.
 function normalizedLots(ingredient) {
   const lots = (ingredient.stockLots || []).map(lot => ({ ...lot }));
   const tracked = lots.reduce((sum, lot) => sum + lot.remainingQuantity, 0);
   const difference = quantity(ingredient.currentStock - tracked);
   if (difference > EPSILON) lots.unshift({ _id: new mongoose.Types.ObjectId(), sourceType: 'OPENING', receivedAt: new Date(0), quantity: difference, remainingQuantity: difference, unitCost: null });
   if (difference < -EPSILON) throw invalid('Số lượng lô không khớp tồn kho. Vui lòng kiểm tra lại.', 409);
-  // Sort lots by receipt time for FIFO, with opening stock ahead of purchased lots.
+  // K-XN: Sắp lô theo thời điểm nhận tăng dần để xuất FIFO. Khi trùng thời điểm, dùng ID lô để giữ thứ tự ổn định.
   return lots.sort((a, b) => new Date(a.receivedAt) - new Date(b.receivedAt) || String(a._id).localeCompare(String(b._id)));
 }
 
+// K-XN: versionFilter — Tạo điều kiện cập nhật theo số tồn và phiên bản lô đã đọc.
 const versionFilter = ingredient => ({
   _id: ingredient._id, currentStock: ingredient.currentStock,
   lotsVersion: ingredient.lotsVersion === undefined ? { $exists: false } : ingredient.lotsVersion
 });
 
+// K-XN: mutateLots — Áp dụng thay đổi lô và thử lại nếu phiên bản tồn vừa thay đổi.
 async function mutateLots(id, mutate) {
   for (let attempt = 0; attempt < 5; attempt++) {
     const ingredient = await Ingredient.findById(id).lean();
@@ -43,6 +49,7 @@ async function mutateLots(id, mutate) {
   throw invalid('Tồn kho vừa thay đổi. Vui lòng thử lại.', 409);
 }
 
+// K-XN: moveStock — Tạo lô khi tăng tồn hoặc phân bổ xuất theo FIFO khi giảm tồn.
 async function moveStock(id, delta, options = {}) {
   if (!Number.isFinite(delta) || Math.abs(delta) < 0.001) throw invalid('Số lượng kho không hợp lệ.');
   return mutateLots(id, (ingredient, lots) => {
@@ -73,6 +80,7 @@ async function moveStock(id, delta, options = {}) {
   });
 }
 
+// K-XN: undoStockMove — Hoàn tác biến động kho theo các lô đã phân bổ.
 async function undoStockMove(movement) {
   return mutateLots(movement.ingredient, (ingredient, lots) => {
     for (const allocation of movement.allocations) {
@@ -89,6 +97,7 @@ async function undoStockMove(movement) {
   });
 }
 
+// K-XN: priceUnvaluedStock — Chia tổng tiền cho lượng chưa có giá để định giá tồn cũ.
 async function priceUnvaluedStock(id, totalCost, userId) {
   if (!Number.isSafeInteger(totalCost) || totalCost < 0) throw invalid('Tổng tiền phải là số nguyên không âm.');
   return mutateLots(id, (ingredient, lots) => {

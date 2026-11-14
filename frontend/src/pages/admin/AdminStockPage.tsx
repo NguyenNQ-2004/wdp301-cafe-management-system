@@ -12,10 +12,14 @@ type InventoryTransaction = { _id: string; ingredient: Pick<Ingredient, '_id' | 
 type InventoryOverview = { summary: { estimatedValue: number; ingredientCount: number; lowStockCount: number; transactionCount: number }; ingredients: Ingredient[] };
 
 const TX_LABEL: Record<InventoryTxType, string> = { IN_PURCHASE: 'Nhập mua hàng', OUT_ORDER: 'Xuất theo đơn bán', ADJUSTMENT: 'Điều chỉnh tăng', SPOILAGE: 'Hao hụt / Hủy' };
+// K-XN: fmtNumber — Định dạng số lượng theo chuẩn tiếng Việt.
 const fmtNumber = (value: number) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 }).format(value);
+// K-XN: fmtMoney — Định dạng số tiền theo đơn vị đồng.
 const fmtMoney = (value: number) => `${new Intl.NumberFormat('vi-VN').format(value)}đ`;
+// K-XN: fmtDateTime — Định dạng thời điểm giao dịch.
 const fmtDateTime = (value: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
 
+// K-XN: AdminStockPage — Hiển thị số tồn và lịch sử xuất nhập.
 export default function AdminStockPage() {
   const navigate = useNavigate();
   const token = useAuthStore((state) => state.user?.token);
@@ -30,7 +34,9 @@ export default function AdminStockPage() {
   const [toast, setToast] = useState('');
   const [form, setForm] = useState<{ ingredientId: string; type: 'ADJUSTMENT' | 'SPOILAGE'; quantity: number | '' }>({ ingredientId: '', type: 'SPOILAGE', quantity: '' });
 
-  // Load stock balances, recent movements, and summary figures for the inventory view.
+  // K-XN: Tải tổng quan tồn kho và tối đa 200 giao dịch gần nhất từ hai API.
+  // Giao diện lọc riêng danh sách nguyên liệu và lịch sử giao dịch.
+  // K-XN: loadInventory — Tải tổng quan và lịch sử kho.
   const loadInventory = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -50,7 +56,7 @@ export default function AdminStockPage() {
     }
   }, [token]);
 
-  // Fetching remote inventory when the authenticated session changes is intentional.
+  // K-XN: Tải lại dữ liệu kho khi phiên đăng nhập thay đổi để dùng quyền của phiên hiện tại.
   // oxlint-disable-next-line react/set-state-in-effect
   useEffect(() => { void loadInventory(); }, [loadInventory]);
 
@@ -59,8 +65,10 @@ export default function AdminStockPage() {
   const selectedIngredient = ingredients.find((item) => item._id === form.ingredientId);
   const selectedUnit = selectedIngredient?.unit || 'đơn vị';
   const filteredTransactions = useMemo(() => transactions.filter((item) => txFilter === 'all' || item.transactionType === txFilter), [transactions, txFilter]);
+  // K-XN: showToast — Hiện thông báo kho trong ba giây.
   const showToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 3000); };
 
+  // K-XN: handleCreate — Gửi phiếu điều chỉnh hoặc hao hụt rồi tải lại tồn và lịch sử.
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
     if (saving) return;

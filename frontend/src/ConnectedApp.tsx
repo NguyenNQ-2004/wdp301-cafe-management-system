@@ -188,6 +188,7 @@ const AppLayout = () => {
           <Route path="/customer" element={<Navigate to="/" replace />} />
           <Route path="/admin/feedback" element={<Navigate to="/admin/complaints" replace />} />
           <Route path="/admin/loyalty" element={<Navigate to="/admin/memberships" replace />} />
+          {/* K-DX: Đề xuất nhập hàng */}
           <Route path="/admin/restock-requests" element={user?.role === 'ADMIN' ? <AdminRestockRequestsPage /> : <Navigate to="/" />} />
           <Route path="/counter-orders" element={<Navigate to="/cashier/orders" replace />} />
           <Route path="/counter-order" element={<Navigate to="/cashier" replace />} />
@@ -247,6 +248,7 @@ const AppLayout = () => {
               )
             }
           />
+          {/* K-NL: Nguyên liệu */}
           <Route
             path="/admin/ingredients"
             element={
@@ -257,6 +259,7 @@ const AppLayout = () => {
               )
             }
           />
+          {/* K-XN: Tồn kho và xuất nhập */}
           <Route
             path="/admin/inventory"
             element={
@@ -277,6 +280,7 @@ const AppLayout = () => {
               )
             }
           />
+          {/* K-NCC: Nhà cung cấp */}
           <Route
             path="/admin/suppliers"
             element={
@@ -287,6 +291,7 @@ const AppLayout = () => {
               )
             }
           />
+          {/* K-PN: Phiếu nhập hàng */}
           <Route
             path="/admin/purchases"
             element={

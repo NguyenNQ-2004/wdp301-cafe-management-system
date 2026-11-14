@@ -14,6 +14,7 @@ const { atomicRouter } = require('../utils/atomicRoute');
 const router = atomicRouter(express.Router());
 router.use(protect);
 
+// K-NL: parse — Chuẩn hóa trường nguyên liệu, kiểm tra tồn đầu và nhà cung cấp.
 async function parse(body, creating) {
   objectBody(body);
   const fields = {};
@@ -27,7 +28,7 @@ async function parse(body, creating) {
   for (const key of ['currentStock', 'minStockLevel']) {
     if (body[key] !== undefined) fields[key] = nonnegative(body[key], key === 'currentStock' ? 'Tồn kho' : 'Mức tối thiểu');
   }
-  // Record valued opening stock as an OPENING lot with unit cost derived from the entered total.
+  // K-NL: Nếu khai báo tổng tiền tồn đầu, tạo lô OPENING và tính đơn giá bằng tổng tiền chia cho số lượng tồn đầu.
   if (creating && body.openingTotalCost !== undefined) {
     if (!Number.isSafeInteger(body.openingTotalCost) || body.openingTotalCost < 0 || !(fields.currentStock > 0)) throw invalid('Cần nhập số lượng tồn đầu và tổng tiền hợp lệ.');
     fields.stockLots = [{ sourceType: 'OPENING', receivedAt: new Date(0), quantity: fields.currentStock, remainingQuantity: fields.currentStock, unitCost: body.openingTotalCost / fields.currentStock }];
@@ -38,6 +39,7 @@ async function parse(body, creating) {
   }
   return fields;
 }
+// K-NL: GET / — Liệt kê nguyên liệu theo bộ lọc.
 router.get('/', async (req, res) => {
   try {
     const filter = {};
@@ -46,6 +48,7 @@ router.get('/', async (req, res) => {
     res.json(await Ingredient.find(filter).populate('supplier', 'name phone').sort({ name: 1 }));
   } catch (error) { sendError(res, error); }
 });
+// K-NL: GET /:id — Đọc chi tiết nguyên liệu theo ID.
 router.get('/:id', async (req, res) => {
   try {
     const item = await Ingredient.findById(objectId(req.params.id)).populate('supplier', 'name phone');
@@ -53,11 +56,14 @@ router.get('/:id', async (req, res) => {
     res.json(item);
   } catch (error) { sendError(res, error); }
 });
+// K-NL: POST / — Thêm nguyên liệu và lưu tồn đầu nếu có.
 router.post('/', adminOnly, async (req, res) => {
   try { res.status(201).json(await Ingredient.create(await parse(req.body, true))); }
   catch (error) { sendError(res, error); }
 });
-// Update the purchase line and its detail records. For received orders, revalue only the stock remaining in the matching lot.
+// K-SG: Sửa tổng tiền và đơn giá của đúng dòng nguyên liệu, đồng bộ chi tiết và tổng tiền cả phiếu.
+// Với phiếu đã nhận, định giá lại lượng còn trong các lô thuộc phiếu và ghi giao dịch điều chỉnh có số lượng bằng 0.
+// K-SG: PUT /:id/purchase-price/:orderId — Sửa giá nhập của một dòng trên phiếu.
 router.put('/:id/purchase-price/:orderId', adminOnly, async (req, res) => {
   let release;
   try {
@@ -103,7 +109,8 @@ router.put('/:id/purchase-price/:orderId', adminOnly, async (req, res) => {
   } catch (error) { sendError(res, error); }
   finally { release?.(); }
 });
-// Apply a total value to stock that does not yet have a unit cost.
+// K-NL: Phân bổ tổng tiền cho phần tồn chưa có đơn giá. Các lô đã được định giá giữ đơn giá đã lưu.
+// K-NL: PUT /:id/unpriced-stock-cost — Định giá phần tồn chưa có đơn giá.
 router.put('/:id/unpriced-stock-cost', adminOnly, async (req, res) => {
   let release;
   try {
@@ -115,6 +122,7 @@ router.put('/:id/unpriced-stock-cost', adminOnly, async (req, res) => {
   } catch (error) { sendError(res, error); }
   finally { release?.(); }
 });
+// K-NL: PUT /:id — Cập nhật thông tin nguyên liệu và áp dụng điều chỉnh hợp lệ.
 router.put('/:id', adminOnly, async (req, res) => {
   try {
     const fields = await parse(req.body, false);
@@ -124,6 +132,7 @@ router.put('/:id', adminOnly, async (req, res) => {
     res.json(item);
   } catch (error) { sendError(res, error); }
 });
+// K-NL: DELETE /:id — Xóa nguyên liệu sau khi kiểm tra lịch sử nhập và biến động kho.
 router.delete('/:id', adminOnly, async (req, res) => {
   try {
     const id = objectId(req.params.id);

@@ -8,6 +8,7 @@ interface Supplier { _id: string; name: string; phone: string; address: string; 
 interface SupplierOverview { summary: { supplierCount: number; activeCount: number; inactiveCount: number; purchaseOrderCount: number }; suppliers: Supplier[] }
 const EMPTY_FORM = { name: '', phone: '', address: '', status: 'ACTIVE' as SupplierStatus };
 
+// K-NCC: AdminSuppliersPage — Hiển thị danh sách và biểu mẫu nhà cung cấp.
 export default function AdminSuppliersPage() {
   const token = useAuthStore((state) => state.user?.token);
   const [data, setData] = useState<SupplierOverview | null>(null);
@@ -19,6 +20,7 @@ export default function AdminSuppliersPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
+  // K-NCC: loadSuppliers — Tải danh sách và thống kê nhà cung cấp.
   const loadSuppliers = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -35,9 +37,12 @@ export default function AdminSuppliersPage() {
   // oxlint-disable-next-line react/set-state-in-effect
   useEffect(() => { void loadSuppliers(); }, [loadSuppliers]);
 
+  // K-NCC: openCreate — Mở biểu mẫu trống để thêm nhà cung cấp.
   const openCreate = () => { setEditing(null); setForm(EMPTY_FORM); setModalOpen(true); };
+  // K-NCC: openEdit — Nạp hồ sơ đã chọn vào biểu mẫu sửa.
   const openEdit = (supplier: Supplier) => { setEditing(supplier); setForm({ name: supplier.name, phone: supplier.phone || '', address: supplier.address || '', status: supplier.status }); setModalOpen(true); };
-  // Reuse the form for both creation and editing, then refresh the supplier list and totals after saving.
+  // K-NCC: Dùng chung biểu mẫu khi thêm hoặc sửa nhà cung cấp. Sau khi lưu, tải lại danh sách và số liệu tổng quan.
+  // K-NCC: saveSupplier — Gửi yêu cầu thêm hoặc cập nhật nhà cung cấp.
   const saveSupplier = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!token) return;
@@ -53,6 +58,7 @@ export default function AdminSuppliersPage() {
       setSaving(false);
     }
   };
+  // K-NCC: removeSupplier — Xác nhận thao tác xóa và gửi yêu cầu đến API.
   const removeSupplier = async (supplier: Supplier) => {
     if (!token || !window.confirm(`Xóa nhà cung cấp “${supplier.name}”?`)) return;
     try {

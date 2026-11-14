@@ -3,6 +3,7 @@ const Request = require('../models/RestockRequest');
 const Ingredient = require('../models/Ingredient');
 const { protect, adminOnly } = require('../middlewares/authMiddleware');
 const { invalid, objectBody, objectId, sendError } = require('../utils/adminValidation');
+// K-DX: cashierOnly — Chỉ cấp quyền tạo và sửa đề xuất cho thu ngân.
 const cashierOnly = (req, res, next) => {
   if (req.user.role !== 'STAFF' || req.user.position !== 'CASHIER') return res.status(403).json({ message: 'Chỉ thu ngân được tạo và gửi đề xuất.' });
   next();
@@ -11,12 +12,14 @@ router.use(protect, (req, res, next) => {
   if (req.user.role === 'ADMIN' || (req.user.role === 'STAFF' && req.user.position === 'CASHIER')) return next();
   res.status(403).json({ message: 'Bạn không có quyền truy cập đề xuất nhập hàng.' });
 });
+// K-DX: note — Chuẩn hóa ghi chú và kiểm tra độ dài.
 const note = value => {
   if (value == null) return '';
   if (typeof value !== 'string' || value.trim().length > 500) throw invalid('Ghi chú không được quá 500 ký tự.');
   return value.trim();
 };
-// Normalize quantity, total cost, and unit price before validating each ingredient against the supplier.
+// K-DX: Admin xem tất cả đề xuất. Thu ngân chỉ xem đề xuất do mình tạo. Cả hai có thể lọc theo trạng thái.
+// K-DX: GET / — Liệt kê đề xuất theo trạng thái và quyền truy cập.
 router.get('/', async (req, res) => {
   try {
     const status = req.query.status || 'ALL';
@@ -25,6 +28,7 @@ router.get('/', async (req, res) => {
     res.json(requests);
   } catch (failure) { sendError(res, failure); }
 });
+// K-DX: parseRequest — Kiểm tra trạng thái khởi tạo, số lượng và nguyên liệu trong đề xuất.
 async function parseRequest(body) {
   objectBody(body);
   if (!['DRAFT', 'PENDING_APPROVAL'].includes(body.status)) throw invalid('Trạng thái khởi tạo không hợp lệ.');
@@ -40,13 +44,16 @@ async function parseRequest(body) {
   }
   return { status: body.status, reason: note(body.reason), note: note(body.note), items };
 }
+// K-DX: POST / — Tạo đề xuất và ghi người tạo vào lịch sử.
 router.post('/', cashierOnly, async (req, res) => {
   try {
     const fields = await parseRequest(req.body);
     res.status(201).json(await Request.create({ ...fields, requester: req.user._id, history: [{ action: 'create', actor: req.user._id, at: new Date() }] }));
   } catch (failure) { sendError(res, failure); }
 });
-// Validate the requested status transition. Receiving uses the shared workflow that creates stock lots and IN_PURCHASE entries.
+// K-DX: Thu ngân chỉ sửa đề xuất nháp hoặc đã bị từ chối của mình.
+// Nếu giao diện gửi thời điểm cập nhật đã đọc, dùng giá trị đó để phát hiện bản ghi đã thay đổi.
+// K-DX: PUT /:id — Cập nhật nội dung đề xuất của thu ngân.
 router.put('/:id', cashierOnly, async (req, res) => {
   try {
     const fields = await parseRequest(req.body);
@@ -58,7 +65,9 @@ router.put('/:id', cashierOnly, async (req, res) => {
     res.json(updated);
   } catch (failure) { sendError(res, failure); }
 });
-// Admins see all requests. Cashiers see their own requests.
+// K-DX: Kiểm tra trạng thái nguồn và quyền trước khi chuyển bước. Admin duyệt hoặc từ chối, thu ngân gửi hoặc hủy đề xuất của mình.
+// Ghi người thao tác và thời điểm vào lịch sử để tra cứu.
+// K-DX: POST /:id/transition — Chuyển trạng thái và ghi lịch sử thao tác.
 router.post('/:id/transition', async (req, res) => {
   try {
     const body = objectBody(req.body);

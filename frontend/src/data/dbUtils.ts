@@ -174,7 +174,9 @@ export const fmtNumber = (value: number | undefined | null): string => {
   return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 }).format(value || 0);
 };
 
+// K-NL: refId — Chuẩn hóa ID tham chiếu để so sánh.
 const refId = (value: any): string => String(value?._id ?? value?.id ?? value ?? '');
+// K-NL: sameRef — So khớp tham chiếu qua cả id và _id.
 const sameRef = (left: any, right: any): boolean => {
   const aliases = (value: any): string[] => value && typeof value === 'object'
     ? [value._id, value.id].filter(id => id !== undefined && id !== null).map(String)
@@ -182,6 +184,7 @@ const sameRef = (left: any, right: any): boolean => {
   return aliases(left).some(id => aliases(right).includes(id));
 };
 
+// K-PN: latestPurchaseLine — Tra dòng nhập mới nhất theo nguyên liệu và trạng thái phiếu.
 const latestPurchaseLine = (db: any, ingredientId: any, statuses: string[]): any | null => {
   if (!db) return null;
   const orders = db.purchase_orders ?? [];
@@ -200,11 +203,13 @@ const latestPurchaseLine = (db: any, ingredientId: any, statuses: string[]): any
   return latest ?? null;
 };
 
+// K-NL: lastOrderedPrice — Lấy đơn giá trên phiếu đã đặt nhưng chưa nhận.
 export const lastOrderedPrice = (db: any, ingredientId: any): number | null => {
   const line = latestPurchaseLine(db, ingredientId, ['ORDERED']);
   return line ? line.unitPrice ?? line.unit_price : null;
 };
 
+// K-NL: lastPurchasePrice — Lấy giá từ phiếu đã nhận hoặc dữ liệu giá cũ của nguyên liệu.
 export const lastPurchasePrice = (db: any, ingredientId: any): number | null => {
   if (!db) return null;
   const received = latestPurchaseLine(db, ingredientId, ['RECEIVED']);

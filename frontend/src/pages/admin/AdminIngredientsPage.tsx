@@ -15,24 +15,29 @@ interface AdminIngredientsPageProps {
 type IngredientForm = Omit<Ingredient, 'id' | 'current_stock' | 'min_stock_level'> & { current_stock: number | ''; min_stock_level: number | '' } & { openingTotalCost?: number | ''; unpricedTotalCost?: number | '' };
 const UNITS = ['gram', 'ml', 'piece', 'kg', 'lít', 'hộp', 'chai', 'gói'];
 
+// K-NL: AdminIngredientsPage — Hiển thị danh sách và biểu mẫu quản lý nguyên liệu.
 export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNavigate, onShowToast }) => {
   const { db, refresh } = useDb();
   const token = useAuthStore(state => state.user?.token);
   const [saving, setSaving] = useState(false);
   const [purchaseEdit, setPurchaseEdit] = useState<{ id: string; name: string; orderId: string; unitPrice: number; quantity: number; total: number | '' } | null>(null);
   const [purchaseError, setPurchaseError] = useState('');
+  // K-SG: editablePurchaseLines — Lấy các dòng phiếu đã đặt hoặc đã nhận có thể sửa giá.
   const editablePurchaseLines = (id: string) => db.purchase_order_items
     .filter(line => String(line.ingredient_id) === id && line.order_id && line.quantity > 0
       && ['RECEIVED', 'ORDERED'].includes(line.status))
     .map(line => ({ ...line, orderId: line.order_id }))
     .sort((a, b) => Date.parse(b.purchasedAt) - Date.parse(a.purchasedAt));
+  // K-SG: selectPurchaseLine — Nạp số lượng và giá của phiếu được chọn vào biểu mẫu.
   const selectPurchaseLine = (id: string, name: string, line: any) => {
     const unitPrice = line.unitPrice ?? line.unit_price;
     setPurchaseError('');
     setPurchaseEdit({ id, name, orderId: String(line.orderId), unitPrice,
       quantity: line.quantity, total: Math.round(line.totalCost ?? unitPrice * line.quantity) });
   };
-  // Update the selected purchase line. The API also revalues any remaining stock from that receipt.
+  // K-SG: Gửi tổng tiền mới cùng đơn giá đã đọc để API phát hiện thao tác sửa đồng thời.
+  // Với phiếu đã nhận, giá mới áp dụng cho phần còn lại của đúng lô nhập.
+  // K-SG: savePurchasePrice — Lưu giá nhập cho phiếu đã chọn.
   const savePurchasePrice = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!purchaseEdit || !token || saving) return;
@@ -53,12 +58,15 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
     finally { setSaving(false); }
   };
   const [valuation, setValuation] = useState<{ id: string; name: string; unit: string; quantity: number; total: number | '' } | null>(null);
-  // Count stock outside tracked lots and the remaining quantity of lots without a unit cost.
+  // K-NL: Cộng phần tồn chưa được ghi nhận theo lô và số lượng còn lại của các lô chưa có đơn giá.
+  // Chỉ hiện thao tác nhập giá tồn cũ khi tổng lượng chưa có giá lớn hơn 0.
+  // K-NL: unpricedQuantity — Tính lượng tồn chưa có giá.
   const unpricedQuantity = (i: any) => {
     const lots = i.stockLots ?? [];
     const tracked = lots.reduce((sum: number, lot: any) => sum + lot.remainingQuantity, 0);
     return Math.max(0, i.current_stock - tracked) + lots.reduce((sum: number, lot: any) => sum + (lot.unitCost == null ? lot.remainingQuantity : 0), 0);
   };
+  // K-NL: saveValuation — Lưu tổng giá trị cho phần tồn cũ từ hộp định giá.
   const saveValuation = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!valuation || valuation.total === '' || !token || saving) return;
@@ -75,10 +83,12 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
   const [priceMessage, setPriceMessage] = useState('');
   const editingIngredient = editing?.id ? (db.ingredients || []).find(i => String(i.id) === String(editing.id)) : null;
   const editingUnpriced = editingIngredient ? unpricedQuantity(editingIngredient) : 0;
+  // K-NL: stockValue — Tính tổng giá trị lượng còn lại theo từng lô khi đã đủ đơn giá.
   const stockValue = (i: any): number | null => {
     if (!i || unpricedQuantity(i) > 0) return null;
     return (i.stockLots ?? []).reduce((sum: number, lot: any) => sum + lot.remainingQuantity * (lot.unitCost ?? 0), 0);
   };
+  // K-NL: saveEditingPrice — Lưu giá phần tồn chưa định giá từ biểu mẫu sửa.
   const saveEditingPrice = async () => {
     if (!editing?.id || !token || saving) return;
     const total = editing.form.unpricedTotalCost;
@@ -96,6 +106,7 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
     finally { setSaving(false); }
   };
 
+  // K-NL: notify — Thông báo kết quả thao tác qua toast.
   const notify = (msg: string) => {
     if (onShowToast) {
       onShowToast(msg);
@@ -105,14 +116,17 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
     }
   };
 
+  // K-NL: supplierName — Tra tên nhà cung cấp theo ID.
   const supplierName = (id: any) =>
     id ? (db.suppliers || []).find(s => s.id === id || s._id === id || String(s.id) === String(id) || String(s._id) === String(id))?.name ?? '—' : 'Chưa gán';
 
+  // K-NL: usedIn — Tìm các món có nguyên liệu trong công thức.
   const usedIn = (id: any) =>
     (db.product_ingredients || []).filter(b => b.ingredient_id === id || b.ingredientId === id || String(b.ingredient_id) === String(id));
 
   const rows = (db.ingredients || []).filter(i => (i.name || '').toLowerCase().includes(search.trim().toLowerCase()));
 
+  // K-NL: handleSave — Kiểm tra và gửi dữ liệu thêm hoặc sửa nguyên liệu.
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editing || saving || !token) return;
@@ -134,6 +148,7 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
     finally { setSaving(false); }
   };
 
+  // K-NL: handleDelete — Kiểm tra liên kết trước khi gửi yêu cầu xóa nguyên liệu.
   const handleDelete = async (i: Ingredient) => {
     if (saving || !token) return;
     const inPo = (db.purchase_order_items || []).some(
@@ -156,6 +171,7 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
     finally { setSaving(false); }
   };
 
+  // K-NL: setForm — Cập nhật các trường vừa thay đổi trong biểu mẫu.
   const setForm = (patch: Partial<IngredientForm>) =>
     setEditing(prev => (prev ? { ...prev, form: { ...prev.form, ...patch } } : prev));
 
@@ -233,7 +249,8 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
             </thead>
             <tbody className="divide-y divide-stone-100">
               {rows.map(i => {
-                // Prefer the received purchase price, then the average cost of valued stock, then the price on an outstanding order.
+                // K-NL: Ưu tiên giá phiếu đã nhận. Nếu thiếu giá nhập, dùng giá bình quân khi toàn bộ tồn đã được định giá.
+                // Nếu chưa có cả hai, dùng đơn giá của phiếu đã đặt nhưng chưa nhận.
                 const purchasePrice = lastPurchasePrice(db, i.id);
                 const value = stockValue(i);
                 const price = purchasePrice ?? (value !== null && i.current_stock > 0 ? value / i.current_stock : null);

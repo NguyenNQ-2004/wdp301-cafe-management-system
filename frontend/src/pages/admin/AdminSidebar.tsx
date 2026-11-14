@@ -23,11 +23,13 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+// K-XN: AdminSidebar — Hiển thị các nhóm điều hướng quản trị, gồm Kho & Nhập hàng.
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentRoute, activePath }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
 
+  // K-XN: handleNav — Điều hướng đến màn hình theo mục menu được chọn.
   const handleNav = (path: string) => {
     navigate(path);
   };
@@ -52,10 +54,15 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentRoute, active
     {
       title: 'KHO & NHẬP HÀNG',
       items: [
+        // K-NL: Nguyên liệu
         { route: 'admin-ingredients', path: '/admin/ingredients', pageRoute: 'admin-ingredients', label: 'Nguyên liệu', icon: 'inventory_2', table: 'ingredients' },
+        // K-XN: Tồn kho và xuất nhập
         { route: 'admin-inventory', path: '/admin/inventory', pageRoute: 'admin-inventory', label: 'Tồn kho & Xuất nhập', icon: 'warehouse', table: 'inventory_transactions' },
+        // K-DX: Đề xuất nhập hàng
         { route: 'admin-restock', path: '/admin/restock-requests', pageRoute: 'admin-restock', label: 'Đề xuất nhập hàng', icon: 'assignment' },
+        // K-NCC: Nhà cung cấp
         { route: 'admin-suppliers', path: '/admin/suppliers', pageRoute: 'admin-suppliers', label: 'Nhà cung cấp', icon: 'store', table: 'suppliers' },
+        // K-PN: Phiếu nhập hàng
         { route: 'admin-purchases', path: '/admin/purchases', pageRoute: 'admin-purchases', label: 'Phiếu nhập hàng', icon: 'receipt', table: 'purchase_orders' },
       ]
     },
@@ -91,7 +98,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentRoute, active
   return (
     <aside className="w-60 shrink-0 bg-white border-r border-stone-200/80 min-h-screen flex flex-col justify-between py-4 text-xs select-none">
       <div className="space-y-4">
-        {/* Brand Header */}
+        {/* Khu vực nhận diện cửa hàng */}
         <div className="px-4 pb-3 flex items-center gap-2.5 border-b border-stone-100">
           <div 
             onClick={() => navigate('/admin')}
@@ -107,7 +114,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentRoute, active
           </div>
         </div>
 
-        {/* Navigation Sections */}
+        {/* Các nhóm chức năng trong thanh điều hướng */}
         <nav className="space-y-4 px-2">
           {navGroups.map((group, gIdx) => (
             <div key={gIdx} className="space-y-0.5">
@@ -146,7 +153,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentRoute, active
         </nav>
       </div>
 
-      {/* User / Exit Footer */}
+      {/* Thông tin tài khoản và nút thoát */}
       <div className="pt-3 border-t border-stone-100 px-3 space-y-2">
         {user && (
           <div className="px-2 py-1.5 rounded-xl bg-stone-50 flex items-center justify-between">
