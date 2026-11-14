@@ -13,6 +13,8 @@
     "mock:gateway": "node scripts/mockPaymentGateway.js",
     "db:local-replica": "node scripts/setupLocalReplicaSet.js",
     "seed:reports-demo": "node seedReportDemo.js",
+    "seed:export": "node seed.js --export",
+    "test:seed": "node --test tests/seedSnapshot.test.js",
     "test:online-ordering": "node --test tests/onlineOrdering.test.js",
     "test:email-auth": "node --test tests/emailAuthentication.test.js",
     "test:inventory": "node --test tests/inventory.test.js",
