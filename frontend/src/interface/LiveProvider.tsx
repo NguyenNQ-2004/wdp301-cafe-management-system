@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 import useAuthStore from '../store/authStore';
 import { shopApi, ShopApiError } from '../lib/shopApi';
-import { groupOrderItems } from '../lib/cartOptions';
+import { counterOrderPayload } from '../lib/counterOrderPayload';
 import { normalizeProductBadge } from '../lib/productBadge';
 import { executeKitchenCommand } from '../lib/kitchenWorkflow';
 import type { KitchenCommand } from '../lib/kitchenWorkflow';
@@ -24,12 +24,17 @@ export interface Tx {
   setSetting: (key: string, value: string) => void;
 }
 export interface PlaceOrderInput {
+  payment_method?: 'CASH' | 'BANK_TRANSFER';
   customer_id: number | null; cashier_id: number | null; order_type: OrderType; status: OrderStatus;
   table_number?: string | null; recipient_name?: string | null; recipient_phone?: string | null;
   delivery_address?: string | null; order_note?: string | null; delivery_fee: number; points_to_redeem: number;
   items: { product_id: number; quantity: number; unit_price: number; customization: OrderCustomization | null }[];
 }
 interface Session { customerId: number; cashierId: number; baristaId: number; shipperId: number; adminId: number }
+export interface DeliveryIssueRecord {
+  _id: string; order: { _id: string; orderCode: string; status: string } | null;
+  issueType: string; description: string; outcome: string; createdAt: string;
+}
 interface Value {
   db: DbState; session: Session; loading: boolean; busy: boolean; revision: number;
   error: string; notice: string; unavailable: string[];
@@ -43,6 +48,9 @@ interface Value {
   cancelOrder: (id: number, reason: string) => Promise<boolean>;
   saveDeliveryOrder: (id: number, body: { status: OrderStatus; shipperId?: number | null; cancelReason?: string; orderNote?: string; collectedAmount?: number }) => Promise<boolean>;
   remitCod: (scheduleId: number, cash: number, note: string) => Promise<boolean>;
+  deliveryIssues: DeliveryIssueRecord[];
+  acceptDelivery: (id: number) => Promise<boolean>;
+  reportDeliveryIssue: (id: number, body: { issueType: string; description: string; outcome: 'REPORT' | 'RETURN' | 'CANCEL' }) => Promise<boolean>;
   adjustPoints: (id: number, delta: number) => void;
 }
 const Context = createContext<Value | null>(null);
@@ -59,6 +67,7 @@ export function DbProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [unavailable, setUnavailable] = useState<string[]>([]);
+  const [deliveryIssues, setDeliveryIssues] = useState<DeliveryIssueRecord[]>([]);
   const ids = useRef(new Map<string, number>());
   const originals = useRef(new Map<number, string>());
   const nextId = useRef(1);
@@ -104,13 +113,14 @@ export function DbProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
     const version = ++generation.current;
     if (!options?.silent) setLoading(true);
-    const requests: [keyof DbState | 'self', string][] = [['categories', '/api/categories'], ['products', '/api/products'], ['shop_settings', '/api/shop-settings']];
+    const requests: [keyof DbState | 'self' | 'deliveryIssues', string][] = [['categories', '/api/categories'], ['products', '/api/products'], ['shop_settings', '/api/shop-settings']];
     if (user?.token) {
       requests.push(['self', '/api/auth/me'], ['orders', '/api/orders'], ['loyalty_transactions', '/api/loyalty-transactions']);
       if (user.role === 'ADMIN') {
         requests.push(['users', '/api/users'], ['ingredients', '/api/ingredients'], ['suppliers', '/api/suppliers'], ['product_ingredients', '/api/product-ingredients'], ['purchase_orders', '/api/purchase-orders'], ['inventory_transactions', '/api/inventory-transactions']);
       } else if (user.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user.position || '')) requests.push(['users', '/api/users/customers']);
       if (user.role === 'ADMIN' || ['CASHIER', 'MANAGER', 'SHIPPER'].includes(user.position || '')) requests.push(['payments', '/api/payments']);
+      if (user.role === 'ADMIN' || ['MANAGER', 'SHIPPER'].includes(user.position || '')) requests.push(['deliveryIssues', '/api/delivery-issues']);
       if (user.role !== 'CUSTOMER') {
         const day = new Date(); day.setDate(day.getDate() - (day.getDay() + 6) % 7);
         const monday = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
@@ -120,11 +130,13 @@ export function DbProvider({ children }: { children: ReactNode }) {
     const responses = await Promise.allSettled(requests.map(([, path]) => shopApi<any>(path, { token: user?.token })));
     if (version !== generation.current || user?.token !== useAuthStore.getState().user?.token) return;
     const next = emptyDb(); const missing: string[] = [];
+    let nextIssues: DeliveryIssueRecord[] = [];
     const users = new Map<number, any>();
     for (let i = 0; i < responses.length; i++) {
       const response = responses[i]; const [table, endpoint] = requests[i];
       if (response.status === 'rejected') { missing.push(endpoint); continue; }
       const body = response.value;
+      if (table === 'deliveryIssues') { nextIssues = body; continue; }
       if (table === 'self') { const person = normalize('users', body); users.set(person.id, person); continue; }
       if (table === 'shop_settings') {
         next.shop_settings = (body.list || Object.entries(body.settings || {}).map(([key, value]) => ({ settingKey: key, settingValue: value }))).map((s: RecordData) => ({ setting_key: s.settingKey, setting_value: String(s.settingValue), updated_at: sqlDate(s.updatedAt) || '' }));
@@ -150,7 +162,7 @@ export function DbProvider({ children }: { children: ReactNode }) {
     }
     next.users = [...users.values()];
     if (!next.shop_settings.some(s => s.setting_key === 'store_name')) next.shop_settings.push({ setting_key: 'store_name', setting_value: 'Aura Café', updated_at: '' });
-    dbRef.current = next; setDb(next); setUnavailable(missing); setLoading(false);
+    dbRef.current = next; setDb(next); setDeliveryIssues(nextIssues); setUnavailable(missing); setLoading(false);
   }, [user?.token, user?.role, user?.position, user?._id, normalize, idFor]);
   useEffect(() => { void refresh(); return () => { generation.current++; }; }, [refresh]);
 
@@ -216,16 +228,9 @@ export function DbProvider({ children }: { children: ReactNode }) {
   const placeOrder = async (input: PlaceOrderInput): Promise<Order> => {
     if (!user?.token) throw new Error('Vui lòng đăng nhập để tạo đơn.');
     if (inFlight.current) throw new Error('Vui lòng chờ thao tác hiện tại hoàn tất.');
-    const orderItems = groupOrderItems(input.items.map(item => ({ productId: rawId(item.product_id), quantity: item.quantity, size: item.customization?.size || 'M', customization: item.customization || undefined })));
     inFlight.current++; setPending(inFlight.current); setError('');
     try {
-    const result = await shopApi<RecordData>('/api/orders', { method: 'POST', token: user.token, body: {
-      items: orderItems,
-      pointsToRedeem: input.points_to_redeem,
-      orderType: input.order_type, customerId: input.customer_id ? rawId(input.customer_id) : undefined,
-      recipientName: input.recipient_name, recipientPhone: input.recipient_phone, deliveryAddress: input.delivery_address,
-      tableNumber: input.table_number, orderNote: [input.order_note, ...input.items.filter(item => item.customization).map(item => `${item.quantity} x ${dbRef.current.products.find(product => product.id === item.product_id)?.name || ''} (${item.customization?.size || 'M'}): ${[item.customization?.sugar && `đường ${item.customization.sugar}`, item.customization?.ice, item.customization?.note].filter(Boolean).join(', ')}`)].filter(Boolean).join('; '), paymentMethod: input.order_type === 'ONLINE' ? 'COD' : 'PAY_AT_COUNTER',
-    } });
+    const result = await shopApi<RecordData>('/api/orders', { method: 'POST', token: user.token, body: counterOrderPayload(input, rawId) });
     await refresh(); return normalize('orders', result) as Order;
     } catch (failure) {
       setError(failure instanceof ShopApiError && failure.status === 404 ? 'Chưa tạo được đơn: API đặt hàng chưa được kết nối.' : failure instanceof Error ? failure.message : 'Không thể tạo đơn.');
@@ -277,6 +282,17 @@ export function DbProvider({ children }: { children: ReactNode }) {
     } finally { inFlight.current--; setPending(inFlight.current); }
   };
   const sessionId = user ? idFor('users', user._id) : 0;
+  const deliveryAction = async (id: number, action: string, body: object): Promise<boolean> => {
+    if (!user?.token || inFlight.current) return false;
+    inFlight.current++; setPending(inFlight.current); setError(''); setNotice('');
+    try {
+      await shopApi(`/api/orders/${rawId(id)}/delivery/${action}`, { method: 'POST', token: user.token, body });
+      await refresh(); return true;
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Không lưu được thao tác giao hàng.');
+      return false;
+    } finally { inFlight.current--; setPending(inFlight.current); }
+  };
   const updatePreparation = async (command: KitchenCommand): Promise<boolean> => {
     if (!user?.token || inFlight.current) return false;
     const token = user.token;
@@ -301,7 +317,9 @@ export function DbProvider({ children }: { children: ReactNode }) {
   const session = useMemo(() => ({ customerId: sessionId, cashierId: sessionId, baristaId: sessionId, shipperId: sessionId, adminId: sessionId }), [sessionId]);
   return <Context.Provider value={{ db, session, loading, busy: pending > 0, revision, error, notice, unavailable, refresh, notify, rawId, idFor, setSession: () => {}, transact, placeOrder,
     setOrderStatus: (id, status, patch = {}) => { transact(tx => tx.update('orders', id, { ...patch, status })); },
-    cancelOrder, saveDeliveryOrder, remitCod, updatePreparation,
+    cancelOrder, saveDeliveryOrder, remitCod, updatePreparation, deliveryIssues,
+    acceptDelivery: id => deliveryAction(id, 'accept', {}),
+    reportDeliveryIssue: (id, body) => deliveryAction(id, 'issues', body),
     adjustPoints: (id, delta) => { perform(async () => { await shopApi('/api/loyalty-transactions/adjust', { method: 'POST', token: user?.token, body: { customerId: rawId(id), pointsChange: delta, reason: 'Điều chỉnh điểm tại quầy' } }); }); },
   }}>{children}</Context.Provider>;
 }

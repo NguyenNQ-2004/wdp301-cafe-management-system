@@ -1,6 +1,8 @@
 import { NumberInput } from '../../../components/NumberInput';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { shopApi } from '../../../lib/shopApi';
+import useAuthStore from '../../../store/authStore';
 import type { PageRoute, PaymentMethod, Product, User, OrderCustomization } from '../../types';
 import { PosHeader } from './PosHeader';
 import { useDb } from '../../data/DbContext';
@@ -15,7 +17,6 @@ import {
   getSettingNumber,
   initials,
   maxRedeemPoints,
-  nowSql,
   pointsToMoney,
   productSizes,
   productToppings
@@ -40,7 +41,8 @@ const METHODS: PaymentMethod[] = ['CASH', 'BANK_TRANSFER'];
 
 export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNavigate, onShowToast }) => {
   const navigate = useNavigate();
-  const { db, session, placeOrder, transact, rawId } = useDb();
+  const { db, session, placeOrder, rawId, idFor, refresh } = useDb();
+  const account = useAuthStore(state => state.user);
   const [activeCategory, setActiveCategory] = useState<number | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -55,7 +57,9 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
   const [customerId, setCustomerId] = useState<number | null>(null);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [isNewCustModalOpen, setIsNewCustModalOpen] = useState(false);
-  const [newCustForm, setNewCustForm] = useState({ phone: '', full_name: '', birthday: '' });
+  const [newCustForm, setNewCustForm] = useState({ phone: '', full_name: '', birthday: '', email: '', password: '' });
+  const [registeringCustomer, setRegisteringCustomer] = useState(false);
+  const [customerError, setCustomerError] = useState('');
 
   const [cartItems, setCartItems] = useState<PosCartItem[]>([]);
 
@@ -131,37 +135,35 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
       setPointsToRedeem(0);
       onShowToast?.(`Đã tìm thấy khách ${found.full_name} (${found.total_points} điểm).`);
     } else {
-      setNewCustForm({ phone, full_name: '', birthday: '' });
+      setNewCustForm({ phone, full_name: '', birthday: '', email: '', password: '' });
       setIsNewCustModalOpen(true);
     }
   };
 
-  const handleRegisterNewCust = (e: React.FormEvent) => {
+  const handleRegisterNewCust = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (registeringCustomer || !account?.token) return;
     if (db.users.some(u => u.phone === newCustForm.phone.trim())) {
       onShowToast?.('Số điện thoại đã tồn tại trong hệ thống.');
       return;
     }
-    const created = transact(tx =>
-      tx.insert('users', {
-        full_name: newCustForm.full_name.trim(),
-        phone: newCustForm.phone.trim(),
-        email: null,
-        password_hash: 'pos_created',
-        birthday: newCustForm.birthday || null,
-        address: null,
-        role: 'CUSTOMER',
-        status: 'ACTIVE',
-        position: null,
-        base_salary: 0,
-        hire_date: null,
-        total_points: 0,
-        created_at: nowSql()
-      })
-    );
-    setCustomerId(created.id);
-    setIsNewCustModalOpen(false);
-    onShowToast?.(`Đã tạo tài khoản khách hàng cho ${created.full_name}.`);
+    setRegisteringCustomer(true);
+    setCustomerError('');
+    try {
+      const { customer: created } = await shopApi<{ customer: { _id: string; fullName: string } }>('/api/users/customers', {
+        method: 'POST', token: account.token,
+        body: { fullName: newCustForm.full_name.trim(), phone: newCustForm.phone.trim(), email: newCustForm.email.trim(), password: newCustForm.password, birthday: newCustForm.birthday || undefined }
+      });
+      await refresh();
+      setCustomerId(idFor('users', created._id));
+      setPhoneQuery(newCustForm.phone.trim());
+      setPointsToRedeem(0);
+      setIsNewCustModalOpen(false);
+      setNewCustForm({ phone: '', full_name: '', birthday: '', email: '', password: '' });
+      onShowToast?.(`Đã tạo tài khoản khách hàng cho ${created.fullName}.`);
+    } catch (error) {
+      setCustomerError(error instanceof Error ? error.message : 'Không thể tạo khách hàng.');
+    } finally { setRegisteringCustomer(false); }
   };
 
   const handleCheckout = async () => {
@@ -178,6 +180,7 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
       customer_id: customerId,
       cashier_id: session.cashierId,
       order_type: orderType,
+      payment_method: paymentMethod as 'CASH' | 'BANK_TRANSFER',
       status: 'CONFIRMED',
       table_number: orderType === 'DINE_IN' ? tableNumber.trim() : null,
       order_note: orderNote.trim(),
@@ -283,7 +286,7 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
               </div>
               <button
                 onClick={() => {
-                  setNewCustForm({ phone: phoneQuery, full_name: '', birthday: '' });
+                  setNewCustForm({ phone: phoneQuery, full_name: '', birthday: '', email: '', password: '' });
                   setIsNewCustModalOpen(true);
                 }}
                 className="text-xs text-primary font-bold hover:underline flex items-center gap-1"
@@ -644,6 +647,7 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
               <button onClick={() => setIsNewCustModalOpen(false)} className="text-stone-400 hover:text-stone-600 text-sm">✕</button>
             </div>
             <form onSubmit={handleRegisterNewCust} className="space-y-3 text-xs">
+              {customerError && <p role="alert" className="text-red-700">{customerError}</p>}
               <div>
                 <label className="block font-semibold text-stone-700 mb-1">Số điện thoại *</label>
                 <input
@@ -660,12 +664,19 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
                 <input
                   type="text"
                   required
-                  maxLength={120}
+                  maxLength={100}
                   value={newCustForm.full_name}
                   onChange={e => setNewCustForm({ ...newCustForm, full_name: e.target.value })}
                   className="w-full h-10 px-3 rounded-xl border border-stone-300 focus:outline-none focus:border-primary"
                 />
               </div>
+              <label className="block font-semibold text-stone-700">Email đăng nhập *
+                <input type="email" required autoComplete="email" value={newCustForm.email} onChange={e => setNewCustForm({ ...newCustForm, email: e.target.value })} className="mt-1 w-full h-10 px-3 rounded-xl border border-stone-300" />
+              </label>
+              <label className="block font-semibold text-stone-700">Mật khẩu khách hàng *
+                <input type="password" required minLength={8} autoComplete="new-password" value={newCustForm.password} onChange={e => setNewCustForm({ ...newCustForm, password: e.target.value })} className="mt-1 w-full h-10 px-3 rounded-xl border border-stone-300" />
+                <span className="mt-1 block font-normal">Ít nhất 8 ký tự, gồm chữ và số, không có khoảng trắng.</span>
+              </label>
               <div>
                 <label className="block font-semibold text-stone-700 mb-1">Ngày sinh</label>
                 <input
@@ -679,8 +690,8 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
                 <button type="button" onClick={() => setIsNewCustModalOpen(false)} className="px-4 py-2 rounded-xl text-stone-600 font-semibold">
                   Bỏ qua
                 </button>
-                <button type="submit" className="px-5 py-2 rounded-xl bg-primary text-white font-bold shadow-xs hover:bg-primary-container">
-                  Lưu & Gắn vào đơn
+                <button type="submit" disabled={registeringCustomer} className="px-5 py-2 rounded-xl bg-primary text-white font-bold shadow-xs hover:bg-primary-container disabled:opacity-50">
+                  {registeringCustomer ? 'Đang lưu...' : 'Lưu & Gắn vào đơn'}
                 </button>
               </div>
             </form>

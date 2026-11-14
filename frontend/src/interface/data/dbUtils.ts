@@ -179,27 +179,32 @@ export const fmtMoney = (n: number | null | undefined) =>
 
 export const fmtNumber = (n: number | null | undefined) => new Intl.NumberFormat('vi-VN').format(n ?? 0);
 
-const pad = (n: number) => String(n).padStart(2, '0');
-
-// 'YYYY-MM-DD HH:mm:ss' theo giờ máy, giống DATETIME của MySQL
+// API timestamps are stored as UTC, including the provider's SQL-shaped strings.
 export const nowSql = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return new Date().toISOString().slice(0, 19).replace('T', ' ');
 };
 
-export const todaySql = () => nowSql().slice(0, 10);
+const apiDate = (s: string) => new Date(/(?:Z|[+-]\d\d:\d\d)$/.test(s) ? s : `${s.replace(' ', 'T')}Z`);
+export const vietnamDayKey = (s: string) => {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const date = apiDate(s);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+};
+export const todaySql = () => vietnamDayKey(new Date().toISOString());
 
 // '2026-10-03 09:00:00' -> '03/10/2026 09:00'
 export const fmtDateTime = (s: string | null | undefined) => {
   if (!s) return '—';
-  const [date, time = ''] = s.split(' ');
-  const [y, m, d] = date.split('-');
-  return `${d}/${m}/${y}${time ? ' ' + time.slice(0, 5) : ''}`;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s.split('-').reverse().join('/');
+  const date = apiDate(s);
+  if (Number.isNaN(date.getTime())) return '—';
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date).map(part => [part.type, part.value]));
+  return `${parts.day}/${parts.month}/${parts.year} ${parts.hour}:${parts.minute}`;
 };
 
-export const fmtDate = (s: string | null | undefined) => (s ? fmtDateTime(s.slice(0, 10)) : '—');
+export const fmtDate = (s: string | null | undefined) => (s ? fmtDateTime(s).split(' ')[0] : '—');
 
-export const fmtTime = (s: string | null | undefined) => (s ? s.slice(11, 16) : '--:--');
+export const fmtTime = (s: string | null | undefined) => (s ? fmtDateTime(s).split(' ')[1] || '--:--' : '--:--');
 
 export const initials = (name: string) =>
   name

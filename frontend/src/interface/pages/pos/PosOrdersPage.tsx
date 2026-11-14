@@ -19,7 +19,8 @@ import {
   orderCustomerName,
   orderItemsOf,
   paymentOf,
-  userName
+  userName,
+  vietnamDayKey
 } from '../../data/dbUtils';
 
 interface PosOrdersPageProps {
@@ -36,6 +37,7 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'DINE_IN' | 'TAKEAWAY'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [orderDate, setOrderDate] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const account = useAuthStore(state => state.user);
@@ -44,6 +46,7 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
   // Đơn phục vụ tại quầy: tại quán + mang đi (kể cả khách đặt online rồi đến lấy)
   const counterOrders = db.orders
     .filter(o => o.order_type === 'DINE_IN' || o.order_type === 'TAKEAWAY')
+    .filter(o => !orderDate || vietnamDayKey(o.created_at) === orderDate)
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
 
   const filteredOrders = counterOrders.filter(o => {
@@ -144,6 +147,9 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
 
       {/* Filters */}
       <div className="w-full px-4 sm:px-6 py-2.5 bg-stone-100 flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between border-b border-stone-200">
+        <label className="text-xs font-semibold text-stone-600">Ngày tạo đơn
+          <input aria-label="Ngày tạo đơn tại quầy" type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} className="ml-2 h-10 rounded-xl border border-stone-200 px-3" />
+        </label>
         <div className="relative flex-1 max-w-xl">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-stone-400">search</span>
           <input
