@@ -11,6 +11,9 @@ export const passwordError = (value: string) => {
 };
 
 export function loginCredentials(identifier: string, password: string) {
+  // [LG02] . Kiểm tra mật khẩu không để trống; email đúng định dạng hoặc số điện thoại có từ 9 đến 15 chữ số.
+  // [LG02] .. Hợp lệ thì trả email chữ thường hoặc số điện thoại đã bỏ khoảng trắng; không hợp lệ thì báo lỗi và dừng gửi API.
+  // [LG02] ... Chuyển dữ liệu hợp lệ để gửi yêu cầu đăng nhập đến backend. [LG03]
   if (!password) throw new Error('Vui lòng nhập mật khẩu.');
   const email = normalizeEmail(identifier);
   if (validEmail(email)) return { email, password };
@@ -23,6 +26,9 @@ export type RegistrationInput = { fullName: string; email: string; phone: string
 export type RegistrationErrors = Partial<Record<'fullName' | 'email' | 'phone' | 'password' | 'confirmPassword' | 'termsAccepted', string>>;
 
 export function validateRegistration(input: RegistrationInput): RegistrationErrors {
+  // [DK02] . Kiểm tra các trường đăng ký trong cùng một lần.
+  // [DK02] .. Trả lỗi theo từng ô để hiển thị đồng thời.
+  // [DK02] ... Chuẩn bị dữ liệu gửi đi nếu không có lỗi. [DK03]
   const errors: RegistrationErrors = {};
   const fullName = input.fullName.trim();
   const email = normalizeEmail(input.email);
@@ -50,6 +56,8 @@ export function validateRegistration(input: RegistrationInput): RegistrationErro
 }
 
 export function registrationPayload(input: RegistrationInput) {
+  // [DK03] . Chuẩn hóa tên, email, số điện thoại và kiểm tra lại dữ liệu.
+  // [DK03] ... Gửi thông tin đăng ký hợp lệ. [DK04]
   const email = normalizeEmail(input.email);
   const password = input.password;
   const fullName = input.fullName.trim();

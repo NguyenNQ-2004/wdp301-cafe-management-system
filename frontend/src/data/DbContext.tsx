@@ -261,6 +261,8 @@ export const DbContextProvider: React.FC<{ children: ReactNode }> = ({ children 
   };
 
   const refresh = useCallback(async () => {
+    // [DM00] . Đọc categories/products và các API được bảo vệ; chuẩn hóa _id, category, basePrice thành dạng dữ liệu dùng trên màn hình.
+    // [CT00] . Công thức lấy từ /product-ingredients, giá và tồn lấy từ ingredients/purchase-orders; refresh() sau lưu để cập nhật màn hình.
     const version = ++refreshVersion.current;
     const token = useAuthStore.getState().user?.token;
     setLoading(true);

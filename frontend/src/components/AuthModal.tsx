@@ -18,30 +18,42 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'forgot'>(initialTab);
   const [showPassword, setShowPassword] = useState(false);
+  // [LG01] . Nút mắt đổi showPassword để hiện/ẩn mật khẩu đăng nhập, không thay chuỗi đã nhập.
   const [showRegPassword, setShowRegPassword] = useState(false);
+  // [DK01] . Nút mắt đổi showRegPassword để hiện/ẩn ô mật khẩu đăng ký.
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [registerError, setRegisterError] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
 
+  // [LG01] . Ô Email hoặc số điện thoại gọi setLoginIdentifier khi nhập; giá trị được kiểm tra khi gửi form.
   const [loginIdentifier, setLoginIdentifier] = useState('');
+  // [LG01] . Ô mật khẩu gọi setLoginPassword; dùng nguyên giá trị để so mật khẩu, không tự bỏ khoảng trắng.
   const [loginPassword, setLoginPassword] = useState('');
+  // [DK01] . Họ tên cập nhật regName, khi gửi kiểm tra tên bằng chữ và các ký tự ngăn cách cho phép.
   const [regName, setRegName] = useState('');
+  // [DK01] . Số điện thoại cập nhật regPhone; kiểm tra 9–15 chữ số và trùng tài khoản ở backend.
   const [regPhone, setRegPhone] = useState('');
+  // [DK01] . Email cập nhật regEmail; chuẩn hóa chữ thường, kiểm tra định dạng và email đã đăng ký khi gửi.
   const [regEmail, setRegEmail] = useState('');
+  // [DK01] . Mật khẩu cập nhật regPassword; cần ít nhất 8 ký tự, có chữ và số, không có khoảng trắng, tối đa 72 byte.
   const [regPassword, setRegPassword] = useState('');
+  // [DK01] . Ô xác nhận cập nhật confirmPassword, phải trùng regPassword.
   const [confirmPassword, setConfirmPassword] = useState('');
+  // [DK01] . Ô đồng ý điều khoản cập nhật termsAccepted; bỏ chọn thì validateRegistration() báo lỗi.
   const [termsAccepted, setTermsAccepted] = useState(true);
   const [registerSubmitted, setRegisterSubmitted] = useState(false);
   const [registerServerErrors, setRegisterServerErrors] = useState<RegistrationErrors>({});
   const registerInput = { fullName: regName, phone: regPhone, email: regEmail, password: regPassword, confirmPassword, termsAccepted };
+  // [DK02] . Ghép lỗi backend và lỗi tại giao diện theo từng ô sau lần gửi form.
   const registerErrors = { ...registerServerErrors, ...(registerSubmitted ? validateRegistration(registerInput) : {}) };
   const clearRegisterError = (field: keyof RegistrationErrors) => {
     setRegisterError('');
     setRegisterServerErrors(current => { const next = { ...current }; delete next[field]; if (field === 'password') delete next.confirmPassword; return next; });
   };
   const registerField = (field: keyof RegistrationErrors) => ({ id: `register-${field}`, 'aria-invalid': !!registerErrors[field], 'aria-describedby': registerErrors[field] ? `register-${field}-error` : undefined });
+  // [DK02] .. Ô sai được tô viền đỏ, thông báo nằm ngay bên dưới.
   const registerBorder = (field: keyof RegistrationErrors) => registerErrors[field] ? ' !border !border-red-500 !bg-red-50 focus:!ring-red-200' : '';
   const registerFieldError = (field: keyof RegistrationErrors) => registerErrors[field] ? <p id={`register-${field}-error`} role="alert" className="text-xs text-red-700">{registerErrors[field]}</p> : null;
 
@@ -53,6 +65,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
+    // [LG01] . Lấy email hoặc số điện thoại và mật khẩu người dùng nhập; chặn gửi lặp khi đang đăng nhập.
+    // [LG01] ... Kiểm tra định dạng email hoặc số điện thoại và mật khẩu còn trống. [LG02]
     e.preventDefault();
     if (isLoggingIn) return;
     setLoginError('');
@@ -61,12 +75,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     catch (error) { setLoginError((error as Error).message); return; }
     setIsLoggingIn(true);
     try {
+      // [LG03] . Gửi email hoặc số điện thoại và mật khẩu bằng POST /api/auth/login.
+      // [LG03] ... Tiếp nhận yêu cầu đăng nhập. [LG04]
       const response = await fetch(`${(import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '')}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentials),
       });
 
+      // [LG09] . Đọc phản hồi API; nếu đăng nhập thất bại thì hiện thông báo và không lưu phiên.
       const data = await response.json();
 
       if (!response.ok) {
@@ -76,6 +93,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
 
+      // [LG09] ... Chuyển thông tin tài khoản và token để chuẩn bị lưu phiên đăng nhập. [LG10]
       onLoginSuccess?.({ name: data.fullName, role: data.role, ...data });
       onClose();
     } catch {
@@ -86,6 +104,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
+    // [DK01] . Nhận form đăng ký, chặn gửi lặp và bật lỗi từng ô.
+    // [DK01] ... Kiểm tra thông tin đăng ký. [DK02]
     e.preventDefault();
     if (isRegistering) return;
     setRegisterError('');
@@ -95,6 +115,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const payload = registrationPayload(registerInput);
     setIsRegistering(true);
     try {
+      // [DK04] . Gửi thông tin đăng ký và xác nhận mật khẩu.
+      // [DK04] ... Tiếp nhận yêu cầu đăng ký. [DK05]
       const response = await fetch(`${(import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '')}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -103,6 +125,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       const data = await response.json();
 
+      // [DK11] . Nhận kết quả, gắn lỗi vào ô tương ứng hoặc hiện lỗi chung.
       if (!response.ok) {
         if (data.errors && typeof data.errors === 'object') setRegisterServerErrors(data.errors);
         else if (/đã.*(đăng ký|sử dụng)/i.test(data.message || '') && /email/i.test(data.message)) setRegisterServerErrors({ email: data.message });
@@ -111,6 +134,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
 
+      // [DK11] .. Đăng ký xong, điền sẵn email và mở tab đăng nhập, chưa tự đăng nhập.
+      // [DK11] ... Tiếp tục khi người dùng gửi form đăng nhập. [LG01]
       triggerToast('Đăng ký thành công! Hãy đăng nhập bằng Gmail và mật khẩu vừa tạo.');
       setLoginIdentifier(payload.email);
       setLoginPassword('');
@@ -204,6 +229,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* Right Interactive Form Container */}
         <div className="w-full md:w-7/12 p-space-lg md:p-space-xl flex flex-col justify-center bg-surface-container-lowest">
           {/* Interactive Tab Selector */}
+          {/* [LG00] . Các tab chỉ đổi activeTab để chọn form, chưa gửi API. */}
           <div className="flex items-center p-1 bg-surface-container-high rounded-lg mb-space-lg">
             <button
               onClick={() => setActiveTab('login')}
@@ -243,6 +269,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
 
           {/* TAB 1: LOGIN FORM */}
+          {/* [LG01] . Nhập tài khoản và mật khẩu vào state; nút Đăng nhập hệ thống hoặc Enter gửi form này. */}
           {activeTab === 'login' && (
             <form className="flex flex-col gap-space-md" onSubmit={handleLoginSubmit}>
               <div className="space-y-1">
@@ -320,6 +347,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               {/* Remember Me Checkbox */}
+              {/* [LG01] . Ô ghi nhớ hiện chỉ có trạng thái mặc định, chưa điều khiển cách lưu phiên. */}
               <div className="flex items-center justify-between py-space-xs">
                 <label className="flex items-center gap-space-sm cursor-pointer select-none">
                   <input
@@ -348,6 +376,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
 
           {/* TAB 2: REGISTER FORM */}
+          {/* [DK01] . Các ô cập nhật state và xóa lỗi backend của ô đang sửa; nút Tạo tài khoản mới gửi form này. */}
           {activeTab === 'register' && (
             <form noValidate className="flex flex-col gap-space-md" onSubmit={handleRegisterSubmit}>
               <div className="space-y-1">

@@ -1,0 +1,78 @@
+{
+  "name": "AuraCafe - Isolated integration test",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "mockGatewayUrl",
+      "value": "http://127.0.0.1:5050",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "adminEmail",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "adminPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "qaPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "isolatedTestEnvironment",
+      "value": "false",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "allowTestWrites",
+      "value": "false",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "enableGatewayTests",
+      "value": "false",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "enableRecoveryTests",
+      "value": "false",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "recoveryEmail",
+      "value": "nguyen.nguyenquoc2004@gmail.com",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "recoveryOtp",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "recoveryNewPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

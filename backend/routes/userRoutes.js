@@ -15,6 +15,8 @@ const { atomicRouter } = require('../utils/atomicRoute');
 const { passwordError } = require('../utils/passwordPolicy');
 
 function validateCustomer(body, creating) {
+  // [KH09] . Khi tạo khách, kiểm tra mật khẩu, tên, số điện thoại, email, ngày sinh, địa chỉ và điểm khởi tạo không âm.
+  // [KH12] . Khi sửa khách, chỉ kiểm tra các trường được gửi; không nhận thông tin hạng thẻ vì hệ thống quản lý điểm theo số điện thoại.
   objectBody(body);
   const fields = creating ? ['fullName', 'phone', 'email', 'password', 'birthday', 'address', 'initialPoints'] : ['fullName', 'email', 'birthday', 'address', 'status'];
   if (Object.keys(body).some(key => !fields.includes(key))) throw invalid('Dữ liệu khách hàng chứa trường không được phép cập nhật.');
@@ -55,6 +57,9 @@ const customerSpending = (customerIds) => Payment.aggregate([
 
 // 1. GET ALL CUSTOMERS with aggregated orders & spending
 router.get('/customers', adminOrCashier, async (req, res) => {
+  // [KH02] . Admin hoặc thu ngân đọc CUSTOMER theo từ khóa, trạng thái và phân trang; loại passwordHash khỏi kết quả.
+  // [KH02] . Tổng hợp đơn hàng, điểm và chi tiêu để trả bảng khách cùng các ô thống kê.
+  // [KH02] ... Chuyển danh sách và thống kê về fetchCustomers() để hiển thị. [KH03]
   try {
     const { search, status, page = 1, limit = 50 } = req.query;
     const filter = { role: 'CUSTOMER' };
@@ -149,6 +154,8 @@ router.get('/customers', adminOrCashier, async (req, res) => {
 
 // 2. GET SINGLE CUSTOMER DETAILS & ORDER HISTORY
 router.get('/customers/:id', adminOrCashier, async (req, res) => {
+  // [KH05] . Đọc hồ sơ CUSTOMER theo ID, đơn hàng và lịch sử LoyaltyTransaction của đúng khách đó.
+  // [KH05] ... Trả hồ sơ, lịch sử mua hàng và điểm để mở chi tiết khách hàng. [KH06]
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã khách hàng không hợp lệ.' });
     const customer = await User.findOne({ _id: req.params.id, role: 'CUSTOMER' }).select('-passwordHash');
@@ -187,6 +194,9 @@ router.get('/customers/:id', adminOrCashier, async (req, res) => {
 
 // 3. CREATE NEW CUSTOMER
 router.post('/customers', adminOrCashier, async (req, res) => {
+  // [KH09] . Kiểm tra dữ liệu và số điện thoại trùng, băm mật khẩu rồi tạo User với vai trò CUSTOMER.
+  // [KH09] . Nếu tặng điểm khởi tạo lớn hơn 0, ghi thêm giao dịch EARN; không trả passwordHash về giao diện.
+  // [KH09] ... Trả khách hàng mới để đóng form và tải lại danh sách. [KH10]
   try {
     validateCustomer(req.body, true);
     const { fullName, phone, email, password, birthday, address, initialPoints = 0 } = req.body;
@@ -240,6 +250,8 @@ router.post('/customers', adminOrCashier, async (req, res) => {
 
 // 4. UPDATE CUSTOMER
 router.put('/customers/:id', adminOrCashier, async (req, res) => {
+  // [KH12] . Sửa tên, email, ngày sinh, địa chỉ và trạng thái của CUSTOMER; API này không cập nhật số điện thoại.
+  // [KH12] ... Trả hồ sơ sau User.save() để đóng form và tải lại danh sách. [KH13]
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã khách hàng không hợp lệ.' });
     validateCustomer(req.body, false);
@@ -266,6 +278,8 @@ router.put('/customers/:id', adminOrCashier, async (req, res) => {
 
 // 5. TOGGLE LOCK / UNLOCK CUSTOMER STATUS
 router.patch('/customers/:id/toggle-lock', adminOrCashier, async (req, res) => {
+  // [KH15] . Nếu đang LOCKED thì đổi ACTIVE, các trạng thái khác đổi LOCKED rồi lưu lại User.
+  // [KH15] ... Trả trạng thái mới để thay đúng dòng khách hàng trên bảng. [KH16]
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã khách hàng không hợp lệ.' });
     const customer = await User.findOne({ _id: req.params.id, role: 'CUSTOMER' });

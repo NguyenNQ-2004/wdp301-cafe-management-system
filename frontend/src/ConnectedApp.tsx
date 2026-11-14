@@ -105,6 +105,9 @@ const AppLayout = () => {
   const { user, login, logout } = useAuthStore();
   const cartCount = useCartStore((state) => state.items.reduce((count, item) => count + item.quantity, 0));
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  // [LG00] . Chọn tab đăng nhập, đăng ký hoặc quên mật khẩu theo đường dẫn và tham số tab.
+  // [LG00] ... Mở form đăng nhập khi chọn tab login. [LG01]
+  // [DK00] ... Mở form đăng ký khi chọn tab register. [DK01]
   const requestedTab = new URLSearchParams(location.search).get('tab');
   const authTab = location.pathname === '/register' || requestedTab === 'register' ? 'register' : location.pathname === '/forgot-password' || requestedTab === 'forgot' ? 'forgot' : 'login';
   const authRoute = ['/login', '/register', '/forgot-password'].includes(location.pathname) || ['login', 'register', 'forgot'].includes(requestedTab || '');
@@ -421,6 +424,7 @@ const AppLayout = () => {
           if (authRoute && !useAuthStore.getState().user) navigate('/', { replace: true });
         }}
         onLoginSuccess={(userData) => {
+          // [LG10] . Nhận thông tin tài khoản và token sau khi đăng nhập thành công.
           // Lưu vào global store
           const userPayload = {
             _id: userData._id,
@@ -432,9 +436,12 @@ const AppLayout = () => {
             position: userData.position,
             token: userData.token
           };
+          // [LG10] ... Lưu phiên đăng nhập. [LG11]
           login(userPayload);
           setIsAuthOpen(false);
           // Điều hướng mượt mà: Customer giữ nguyên trang hoặc về Trang chủ; Staff/Admin vào dashboard
+          // [LG12] . Chọn trang theo vai trò và vị trí nhân viên.
+          // [LG12] .. Admin và nhân viên vào trang làm việc; khách ở lại trang phù hợp hoặc về trang chủ.
           navigate(getRoleRedirectPath(userPayload, location.pathname));
         }}
       />

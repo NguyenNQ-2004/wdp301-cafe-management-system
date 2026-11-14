@@ -6,7 +6,11 @@ const { normalizeEmail, validEmail } = require('../utils/accountEmail');
 const { validFullName } = require('../utils/personName');
 router.use(require('./passwordRecoveryRoutes'));
 
+// [DK05] . Nhận yêu cầu POST đăng ký.
+// [DK05] ... Kiểm tra dữ liệu trước khi tạo tài khoản. [DK06]
 router.post('/register', register);
+// [LG04] . Nhận yêu cầu POST đăng nhập.
+// [LG04] ... Kiểm tra dữ liệu từ client. [LG05]
 router.post('/login', login);
 router.post('/logout', logout);
 router.get('/me', protect, (req, res) => {
@@ -14,6 +18,9 @@ router.get('/me', protect, (req, res) => {
   res.json({ _id, fullName, phone, email, birthday, address, role, position, status, baseSalary, hireDate, totalPoints });
 });
 router.put('/profile', protect, async (req, res) => {
+  // [HS03] . Kiểm tra tên, số điện thoại, email, ngày sinh và địa chỉ; dùng ID từ token để chỉ sửa hồ sơ chính người đang đăng nhập.
+  // [HS03] . User.save() kiểm tra model và ràng buộc duy nhất; số điện thoại hoặc email trùng sẽ được báo lỗi.
+  // [HS03] ... Trả hồ sơ vừa lưu để cập nhật form và phiên trên giao diện. [HS04]
   try {
     if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) return res.status(400).json({ message: 'Thông tin hồ sơ không hợp lệ.' });
     const { fullName, phone, email, birthday, address } = req.body;

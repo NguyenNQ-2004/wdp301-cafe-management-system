@@ -41,12 +41,14 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
   };
 
   const products = (db.products || []).filter(p => {
+    // [CT01] . Tìm tên món và lọc đã có/chưa có công thức trên dữ liệu đã tải, không sửa tồn kho.
     const pId = p.id ?? p._id;
     const has = bomOf(pId).length > 0;
     return p.name.toLocaleLowerCase('vi').includes(search.trim().toLocaleLowerCase('vi')) && (filter === 'all' || (filter === 'with' ? has : !has));
   });
 
   const openEditor = (productId: any) => {
+    // [CT01] . Nút Khai báo/Sửa định mức chọn sản phẩm, đọc công thức cũ vào lines; chưa có thì tạo sẵn một dòng.
     setMessage('');
     setEditingProductId(productId);
     const existing = bomOf(productId);
@@ -61,6 +63,8 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
   };
 
   const handleSave = async (e: React.FormEvent) => {
+    // [CT02] . Nút Lưu công thức kiểm tra nguyên liệu đã chọn, lượng dùng từ 0.001 và không trùng nguyên liệu.
+    // [CT02] ... Gửi toàn bộ lines bằng PUT /api/product-ingredients/product/:id. [CT03]
     e.preventDefault();
     if (!editingProductId || saving || !token) return;
     const valid = lines;
@@ -76,6 +80,7 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
     try {
       await shopApi(`/api/product-ingredients/product/${editingProductId}`, { token, method: 'PUT', body: { items: valid.map(l => ({ ingredient: l.ingredient_id, quantityRequired: l.quantity_required })) } });
       await refresh();
+      // [CT05] .. API lưu xong thì tải lại dữ liệu, báo thành công và đóng trình sửa; lỗi vẫn giữ bản nháp.
       setMessage('Đã lưu công thức định mức.');
       onShowToast?.('Đã lưu công thức định mức.');
       setEditingProductId(null);
@@ -87,6 +92,8 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
     p => p.id === editingProductId || p._id === editingProductId || String(p.id) === String(editingProductId)
   );
   const draftCosts = lines.map(line => {
+    // [CT06] . Giá vốn dự thảo tính lại khi thay nguyên liệu hoặc lượng dùng, chưa lưu công thức và không trừ tồn.
+    // [CT06] ... Tính chi phí từng dòng theo lô tồn và giá tham chiếu. [CT08]
     const valid = Boolean(ingredient(line.ingredient_id)) && Number.isFinite(line.quantity_required) && line.quantity_required >= 0.001;
     return valid ? recipeLineCost(db, line.ingredient_id, line.quantity_required) : { cost: null, estimated: false };
   });
@@ -212,6 +219,8 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
 
       {editingProduct && (
         <Modal title={`Định mức: ${editingProduct.name}`} onClose={() => setEditingProductId(null)} wide>
+          {/* [CT01] . Hủy hoặc X bỏ bản nháp và đóng form; Lưu công thức gửi form đến handleSave(). */}
+          {/* [CT01] ... Kiểm tra các dòng định mức trước khi gửi. [CT02] */}
           <form onSubmit={handleSave} className="space-y-4 text-xs">
             <div className="rounded-xl border border-stone-200 bg-[#faf9f6] px-4 py-3"><p className="font-semibold text-stone-800">Công thức cho 1 ly / phần</p><p className="mt-1 leading-relaxed text-stone-500">Nhập lượng nguyên liệu dùng cho một món, theo đơn vị ghi cạnh tên nguyên liệu.</p></div>
             <div className="hidden grid-cols-12 gap-3 text-[10px] font-bold uppercase text-stone-500 sm:grid">
@@ -219,6 +228,8 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
               <span className="col-span-3">Lượng dùng / phần</span>
               <span className="col-span-3 text-right">Chi phí nguyên liệu</span>
             </div>
+            {/* [CT01] . Nguyên liệu chọn ingredient_id; Lượng dùng cập nhật quantity_required cho một ly/phần theo đơn vị nguyên liệu. */}
+            {/* [CT01] . Chi phí mỗi dòng là kết quả tính, không nhập tay; thùng rác bỏ dòng, Thêm nguyên liệu thêm một dòng lượng mặc định 1. */}
             {lines.map((l, i) => (
               <div key={i} className="grid grid-cols-12 items-start gap-3 rounded-xl border border-stone-100 bg-stone-50/50 p-3 sm:border-0 sm:bg-transparent sm:p-0">
                 <div className="col-span-11 sm:col-span-5">
@@ -288,6 +299,7 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
               <span className="material-symbols-outlined text-[16px]">add</span>
               Thêm nguyên liệu
             </button>
+            {/* [CT10] .. Tổng giá vốn cộng chi phí các dòng hợp lệ; thiếu giá thì hiện Chưa tính đủ, nguyên liệu trùng hoặc vốn vượt giá bán thì hiện cảnh báo. */}
             <div aria-live="polite" aria-atomic="true" className="rounded-xl border border-stone-200 bg-[#faf9f6] p-4">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><h4 className="font-semibold text-stone-800">Ước tính cho 1 ly / phần</h4><span className="text-[10px] text-stone-400">Cập nhật theo lượng vừa nhập</span></div>
               <div className="grid gap-4 sm:grid-cols-2">

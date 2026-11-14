@@ -3,6 +3,8 @@ const User = require('../models/User');
 const getJwtSecret = require('../config/jwtSecret');
 
 const protect = async (req, res, next) => {
+  // [HS03] . Các API hồ sơ và nghiệp vụ đọc Bearer token, kiểm tra chữ ký, tài khoản ACTIVE và phiên bản mật khẩu trước khi xử lý.
+  // [LG12] .. Token hết hạn, tài khoản bị khóa hoặc đã đổi mật khẩu thì trả lỗi; không cho chạy tiếp handler nghiệp vụ.
   let token;
 
   if (

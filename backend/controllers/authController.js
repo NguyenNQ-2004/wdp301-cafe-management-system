@@ -10,6 +10,8 @@ const { passwordError } = require('../utils/passwordPolicy');
 // @route   POST /api/auth/register
 // @access  Public (chỉ tạo CUSTOMER) | Private/Admin (tạo STAFF và ADMIN)
 const register = async (req, res) => {
+  // [DK06] . Kiểm tra dữ liệu đăng ký và email, số điện thoại trùng.
+  // [DK06] .. Dữ liệu sai hoặc trùng thì trả lỗi từng trường, không tạo tài khoản.
   try {
     if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) return res.status(400).json({ message: 'Dữ liệu đăng ký không hợp lệ.' });
     const { fullName, phone, email, password, role, position } = req.body;
@@ -33,6 +35,8 @@ const register = async (req, res) => {
     if (phoneExists) errors.phone = 'Số điện thoại này đã được đăng ký.';
     if (Object.keys(errors).length) return res.status(!invalidInput && emailExists ? 409 : 400).json({ message: 'Vui lòng kiểm tra các thông tin được đánh dấu.', errors });
 
+    // [DK06] ... Xác định quyền tạo tài khoản nếu dữ liệu hợp lệ. [DK07]
+    // [DK07] . Mặc định tạo CUSTOMER; chỉ Admin hợp lệ mới được chọn vai trò và vị trí khác.
     // Phân quyền role:
     // - Không có token -> chỉ được đăng ký CUSTOMER
     // - ADMIN đăng nhập -> có thể tạo bất kỳ role nào
@@ -55,11 +59,14 @@ const register = async (req, res) => {
       }
     }
 
+    // [DK07] ... Chuẩn bị lưu tài khoản. [DK08]
+    // [DK08] . Băm mật khẩu bằng bcrypt, không lưu mật khẩu gốc.
     // Hash mật khẩu
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
     // Tạo user
+    // [DK08] ... Kiểm tra model trước khi lưu tài khoản. [DK09]
     const user = await User.create({
       fullName: fullName.trim(),
       phone: contactPhone,
@@ -69,6 +76,8 @@ const register = async (req, res) => {
       position: assignedPosition,
     });
 
+    // [DK10] .. Tài khoản đã được lưu; trả thông tin cùng JWT với HTTP 201.
+    // [DK10] ... Hiển thị kết quả đăng ký. [DK11]
     if (user) {
       res.status(201).json({
         _id: user._id,
@@ -103,6 +112,8 @@ const register = async (req, res) => {
 // @route   POST /api/auth/login
 // @access  Public
 const login = async (req, res) => {
+  // [LG05] . Kiểm tra định dạng email hoặc số điện thoại và mật khẩu nhận được.
+  // [LG05] .. Dữ liệu không hợp lệ thì trả HTTP 400.
   try {
     const { password } = req.body;
     const identifier = req.body.identifier ?? req.body.email ?? req.body.phone;
@@ -110,7 +121,9 @@ const login = async (req, res) => {
       return res.status(400).json({ message: 'Vui lòng nhập email hoặc số điện thoại hợp lệ và mật khẩu.' });
     }
 
+    // [LG05] ... Chọn điều kiện tìm tài khoản. [LG06]
     const matches = await User.find(loginFilter(identifier)).limit(2);
+    // [LG07] . Nhận kết quả tìm tài khoản, chặn trùng, so mật khẩu và kiểm tra trạng thái hoạt động.
     if (matches.length > 1) return res.status(409).json({ message: 'Email đang gắn với nhiều tài khoản cũ. Vui lòng liên hệ quản trị viên để cập nhật email riêng.' });
     const user = matches[0];
 
@@ -118,6 +131,7 @@ const login = async (req, res) => {
       if (user.status !== 'ACTIVE') {
         return res.status(403).json({ message: 'Tên đăng nhập hoặc mật khẩu không đúng.' });
       }
+      // [LG07] ... Tạo token nếu xác thực thành công. [LG08]
       res.json({
         _id: user._id,
         fullName: user.fullName,
@@ -135,6 +149,7 @@ const login = async (req, res) => {
         token: generateToken(user),
       });
     } else {
+      // [LG07] .. Không có tài khoản hoặc mật khẩu sai thì trả HTTP 401.
       res.status(401).json({ message: 'Tên đăng nhập hoặc mật khẩu không đúng.' });
     }
   } catch (error) {
@@ -155,6 +170,9 @@ const logout = (req, res) => {
 // @route   PUT /api/auth/change-password
 // @access  Private
 const changePassword = async (req, res) => {
+  // [HS06] . Nhận mật khẩu cũ, mới và xác nhận; kiểm tra quy tắc mật khẩu mới rồi so mật khẩu cũ bằng bcrypt.
+  // [HS06] .. Nếu đúng, băm mật khẩu mới và đổi passwordChangedAt để token cũ không còn hợp lệ; sai thì trả lỗi.
+  // [HS06] ... Trả kết quả để giao diện kết thúc phiên và yêu cầu đăng nhập lại. [HS07]
   try {
     const { oldPassword, newPassword } = req.body;
     const newPasswordError = passwordError(newPassword);
@@ -180,6 +198,9 @@ const changePassword = async (req, res) => {
 
 // Generate JWT
 const generateToken = (user) => {
+  // [LG08] . Tạo JWT hạn 30 ngày, chứa ID và phiên bản mật khẩu; cũng dùng khi đăng ký ở DK10.
+  // [LG08] .. Trả token để gửi cùng thông tin tài khoản.
+  // [LG08] ... Nhận phản hồi đăng nhập ở giao diện. [LG09]
   return jwt.sign({ id: user._id, passwordVersion: user.passwordChangedAt?.getTime() || 0 }, getJwtSecret(), {
     expiresIn: '30d',
   });
