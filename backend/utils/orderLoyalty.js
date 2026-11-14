@@ -6,6 +6,10 @@ const LoyaltyTransaction = require('../models/LoyaltyTransaction');
 const RewardItem = require('../models/RewardItem');
 
 async function awardOrderPoints(orderId) {
+  // [DT17] . Được gọi từ luồng thanh toán hoặc hoàn tất đơn; chỉ tích nếu có khách, đơn không hủy và payment SUCCESS đúng số tiền.
+  // [DT17] . Nếu đã có EARN cho đơn thì dừng; tính điểm bằng phần nguyên tiền món sau giảm giá chia points_earn_unit, không gồm phí giao hàng.
+  // [DT17] . Tạo lịch sử EARN và tăng User.totalPoints, lưu balanceAfter; lỗi cập nhật sẽ được hoàn tác theo transaction hoặc bù dữ liệu.
+  // [DT17] ... Điểm và giao dịch mới được đọc lại qua tra cứu số điện thoại hoặc lịch sử. [DT18]
   const order = await Order.findById(orderId);
   if (!order?.customer || order.status === 'CANCELLED') return;
   if (!await Payment.exists({ order: orderId, status: 'SUCCESS', amount: order.finalAmount })) return;
@@ -37,6 +41,9 @@ async function awardOrderPoints(orderId) {
   await transaction.save();
 }
 async function refundRedemption(order) {
+  // [DT19] . Khi đơn CANCELLED, hoàn điểm đã đổi và thu hồi điểm tự tích của đơn, kiểm tra lịch sử để không xử lý lặp.
+  // [DT19] .. Ghi REFUND/ADJUST và số dư sau xử lý; điểm có thể âm nếu khách đã tiêu điểm kiếm từ đơn bị hủy.
+  // [DT19] ... Tra cứu và lịch sử sẽ phản ánh các giao dịch hoàn/thu hồi sau khi tải lại. [DT18]
   if (order.status !== 'CANCELLED' || !order.customer) return;
   const earned = await LoyaltyTransaction.findOne({ order: order._id, automatic: true, transactionType: 'EARN' });
   const refunded = await LoyaltyTransaction.exists({ order: order._id, redemptionRefund: true });

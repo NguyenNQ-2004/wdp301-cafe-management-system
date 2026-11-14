@@ -5,6 +5,10 @@ const { invalid, objectId } = require('./adminValidation');
 
 const pending = new Map();
 async function changeRecipe(productId, change) {
+  // [CT04] . Chặn cập nhật đồng thời cùng sản phẩm; đọc công thức cũ, kiểm tra sản phẩm và nguyên liệu còn tồn tại.
+  // [CT04] . Định lượng tối thiểu 0.001, mỗi nguyên liệu chỉ một dòng; cập nhật ProductIngredient rồi đồng bộ Product.recipe.
+  // [CT04] .. Dòng bỏ khỏi danh sách sẽ bị xóa; lưu công thức không làm thay đổi lượng tồn kho.
+  // [CT04] ... Trả công thức cho route, sau đó giao diện tải lại và đóng form. [CT05]
   const key = String(objectId(productId));
   if (pending.has(key)) throw invalid('Công thức đang được cập nhật. Vui lòng thử lại.', 409);
   pending.set(key, true);

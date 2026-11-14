@@ -40,6 +40,7 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
     ).length;
 
   const select = (c: Category | null) => {
+    // [DM01] . Thêm mới dùng form trống; sửa lấy tên, mô tả, ảnh và trạng thái từ danh mục đang chọn.
     setSelectedId(c?.id ?? null);
     setForm(
       c
@@ -65,6 +66,8 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
   };
 
   const handleSave = async (e: React.FormEvent) => {
+    // [DM02] . Nút lưu gửi form; bỏ khoảng trắng tên và kiểm tra tên trống hoặc trùng trước khi gửi API.
+    // [DM02] ... Có selectedId thì PUT để sửa, chưa có thì POST để tạo danh mục. [DM03]
     e.preventDefault();
     if (saving || !token) return;
     const name = form.name.trim();
@@ -90,6 +93,7 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
     setSaving(true);
     try {
       await shopApi(selectedId ? `/api/categories/${selectedId}` : '/api/categories', { token, method: selectedId ? 'PUT' : 'POST', body: row });
+      // [DM04] .. API thành công thì tải lại bảng, báo kết quả và đóng form; lỗi giữ form và hiện thông báo.
       await refresh();
       showToast(selectedId ? `Đã cập nhật danh mục "${name}".` : `Đã tạo danh mục "${name}".`);
       setIsFormOpen(false);
@@ -98,6 +102,8 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
   };
 
   const handleDelete = async (c: Category) => {
+    // [DM05] . Nút xóa kiểm tra số sản phẩm thuộc danh mục rồi yêu cầu xác nhận, hủy thì không gửi API.
+    // [DM05] ... Gửi DELETE /api/categories/:id để backend kiểm tra lại và xóa. [DM06]
     if (saving || !token) return;
     if (productCount(c.id) > 0) {
       showToast('Không thể xóa: danh mục đang có sản phẩm (ràng buộc fk_product_category).');
@@ -109,12 +115,15 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
       await shopApi(`/api/categories/${c.id}`, { token, method: 'DELETE' });
       await refresh();
       if (selectedId === c.id) select(null);
+      // [DM07] .. Xóa thành công thì tải lại bảng và bỏ lựa chọn danh mục vừa xóa.
       showToast('Đã xóa danh mục.');
     } catch (error) { showToast((error as Error).message); }
     finally { setSaving(false); }
   };
 
   const toggleStatus = async (c: Category) => {
+    // [DM08] . Nút trạng thái đổi ACTIVE sang INACTIVE hoặc ngược lại.
+    // [DM08] ... Gửi PUT chỉ gồm status mới. [DM09]
     if (saving || !token) return;
     const status: ActiveStatus = c.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
     setSaving(true);
@@ -124,6 +133,7 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
       if (String(c.id) === String(selectedId) || String(c._id) === String(selectedId)) {
         setForm(f => ({ ...f, status }));
       }
+      // [DM10] .. Tải lại danh sách và đồng bộ trạng thái trong form nếu đang sửa đúng danh mục này.
       showToast(`Đã chuyển trạng thái sang "${status}".`);
     } catch (error) { showToast((error as Error).message); }
     finally { setSaving(false); }
@@ -131,6 +141,7 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
 
   // Filter categories by search and status
   const filteredCategories = db.categories.filter(c => {
+    // [DM01] . Ô tìm kiếm lọc theo tên hoặc mã; bộ lọc trạng thái lọc ngay dữ liệu đã tải, không ghi database.
     const matchSearch =
       c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       String(c.id).toLowerCase().includes(searchQuery.toLowerCase());
@@ -339,7 +350,10 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
               </button>
             </div>
 
+            {/* [DM01] . Thêm danh mục gọi handleOpenCreate(), nút sửa gọi handleOpenEdit(); Hủy hoặc X chỉ đóng form. */}
+            {/* [DM01] ... Tạo danh mục hoặc Lưu thay đổi gửi form đến handleSave(). [DM02] */}
             <form onSubmit={handleSave} className="p-6 space-y-4 text-xs">
+              {/* [DM01] . Tên danh mục cập nhật form.name, bắt buộc và tối đa 100 ký tự. */}
               <Field label="Tên danh mục *" column="name">
                 <input
                   required
@@ -351,6 +365,7 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
                 />
               </Field>
 
+              {/* [DM01] . Mô tả cập nhật form.description, được bỏ khoảng trắng khi lưu. */}
               <Field label="Mô tả" column="description">
                 <textarea
                   rows={3}
@@ -361,10 +376,12 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
                 />
               </Field>
 
+              {/* [DM01] . Ảnh nhận URL hoặc tệp qua ImageInput, trả giá trị về form.image_url; Xóa ảnh chỉ xóa ảnh trên form trước khi lưu. */}
               <Field label="Ảnh đại diện" column="image_url">
                 <ImageInput value={form.image_url ?? ''} onChange={image_url => setForm({ ...form, image_url })} className={inputCls} />
               </Field>
 
+              {/* [DM01] . Trạng thái cập nhật form.status bằng ACTIVE hoặc INACTIVE. */}
               <Field label="Trạng thái" column="status">
                 <select
                   value={form.status}

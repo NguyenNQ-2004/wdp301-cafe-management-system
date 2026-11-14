@@ -1,4 +1,7 @@
 // SMTP settings belong to this MERN app; credentials are never copied from SWP.
+// [QMK04] . Đọc cấu hình SMTP từ môi trường; send() gửi OTP tới email nhận bằng Nodemailer.
+// [QMK04] .. Gửi thành công thì route trả challenge; không trả OTP cho trình duyệt.
+// [QMK04] ... Giao diện nhận challenge và mở ô nhập OTP. [QMK05]
 const senderEmail = () => process.env.SMTP_FROM || process.env.AURA_SMTP_EMAIL || '';
 const smtpPassword = () => process.env.SMTP_PASS || process.env.AURA_SMTP_PASSWORD || '';
 const smtpHost = () => process.env.SMTP_HOST || 'smtp.gmail.com';

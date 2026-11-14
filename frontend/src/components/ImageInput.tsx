@@ -5,6 +5,8 @@ export default function ImageInput({ value, onChange, className }: { value: stri
   const generation = useRef(0);
   const update = (next: string) => { generation.current++; onChange(next); setError(''); };
   const select = (file?: File) => {
+    // [DM01] . Tệp ảnh danh mục/sản phẩm phải là JPG, PNG, WebP hoặc GIF và không quá 2 MB; sai thì hiện lỗi.
+    // [SP01] . FileReader đọc ảnh thành data URL rồi onChange trả về form cha; chưa ghi ảnh vào database ở bước chọn tệp.
     if (!file) return;
     const current = ++generation.current;
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) { setError('Chọn ảnh JPG, PNG, WebP hoặc GIF.'); return; }
@@ -15,6 +17,7 @@ export default function ImageInput({ value, onChange, className }: { value: stri
     reader.readAsDataURL(file);
   };
   return <div className="space-y-2">
+    {/* [DM01] . Ô URL gọi update() để cập nhật ảnh; Chọn tệp gọi select(); Xóa ảnh đặt giá trị rỗng và cập nhật xem trước. */}
     <input aria-label="Đường dẫn ảnh" type="text" className={className} value={value.startsWith('data:') ? '' : value} placeholder={value.startsWith('data:') ? 'Đã chọn ảnh từ máy tính' : 'https://example.com/image.jpg'} onChange={event => update(event.target.value)} />
     <input aria-label="Tải ảnh từ máy tính" type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="block w-full text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-stone-100 file:px-3 file:py-2" onChange={event => { select(event.target.files?.[0]); event.target.value = ''; }} />
     <p className="text-[11px] text-stone-500">Nhập URL hoặc tải ảnh JPG, PNG, WebP, GIF tối đa 2 MB.</p>

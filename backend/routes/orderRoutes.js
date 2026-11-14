@@ -211,6 +211,9 @@ router.post('/', async (req, res) => {
       discountAmount = Math.min(reward.discountValue, totalAmount);
     }
     if (req.body.pointsToRedeem != null && req.body.pointsToRedeem !== 0) {
+      // [DT14] . Kiểm tra điểm đổi là số nguyên không âm, đúng chủ tài khoản và không dùng đồng thời với rewardId.
+      // [DT14] . Đọc bậc đổi từ ShopSetting, kiểm tra không vượt số dư hoặc tiền món rồi tính requestedPoints và discountAmount.
+      // [DT14] .. Tạo đơn tiếp tục giữ/trừ điểm và ghi lịch sử REDEEM; chọn thanh trượt ở giỏ chưa tự trừ điểm.
       if (rewardId != null || !pointsOwnerId || !Number.isSafeInteger(req.body.pointsToRedeem) || req.body.pointsToRedeem < 0) throw orderError('Điểm đổi không hợp lệ.');
       const settings = await ShopSetting.find({ settingKey: { $in: ['points_step', 'points_step_value'] } });
       const rules = Object.fromEntries(settings.map(item => [item.settingKey, Number(item.settingValue)]));
@@ -503,6 +506,8 @@ router.put('/:id/status', withOrderMutation(async (req, res) => {
       }
     }
 
+    // [DT16] . Hoàn tất đơn gọi kiểm tra tích điểm; chưa có payment SUCCESS thì hàm không cộng điểm.
+    // [DT16] ... Chuyển mã đơn sang awardOrderPoints() để tính và ghi điểm một lần. [DT17]
     if (status === 'COMPLETED') await awardOrderPoints(order._id);
     if (status === 'CANCELLED') {
       try { await refundRedemption(order); }

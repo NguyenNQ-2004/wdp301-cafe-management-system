@@ -215,12 +215,17 @@ export const lastPurchasePrice = (db: any, ingredientId: any): number | null => 
 };
 
 export const recipeUnitPrice = (db: any, ingredientId: any): { price: number | null; estimated: boolean } => {
+  // [CT09] . Chọn giá tham chiếu từ phiếu mới nhất DRAFT/ORDERED/RECEIVED; phiếu chưa nhận đánh dấu dự kiến, thiếu thì lấy giá nhận gần nhất.
+  // [CT09] .. Giá này dùng khi cần ước tính, không thay giá vốn đã ghi trên lô tồn.
   const line = latestPurchaseLine(db, ingredientId, ['DRAFT', 'ORDERED', 'RECEIVED']);
   if (line) return { price: line.unitPrice ?? line.unit_price, estimated: line.status === 'DRAFT' || line.status === 'ORDERED' };
   return { price: lastPurchasePrice(db, ingredientId), estimated: false };
 };
 
 export const recipeLineCost = (db: any, ingredientId: any, amount: number): { cost: number | null; estimated: boolean } => {
+  // [CT08] . Tính chi phí lượng dùng cho một nguyên liệu theo lô còn lại, ưu tiên lô nhập trước; không trừ tồn thật.
+  // [CT08] . Lô thiếu giá hoặc tồn chưa có giá thì trả null; lượng vượt lô đã biết dùng giá tham chiếu và đánh dấu dự kiến.
+  // [CT08] ... Lấy giá tham chiếu khi cần qua recipeUnitPrice(). [CT09]
   if (!Number.isFinite(amount) || amount < 0) return { cost: null, estimated: false };
   const ingredient = db?.ingredients?.find((row: any) => sameRef(row, ingredientId));
   const lots = ingredient?.stockLots ?? ingredient?.stock_lots;
@@ -247,6 +252,10 @@ export const recipeLineCost = (db: any, ingredientId: any, amount: number): { co
 };
 
 export const productCostDetails = (db: any, productId: any): { cost: number | null; estimated: boolean } => {
+  // [CT07] . Tìm sản phẩm và công thức theo ID MongoDB hoặc ID giao diện; ưu tiên ProductIngredient, thiếu thì dùng recipe trong sản phẩm.
+  // [CT07] ... Mỗi dòng gọi recipeLineCost() theo nguyên liệu và định lượng. [CT08]
+  // [CT07] .. Cộng chi phí các dòng; dòng nào thiếu giá thì tổng chưa xác định, có dòng ước tính thì tổng mang cờ estimated.
+  // [CT07] ... Trả giá vốn và cờ dự kiến cho bảng sản phẩm hoặc thẻ công thức. [CT10]
   if (!db) return { cost: null, estimated: false };
   const product = db.products?.find((item: any) => sameRef(item, productId));
   const links = db.product_ingredients?.filter((line: any) => sameRef(line.product_id ?? line.productId ?? line.product, product ?? productId)) ?? [];

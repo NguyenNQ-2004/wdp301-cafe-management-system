@@ -50,11 +50,14 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const handleDelete = async () => {
+    // [SP07] . Nút thùng rác chọn sản phẩm và mở xác nhận; Hủy chỉ đóng cửa sổ, xác nhận mới gọi hàm này.
+    // [SP07] ... Đổi ID giao diện sang MongoDB ID bằng rawId(), gửi DELETE /api/products/:id. [SP08]
     if (!deletingProduct || !token || deleting) return;
     setDeleting(true);
     setDeleteError('');
     try {
       await shopApi(`/api/products/${rawId(deletingProduct.id)}`, { method: 'DELETE', token });
+      // [SP09] .. Xóa thành công thì đóng xác nhận và tải lại bảng; lỗi được hiện trong cửa sổ để người dùng xử lý.
       setDeletingProduct(null);
       await refresh();
       onShowToast?.('Đã xóa sản phẩm.');
@@ -65,16 +68,22 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
   const categoryName = (id: number) => db.categories.find(c => c.id === id)?.name ?? '—';
 
   const filtered = db.products.filter(p => {
+    // [SP01] . Ô tìm kiếm và bộ lọc danh mục lọc dữ liệu đã tải, chưa gọi thao tác ghi database.
     const q = searchFilter.trim().toLowerCase();
     return (catFilter === 'all' || p.category_id === catFilter) && (q === '' || p.name.toLowerCase().includes(q) || String(p.id) === q);
   });
 
   const toggleAvailable = (p: Product) => {
+    // [SP06] . Bấm trạng thái để đảo is_available, dùng chung hàng đợi cập nhật sản phẩm.
+    // [SP06] ... Đóng gói lệnh sửa và gửi API qua LiveProvider. [SP03]
     transact(tx => tx.update('products', p.id, { is_available: !p.is_available }));
     onShowToast?.(`${p.name}: ${!p.is_available ? 'đang bán' : 'tạm ngưng bán'}.`);
   };
 
   const handleSave = (e: React.FormEvent) => {
+    // [SP02] . Nút lưu lấy form đang mở, chuẩn hóa tên và kiểm tra trùng, kiểm tra giá không âm.
+    // [SP02] . Size được gom thành tên và phụ thu; topping gồm tên và giá, lưu trong variants_config.
+    // [SP02] ... Có editing.id thì cập nhật, chưa có thì tạo mới qua transact(). [SP03]
     e.preventDefault();
     if (!editing) return;
     const f = editing.form;
@@ -114,6 +123,7 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
   };
 
   const setForm = (patch: Partial<ProductForm>) => setEditing(prev => (prev ? { ...prev, form: { ...prev.form, ...patch } } : prev));
+  // [SP01] . setForm() chỉ cập nhật bản nháp; Thêm món mới tạo form rỗng, Sửa dùng toForm() điền dữ liệu món đã chọn.
 
   const withCost = db.products.map(p => ({ p, cost: productCost(db, p.id) }));
 
@@ -171,7 +181,6 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
                 <th className="py-3 px-4">Size / Topping</th>
                 <th className="py-3 px-4 text-right">Giá vốn</th>
                 <th className="py-3 px-4 text-right">Giá bán</th>
-                <th className="py-3 px-4 text-center">Lợi nhuận</th>
                 <th className="py-3 px-4 text-center">Trạng thái</th>
                 <th className="py-3 px-4 text-right">Thao tác</th>
               </tr>
@@ -179,7 +188,6 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
             <tbody className="divide-y divide-stone-100">
               {filtered.map(p => {
                 const { cost, estimated } = productCostDetails(db, p.id);
-                const margin = cost !== null && p.base_price > 0 ? Math.round(((p.base_price - cost) / p.base_price) * 100) : null;
                 return (
                   <tr key={p.id} className="hover:bg-stone-50">
                     <td className="py-3 px-4">
@@ -202,9 +210,6 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
                     </td>
                     <td className="py-3 px-4 text-right font-mono text-stone-500">{cost === null ? '—' : <>{formatCostMoney(cost)}{estimated && <span className="block text-[10px] font-sans text-amber-700">Dự kiến · chưa nhập kho</span>}</>}</td>
                     <td className="py-3 px-4 text-right font-mono font-bold text-stone-900">{fmtMoney(p.base_price)}</td>
-                    <td className="py-3 px-4 text-center font-mono">
-                      {margin === null ? <span className="text-stone-400">—</span> : <Badge className="bg-emerald-50 text-emerald-800">{margin}%</Badge>}
-                    </td>
                     <td className="py-3 px-4 text-center">
                       <button
                         onClick={() => toggleAvailable(p)}
@@ -242,11 +247,15 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
       )}
       {editing && (
         <Modal title={editing.id ? `Sửa sản phẩm #${editing.id}` : 'Thêm sản phẩm'} onClose={() => setEditing(null)} wide>
+          {/* [SP01] . Hủy hoặc X đóng form, chưa ghi dữ liệu; Thêm sản phẩm/Lưu thay đổi gọi handleSave(). */}
+          {/* [SP01] ... Gửi bản nháp để kiểm tra trước khi lưu. [SP02] */}
           <form onSubmit={handleSave} className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* [SP01] . Tên món cập nhật name, bắt buộc và tối đa 150 ký tự; tên trùng bị chặn khi lưu. */}
               <Field label="Tên món *" column="name">
                 <input required maxLength={150} value={editing.form.name} onChange={e => setForm({ name: e.target.value })} className={inputCls} />
               </Field>
+              {/* [SP01] . Chọn danh mục cập nhật category_id bằng ID giao diện; ID MongoDB được đổi trước khi gửi API. */}
               <Field label="Danh mục *" column="category_id">
                 <select value={editing.form.category_id} onChange={e => setForm({ category_id: Number(e.target.value) })} className={inputCls}>
                   {db.categories.map(c => (
@@ -254,18 +263,22 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
                   ))}
                 </select>
               </Field>
+              {/* [SP01] . Giá cơ bản cập nhật base_price dạng số; đây là giá chưa cộng size và topping. */}
               <Field label="Giá cơ bản (VNĐ) *" column="base_price">
                 <NumberInput type="number" min={0} required value={editing.form.base_price} onChange={e => setForm({ base_price: Number(e.target.value) })} className={inputCls} />
               </Field>
+              {/* [SP01] . ImageInput nhận URL hoặc đọc tệp thành data URL và trả về image_url trên form. */}
               <Field label="Ảnh sản phẩm" column="image_url">
                 <ImageInput value={editing.form.image_url} onChange={image_url => setForm({ image_url })} className={inputCls} />
               </Field>
             </div>
+            {/* [SP01] . Mô tả cập nhật description, rỗng thì gửi null. */}
             <Field label="Mô tả" column="description">
               <textarea rows={2} value={editing.form.description} onChange={e => setForm({ description: e.target.value })} className={inputCls} />
             </Field>
 
             {/* variants_config.sizes */}
+            {/* [SP01] . Tên size cập nhật sizes[i].name, phụ thu cập nhật delta; Thêm size thêm dòng, thùng rác bỏ dòng khỏi bản nháp. */}
             <div className="p-3 rounded-xl border border-stone-200 space-y-2">
               <div className="flex items-center justify-between text-xs font-bold text-stone-600">
                 <span>Size & phụ thu</span>
@@ -297,6 +310,7 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
             </div>
 
             {/* variants_config.toppings */}
+            {/* [SP01] . Tên topping cập nhật toppings[i].name, giá cập nhật price; thêm/xóa chỉ đổi bản nháp, chưa ghi database. */}
             <div className="p-3 rounded-xl border border-stone-200 space-y-2">
               <div className="flex items-center justify-between text-xs font-bold text-stone-600">
                 <span>Topping & giá</span>
@@ -327,6 +341,7 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
               </button>
             </div>
 
+            {/* [SP01] . Ô Đang bán cập nhật is_available, được gửi cùng các trường sản phẩm khi lưu. */}
             <label className="flex items-center gap-2 text-xs font-semibold text-stone-700">
               <input type="checkbox" checked={editing.form.is_available} onChange={e => setForm({ is_available: e.target.checked })} className="accent-primary w-4 h-4" />
               Đang bán <span className="font-mono text-[10px] text-stone-400">is_available</span>

@@ -14,6 +14,7 @@ const error = (res, status, message) => res.status(status).json({ message });
 const validBody = body => body && typeof body === 'object' && !Array.isArray(body);
 
 router.post('/forgot-password', async (req, res) => {
+  // [QMK03] . Kiểm tra email và cấu hình SMTP; chỉ tìm tài khoản ACTIVE, không tiết lộ email có tồn tại qua thông báo trả về.
   try {
     if (!validBody(req.body)) return error(res, 400, 'Dữ liệu không hợp lệ.');
     const email = normalizeEmail(req.body.email);
@@ -23,6 +24,7 @@ router.post('/forgot-password', async (req, res) => {
     const user = await User.findOne({ ...emailFilter(email), status: 'ACTIVE' }).select('_id');
     if (!user) return res.json({ message: generic, challenge });
     const now = new Date();
+    // [QMK03] . Tạo OTP 6 số và challenge; lưu bản băm OTP, hạn 10 phút, số lần thử và thời điểm gửi để giới hạn gửi lại 60 giây.
     const otp = String(randomInt(0, 1000000)).padStart(6, '0');
     // Unique email and the conditional upsert enforce the cooldown even when
     // two resend requests arrive at the same time.
@@ -35,6 +37,7 @@ router.post('/forgot-password', async (req, res) => {
       if (failure.code === 11000) return res.json({ message: generic, challenge });
       throw failure;
     }
+    // [QMK03] ... Gửi email chứa OTP qua SMTP; gửi lỗi thì xóa yêu cầu vừa tạo và báo lỗi. [QMK04]
     try { await mailer.send(email, otp); }
     catch (_) { await Recovery.deleteOne({ _id: record._id, challenge }); return error(res, 503, 'Không gửi được email. Vui lòng thử lại sau.'); }
     return res.json({ message: generic, challenge });
@@ -42,6 +45,9 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 router.post('/verify-otp', async (req, res) => {
+  // [QMK06] . Nhận challenge và OTP 6 số; tăng lượt thử, kiểm tra hạn và đối chiếu bản băm, tối đa 5 lần thử.
+  // [QMK06] .. OTP đúng thì cấp resetToken dùng để đổi mật khẩu, lưu bản băm token với hạn 15 phút; sai thì báo lỗi.
+  // [QMK06] ... Trả resetToken để mở bước nhập mật khẩu mới. [QMK07]
   try {
     const { challenge, otp } = validBody(req.body) ? req.body : {};
     if (typeof challenge !== 'string' || !/^[a-f0-9]{64}$/.test(challenge) || typeof otp !== 'string' || !/^\d{6}$/.test(otp)) return error(res, 400, 'Mã OTP phải gồm 6 chữ số.');
@@ -57,6 +63,10 @@ router.post('/verify-otp', async (req, res) => {
 });
 
 router.post('/reset-password', atomicRoute(async (req, res) => {
+  // [QMK08] . Kiểm tra mật khẩu mới, xác nhận và resetToken; băm mật khẩu, lấy và xóa token còn hạn để chỉ dùng một lần.
+  // [QMK08] . Cập nhật passwordHash và passwordChangedAt cho đúng tài khoản ACTIVE gắn với yêu cầu khôi phục.
+  // [QMK08] .. Thành công thì yêu cầu đăng nhập lại; token sai, hết hạn hoặc đã dùng thì từ chối.
+  // [QMK08] ... Trả kết quả đặt lại mật khẩu về form. [QMK09]
   try {
     const { resetToken, password, confirmPassword } = validBody(req.body) ? req.body : {};
     const passwordValidationError = passwordError(password);

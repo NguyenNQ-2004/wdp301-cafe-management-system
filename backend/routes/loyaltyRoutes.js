@@ -18,6 +18,8 @@ router.use(protect);
 
 // 1. GET PHONE LOYALTY RULES
 router.get('/rules', async (req, res) => {
+  // [DT02] . Đọc points_earn_unit, points_step và points_step_value từ ShopSetting; thiếu cấu hình thì dùng 1000, 10 và 2000.
+  // [DT02] ... Trả quy tắc cho ba ô cấu hình và phần quy đổi điểm trên giao diện. [DT03]
   try {
     const [earnSetting, stepSetting, valueSetting] = await Promise.all([
       ShopSetting.findOne({ settingKey: 'points_earn_unit' }),
@@ -37,6 +39,8 @@ router.get('/rules', async (req, res) => {
 
 // 2. ADMIN UPDATE LOYALTY RULES
 router.put('/rules', adminOnly, async (req, res) => {
+  // [DT05] . Chỉ Admin được lưu; kiểm tra ba giá trị rồi upsert theo settingKey, không sửa điểm hiện tại của khách.
+  // [DT05] ... Trả thông báo để giao diện tải lại quy tắc và thống kê. [DT06]
   try {
     objectBody(req.body);
     const { points_earn_unit, points_step, points_step_value } = req.body;
@@ -73,6 +77,7 @@ router.put('/rules', adminOnly, async (req, res) => {
 
 // 3. STATS TỔNG HỢP VỀ ĐIỂM THƯỞNG
 router.get('/stats', adminOrStaff, async (req, res) => {
+  // [DT10] . Đếm khách có điểm, tổng hợp totalPoints và số giao dịch; quy đổi tổng điểm theo bậc đang cấu hình để hiển thị thống kê.
   try {
     const [stepSetting, valueSetting] = await Promise.all([
       ShopSetting.findOne({ settingKey: 'points_step' }),
@@ -106,6 +111,9 @@ router.get('/stats', adminOrStaff, async (req, res) => {
 
 // 4. TRA CỨU HỘI VIÊN QUA SỐ ĐIỆN THOẠI (Admin, Staff / Thu ngân tại quầy)
 router.get('/lookup', adminOrStaff, async (req, res) => {
+  // [DT08] . Bỏ khoảng trắng số điện thoại và tìm User có role CUSTOMER; không có thì trả 404.
+  // [DT08] . Lấy số dư, giá trị quy đổi, đơn hàng và 10 giao dịch điểm gần nhất; không cộng điểm tại bước tra cứu.
+  // [DT08] ... Trả kết quả cho handleSearchPhone() để hiện hồ sơ và nút điều chỉnh. [DT09]
   try {
     const { phone } = req.query;
     if (!phone || !phone.trim()) {
@@ -157,10 +165,12 @@ router.get('/lookup', adminOrStaff, async (req, res) => {
 });
 
 // 5. ĐIỀU CHỈNH ĐIỂM (CỘNG / TRỪ ĐIỂM) & TỰ ĐỘNG CẬP NHẬT HẠNG THÀNH VIÊN
+// [CD03] . Yêu cầu đã qua protect để kiểm tra phiên; adminOrStaff kiểm tra quyền trước khi chạy phần điều chỉnh.
 router.post('/adjust', adminOrStaff, async (req, res) => {
   try {
     const { customerId, phone, pointsChange, reason, orderId } = req.body;
 
+    // [CD03] . Tìm CUSTOMER theo customerId; nếu không truyền mã khách thì tìm bằng số điện thoại đã bỏ khoảng trắng.
     let user = null;
     if (customerId) {
       user = await User.findOne({ _id: objectId(customerId), role: 'CUSTOMER' });
@@ -173,6 +183,8 @@ router.post('/adjust', adminOrStaff, async (req, res) => {
       return res.status(404).json({ message: 'Không tìm thấy khách hàng.' });
     }
 
+    // [CD03] . Kiểm tra số điểm là số nguyên an toàn khác 0, không trừ quá số dư; kiểm tra lý do và đơn hàng nếu có.
+    // [CD03] .. Không tìm thấy khách hoặc dữ liệu không hợp lệ thì trả lỗi, chưa thay đổi điểm.
     const change = pointsChange;
     if (!Number.isSafeInteger(change) || change === 0) {
       return res.status(400).json({ message: 'Số điểm thay đổi phải khác 0.' });
@@ -186,8 +198,13 @@ router.post('/adjust', adminOrStaff, async (req, res) => {
 
     if (reason !== undefined && (typeof reason !== 'string' || reason.length > 500)) throw invalid('Lý do điều chỉnh không hợp lệ.');
     if (orderId && !await Order.exists({ _id: objectId(orderId), customer: user._id })) throw invalid('Đơn hàng không thuộc khách hàng này.');
+    // [CD03] ... Dữ liệu hợp lệ được chuyển sang cập nhật số dư khách hàng. [CD04]
+    // [CD04] . Dùng $inc cộng số điểm thay đổi vào User.totalPoints; với số âm, kiểm tra đủ điểm ngay trong điều kiện cập nhật.
+    // [CD04] .. Nhận lại tài khoản với số dư sau điều chỉnh.
     user = await User.findOneAndUpdate({ _id: user._id, role: 'CUSTOMER', ...(change < 0 ? { totalPoints: { $gte: -change } } : {}) }, { $inc: { totalPoints: change } }, { returnDocument: 'after' });
     if (!user) throw invalid('Số điểm không đủ để thực hiện điều chỉnh.');
+    // [CD04] ... Chuyển số điểm thay đổi và số dư mới sang phần lưu lịch sử. [CD05]
+    // [CD05] . Tạo giao dịch ADJUST, lưu khách hàng, điểm thay đổi, số dư mới, lý do và người thực hiện.
     let tx;
     try { tx = await LoyaltyTransaction.create({
       customer: user._id,
@@ -198,10 +215,13 @@ router.post('/adjust', adminOrStaff, async (req, res) => {
       reason: reason || (change > 0 ? 'Cộng điểm tích lũy' : 'Đổi điểm giảm giá'),
       performedBy: req.user._id
     }); } catch (error) {
+      // [CD05] .. Nếu ghi lịch sử lỗi, chuyển lỗi cho transaction hoàn tác; ngoài transaction thì bù lại số điểm trước khi báo lỗi.
       if (require('mongoose').transactionAsyncLocalStorage?.getStore()?.session) throw error;
       await User.updateOne({ _id: user._id }, { $inc: { totalPoints: -change } });
       throw error;
     }
+    // [CD05] .. Cập nhật điểm và lịch sử thành công thì trả HTTP 201 cùng thông tin giao dịch và số dư mới.
+    // [CD05] ... Trả kết quả về handleAdjustPoints() để hiển thị và tải lại dữ liệu. [CD06]
     res.status(201).json({
       message: `Đã ${change > 0 ? 'cộng' : 'trừ'} ${Math.abs(change)} điểm cho khách hàng ${user.fullName}.`,
       transaction: tx,
@@ -219,6 +239,8 @@ router.post('/adjust', adminOrStaff, async (req, res) => {
 
 // 6. GET NHẬT KÝ TÍCH & ĐỔI ĐIỂM TOÀN HỆ THỐNG
 router.get('/', async (req, res) => {
+  // [DT11] . CUSTOMER chỉ đọc lịch sử chính mình; tài khoản khác có thể lọc customerId, loại giao dịch và phân trang.
+  // [DT11] ... Trả transactions cùng thông tin khách, đơn và người thực hiện cho bảng lịch sử. [DT12]
   try {
     const filter = {};
     if (req.user.role === 'CUSTOMER') {

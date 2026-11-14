@@ -102,6 +102,8 @@ export function DbProvider({ children }: { children: ReactNode }) {
   }, [idFor]);
 
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
+    // [SP05] . Đọc lại các API theo quyền, đổi dữ liệu MongoDB sang dạng giao diện để sản phẩm, hồ sơ và lịch sử dùng dữ liệu vừa lưu.
+    // [DT18] .. Khi đọc lại /api/auth/me và /api/loyalty-transactions, hồ sơ nhận số dư và lịch sử mới từ backend.
     const version = ++generation.current;
     if (!options?.silent) setLoading(true);
     const requests: [keyof DbState | 'self', string][] = [['categories', '/api/categories'], ['products', '/api/products'], ['shop_settings', '/api/shop-settings']];
@@ -156,6 +158,8 @@ export function DbProvider({ children }: { children: ReactNode }) {
 
   const notify = (message: string) => { if (inFlight.current) deferredNotice.current = message; else setNotice(message); };
   const perform = (work: () => Promise<unknown>) => {
+    // [SP03] . Xếp thao tác vào hàng đợi để gửi lần lượt; thành công thì refresh(), lỗi thì hiện thông báo và bỏ thông báo thành công đang chờ.
+    // [SP03] ... Sau khi lưu thành công, tải lại dữ liệu sản phẩm. [SP05]
     inFlight.current++; setPending(inFlight.current); setError(''); setNotice('');
     const operation = queue.current.catch(() => {}).then(work).then(async () => { await refresh(); if (deferredNotice.current) setNotice(deferredNotice.current); deferredNotice.current = ''; })
       .catch((failure: unknown) => {
@@ -167,6 +171,8 @@ export function DbProvider({ children }: { children: ReactNode }) {
   };
 
   const send = async (command: Command) => {
+    // [SP03] . Kiểm tra phiên, đổi tên trường từ dạng giao diện sang camelCase và category_id sang MongoDB ID bằng rawId().
+    // [SP03] ... Gửi POST/PUT /api/products theo lệnh tạo hoặc sửa để backend kiểm tra và ghi Product. [SP04]
     if (!user?.token) throw new Error('Vui lòng đăng nhập trước khi thực hiện.');
     if (user.token !== useAuthStore.getState().user?.token) throw new Error('Phiên đăng nhập đã thay đổi. Vui lòng thực hiện lại.');
     const { table, action, id, data } = command;
@@ -201,6 +207,8 @@ export function DbProvider({ children }: { children: ReactNode }) {
     if (action === 'POST' && id && result?._id) { originals.current.set(id, result._id); ids.current.set(`${table}:${result._id}`, id); }
   };
   const transact = <R,>(fn: (tx: Tx) => R): R => {
+    // [SP03] . tx.insert/tx.update chỉ gom lệnh trên bản nháp; perform() mới gọi send() để ghi backend, không phải transaction trực tiếp với MongoDB.
+    // [SP03] .. Hàm trả về trước khi API hoàn tất; thông báo gọi ngay sau transact() chưa chứng minh dữ liệu đã lưu.
     let staged = structuredClone(dbRef.current); const commands: Command[] = [];
     const tx: Tx = {
       db: () => staged,

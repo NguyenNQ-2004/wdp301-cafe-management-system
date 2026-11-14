@@ -5,6 +5,8 @@ import type { PageRoute } from '../types';
 import { InterfaceContext } from '../interface/LiveProvider';
 import '../interface/storefront.css';
 interface HeaderProps { currentRoute: PageRoute; onNavigate: (route: PageRoute) => void; cartCount: number; onOpenAuth: () => void; onSearch?: (query: string) => void; user?: { fullName: string; role?: string; position?: string } | null; onLogout?: () => void }
+// [LG00] . Nút Đăng nhập mở /login, chưa kiểm tra tài khoản.
+// [DK00] . Nút Đăng ký mở /register, chưa tạo tài khoản.
 const AuthLinks = () => <><Link to="/login" className="font-semibold text-primary">Đăng nhập</Link><Link to="/register" className="rounded-full bg-primary px-3 py-2 font-semibold text-white">Đăng ký</Link></>;
 export const Header = ({ currentRoute, onNavigate, cartCount, onOpenAuth, onSearch, user = null, onLogout }: HeaderProps) => {
   const store = useContext(InterfaceContext);

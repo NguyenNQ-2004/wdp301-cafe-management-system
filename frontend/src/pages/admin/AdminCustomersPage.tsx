@@ -129,6 +129,8 @@ export const AdminCustomersPage: React.FC = () => {
   };
 
   const fetchCustomers = useCallback(async () => {
+    // [KH01] . Ô tìm kiếm và bộ lọc trạng thái cập nhật search/selectedStatus; useEffect gọi lại hàm khi chúng thay đổi.
+    // [KH01] ... Gửi GET /api/users/customers kèm bộ lọc và token để lấy danh sách. [KH02]
     if (!user?.token) return;
     setLoading(true);
     try {
@@ -141,6 +143,7 @@ export const AdminCustomersPage: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Không thể tải danh sách khách hàng');
+      // [KH03] .. Gán danh sách cho bảng, stats cho các ô thống kê; API lỗi thì hiện thông báo.
       setCustomers(data.customers || []);
       if (data.stats) setStats(data.stats);
     } catch (err: any) {
@@ -156,6 +159,8 @@ export const AdminCustomersPage: React.FC = () => {
 
   // Load customer detail for Order History Modal
   const openCustomerDetail = async (customerId: string) => {
+    // [KH04] . Nút xem chi tiết gửi GET /api/users/customers/:id cho đúng khách hàng được chọn.
+    // [KH04] ... Backend đọc hồ sơ, đơn hàng và lịch sử điểm. [KH05]
     if (!user?.token) return;
     setDetailLoading(true);
     try {
@@ -164,6 +169,7 @@ export const AdminCustomersPage: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Không thể xem chi tiết khách hàng');
+      // [KH06] .. Có dữ liệu thì mở cửa sổ chi tiết; tên, liên hệ, địa chỉ, điểm và đơn hàng lấy từ phản hồi này.
       setDetailData(data);
     } catch (err: any) {
       showToast(err.message, 'error');
@@ -174,6 +180,8 @@ export const AdminCustomersPage: React.FC = () => {
 
   // Handle Create Customer
   const handleCreateCustomer = async (e: React.FormEvent) => {
+    // [KH08] . Nút Tạo khách hàng gửi toàn bộ createForm bằng POST /api/users/customers, bao gồm mật khẩu và điểm tặng khởi tạo.
+    // [KH08] ... Backend kiểm tra và tạo tài khoản CUSTOMER. [KH09]
     e.preventDefault();
     if (!createForm || !user?.token) return;
     setSubmitting(true);
@@ -189,6 +197,7 @@ export const AdminCustomersPage: React.FC = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Lỗi thêm khách hàng');
       showToast(data.message || 'Đã thêm khách hàng thành công!');
+      // [KH10] .. Tạo thành công thì báo kết quả, đóng form và gọi fetchCustomers() tải lại bảng.
       setCreateForm(null);
       fetchCustomers();
     } catch (err: any) {
@@ -200,6 +209,8 @@ export const AdminCustomersPage: React.FC = () => {
 
   // Handle Edit Customer
   const handleEditCustomer = async (e: React.FormEvent) => {
+    // [KH11] . Nút Lưu thông tin gửi tên, email, ngày sinh, địa chỉ và trạng thái bằng PUT /api/users/customers/:id.
+    // [KH11] ... Backend cập nhật hồ sơ khách, không gửi hay thay đổi số điện thoại từ form sửa này. [KH12]
     e.preventDefault();
     if (!editCustomer || !user?.token) return;
     setSubmitting(true);
@@ -222,6 +233,7 @@ export const AdminCustomersPage: React.FC = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Lỗi cập nhật');
       showToast(data.message || 'Cập nhật thành công!');
+      // [KH13] .. Lưu thành công thì đóng form và tải lại danh sách; lỗi giữ form để sửa.
       setEditCustomer(null);
       fetchCustomers();
     } catch (err: any) {
@@ -233,6 +245,8 @@ export const AdminCustomersPage: React.FC = () => {
 
   // Handle Toggle Lock
   const handleToggleLock = async (c: CustomerItem) => {
+    // [KH14] . Nút khóa/mở khóa gửi PATCH /api/users/customers/:id/toggle-lock, khác nút mở form sửa hồ sơ.
+    // [KH14] ... Backend đổi trạng thái tài khoản đang chọn. [KH15]
     if (!user?.token) return;
     try {
       const res = await fetch(`${API_BASE}/api/users/customers/${c._id}/toggle-lock`, {
@@ -242,6 +256,7 @@ export const AdminCustomersPage: React.FC = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Lỗi đổi trạng thái');
       showToast(data.message);
+      // [KH16] .. Nhận trạng thái mới rồi thay đúng dòng khách hàng trong bảng.
       setCustomers((prev) =>
         prev.map((item) => (item._id === c._id ? { ...item, status: data.status } : item))
       );
@@ -626,7 +641,10 @@ export const AdminCustomersPage: React.FC = () => {
       {/* MODAL 2: THÊM KHÁCH HÀNG MỚI */}
       {createForm && (
         <Modal title="Thêm khách hàng thành viên mới" onClose={() => setCreateForm(null)}>
+          {/* [KH07] . Thêm khách hàng mở createForm trống; Hủy hoặc X bỏ form, Tạo khách hàng gọi handleCreateCustomer(). */}
+          {/* [KH07] ... Gửi các trường tạo khách sau khi người dùng xác nhận. [KH08] */}
           <form onSubmit={handleCreateCustomer} className="space-y-3.5 text-xs">
+            {/* [KH07] . Họ tên cập nhật createForm.fullName, bắt buộc, tối đa 100 ký tự. */}
             <Field label="Họ và tên khách hàng *" column="users.fullName">
               <input
                 required
@@ -639,6 +657,7 @@ export const AdminCustomersPage: React.FC = () => {
             </Field>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* [KH07] . Số điện thoại cập nhật createForm.phone; backend kiểm tra 9–15 chữ số và không trùng tài khoản đã có. */}
               <Field label="Số điện thoại *" column="users.phone (UNIQUE)">
                 <input
                   required
@@ -649,6 +668,7 @@ export const AdminCustomersPage: React.FC = () => {
                   className={inputCls}
                 />
               </Field>
+              {/* [KH07] . Ngày sinh cập nhật createForm.birthday từ ô date. */}
               <Field label="Ngày sinh" column="users.birthday">
                 <input
                   type="date"
@@ -659,6 +679,7 @@ export const AdminCustomersPage: React.FC = () => {
               </Field>
             </div>
 
+            {/* [KH07] . Email cập nhật createForm.email; nếu nhập thì phải đúng định dạng và không trùng khi lưu model. */}
             <Field label="Địa chỉ Email" column="users.email">
               <input
                 type="email"
@@ -670,6 +691,7 @@ export const AdminCustomersPage: React.FC = () => {
               />
             </Field>
 
+            {/* [KH07] . Mật khẩu cập nhật createForm.password; backend băm thành passwordHash, không lưu trực tiếp chuỗi nhập. */}
             <Field label="Mật khẩu đăng nhập *" column="users.password_hash">
               <input
                 type="password"
@@ -684,6 +706,7 @@ export const AdminCustomersPage: React.FC = () => {
               <span className="text-[10px] text-stone-500">Ít nhất 8 ký tự. Khách hàng dùng mật khẩu này để đăng nhập.</span>
             </Field>
 
+            {/* [KH07] . Địa chỉ liên hệ cập nhật createForm.address, được gửi cùng hồ sơ khi tạo khách. */}
             <Field label="Địa chỉ liên hệ" column="users.address">
               <input
                 value={createForm.address}
@@ -693,6 +716,7 @@ export const AdminCustomersPage: React.FC = () => {
               />
             </Field>
 
+            {/* [KH07] . Điểm tặng khởi tạo cập nhật initialPoints dạng số nguyên không âm; lớn hơn 0 sẽ có lịch sử EARN khi tạo khách. */}
             <Field label="Điểm thưởng tặng khởi tạo" column="loyalty_transactions (EARN)">
               <NumberInput
                 type="number"
@@ -716,7 +740,9 @@ export const AdminCustomersPage: React.FC = () => {
       {/* MODAL 3: CHỈNH SỬA THÔNG TIN */}
       {editCustomer && (
         <Modal title={`Chỉnh sửa: ${editCustomer.fullName}`} onClose={() => setEditCustomer(null)}>
+          {/* [KH11] . Nút sửa lấy khách vào editCustomer; các ô sửa bản nháp, Lưu thông tin gọi handleEditCustomer(), Hủy/X không lưu. */}
           <form onSubmit={handleEditCustomer} className="space-y-3.5 text-xs">
+            {/* [KH11] . Họ tên cập nhật editCustomer.fullName. */}
             <Field label="Họ và tên *" column="users.fullName">
               <input
                 required
@@ -727,6 +753,7 @@ export const AdminCustomersPage: React.FC = () => {
             </Field>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* [KH11] . Số điện thoại chỉ đọc vì input disabled, không nằm trong dữ liệu gửi cập nhật. */}
               <Field label="Số điện thoại" column="users.phone (READ-ONLY)">
                 <input
                   disabled
@@ -734,6 +761,7 @@ export const AdminCustomersPage: React.FC = () => {
                   className={`${inputCls} opacity-60 bg-stone-100 cursor-not-allowed`}
                 />
               </Field>
+              {/* [KH11] . Ngày sinh hiển thị phần YYYY-MM-DD và cập nhật editCustomer.birthday. */}
               <Field label="Ngày sinh" column="users.birthday">
                 <input
                   type="date"
@@ -744,6 +772,7 @@ export const AdminCustomersPage: React.FC = () => {
               </Field>
             </div>
 
+            {/* [KH11] . Email cập nhật editCustomer.email; model kiểm tra tính hợp lệ và trùng email khi lưu. */}
             <Field label="Email" column="users.email">
               <input
                 type="email"
@@ -753,6 +782,7 @@ export const AdminCustomersPage: React.FC = () => {
               />
             </Field>
 
+            {/* [KH11] . Địa chỉ cập nhật editCustomer.address. */}
             <Field label="Địa chỉ" column="users.address">
               <input
                 value={editCustomer.address || ''}
@@ -762,6 +792,7 @@ export const AdminCustomersPage: React.FC = () => {
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
+              {/* [KH11] . Trạng thái chọn ACTIVE, LOCKED hoặc INACTIVE; thay đổi chỉ có hiệu lực sau khi lưu. */}
               <Field label="Trạng thái" column="users.status">
                 <select
                   value={editCustomer.status}

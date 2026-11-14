@@ -45,6 +45,9 @@ const userSchema = new mongoose.Schema(
 for (const option of ['toJSON', 'toObject']) userSchema.set(option, { transform: (_doc, result) => { delete result.tierName; return result; } });
 
 userSchema.index({ emailKey: 1 }, { unique: true, partialFilterExpression: { emailKey: { $type: 'string' } } });
+// [DK09] . Kiểm tra email thay đổi, chặn trùng và tạo emailKey trước khi lưu.
+// [DK09] .. Tài khoản chỉ được lưu khi dữ liệu và ràng buộc duy nhất hợp lệ.
+// [DK09] ... Trả kết quả sau khi tạo tài khoản thành công. [DK10]
 userSchema.pre('validate', async function () {
   if (!this.isModified('email')) return;
   const email = normalizeEmail(this.email);
