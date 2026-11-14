@@ -22,6 +22,11 @@ const minutes = (time) => {
   return hour * 60 + minute;
 };
 
+const shiftInterval = (start, end) => ({ start, end: end <= start ? end + 1440 : end });
+const intervalsOverlap = (first, second) => [-1440, 0, 1440].some((offset) =>
+  first.start < second.end + offset && first.end > second.start + offset
+);
+
 const toShift = (definition, range) => {
   const [startTime, endTime] = range.split('-');
   return { code: definition.code, name: definition.name, startTime, endTime };
@@ -50,11 +55,16 @@ const parseShift = (body) => {
   if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => !['weekStart', 'shiftName', 'startTime', 'endTime'].includes(key))) throw invalid('Dữ liệu ca làm không hợp lệ.');
   if (typeof body.shiftName !== 'string' || !body.shiftName.trim() || body.shiftName.trim().length > 50) throw invalid('Tên ca phải từ 1 đến 50 ký tự.');
   const start = minutes(body.startTime), end = minutes(body.endTime);
-  if (start === null || end === null || start >= end) throw invalid('Giờ bắt đầu phải trước giờ kết thúc (HH:mm).');
+  if (start === null || end === null || start === end) throw invalid('Giờ bắt đầu và kết thúc phải đúng định dạng HH:mm và không được trùng nhau.');
   return { weekStart: parseWeek(body.weekStart), shiftName: body.shiftName.trim(), startTime: body.startTime, endTime: body.endTime };
 };
 const assertNoOverlap = async (data, except) => {
-  if (await WorkShift.exists({ weekStart: data.weekStart, ...(except ? { _id: { $ne: except } } : {}), startTime: { $lt: data.endTime }, endTime: { $gt: data.startTime } })) throw invalid('Khung giờ ca làm bị chồng lấn.', 409);
+  const start = minutes(data.startTime), end = minutes(data.endTime);
+  const candidate = shiftInterval(start, end);
+  const shifts = await WorkShift.find({ weekStart: data.weekStart, ...(except ? { _id: { $ne: except } } : {}) }).select('startTime endTime').lean();
+  if (shifts.some((shift) => intervalsOverlap(candidate, shiftInterval(minutes(shift.startTime), minutes(shift.endTime))))) {
+    throw invalid('Khung giờ ca làm bị chồng lấn.', 409);
+  }
 };
 const scheduleFilter = (shift) => {
   const end = new Date(shift.weekStart); end.setUTCDate(end.getUTCDate() + 7);

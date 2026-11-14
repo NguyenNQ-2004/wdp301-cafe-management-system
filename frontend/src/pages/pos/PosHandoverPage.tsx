@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { formatVnd, shopApi } from '../../lib/shopApi';
+import { getShiftStatusLabel } from '../../lib/shiftStatus';
 import useAuthStore from '../../store/authStore';
 import './PosHandoverPage.css';
 
@@ -87,7 +88,13 @@ const formatShiftHours = (shiftName: string, shiftInfo?: ShiftInfo) =>
     ? `${shiftInfo.startTime} – ${shiftInfo.endTime}`
     : shiftTimes[shiftName] || '';
 // Same wording as the Admin attendance screen; COMPLETED reads as the handover step here.
-const shiftStatusLabels: Record<string, string> = { SCHEDULED: 'Chưa chấm công', PRESENT: 'Đang trong ca', ABSENT: 'Vắng mặt', COMPLETED: 'Chờ bàn giao' };
+const shiftStatusClasses: Record<string, string> = {
+  'Đã bàn giao': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'Chờ bàn giao': 'bg-amber-50 text-amber-800 border-amber-200',
+  'Đang làm việc': 'bg-blue-50 text-blue-700 border-blue-200',
+  'Vắng mặt': 'bg-red-50 text-red-700 border-red-200',
+  'Chưa vào ca': 'bg-slate-100 text-slate-600 border-slate-200'
+};
 const SYNC_INTERVAL_MS = 30000;
 const validMoney = (value: string) => /^\d+$/.test(value) && Number.isSafeInteger(Number(value));
 
@@ -265,6 +272,7 @@ export default function PosHandoverPage() {
     VNPAY: { count: 0, sales: 0 },
     MOMO: { count: 0, sales: 0 }
   };
+  const detailStatus = detail ? getShiftStatusLabel(detail.schedule) : '';
 
   return (
     <div className="min-h-[calc(100vh-5rem)] bg-[#f8fafc] text-slate-800">
@@ -317,14 +325,8 @@ export default function PosHandoverPage() {
                     {formatShiftTitle(detail.schedule.shiftName, detail.schedule.shiftInfo)}
                     {formatShiftHours(detail.schedule.shiftName, detail.schedule.shiftInfo) && ` (${formatShiftHours(detail.schedule.shiftName, detail.schedule.shiftInfo)})`}
                   </h2>
-                  <span className={`rounded-md px-2.5 py-0.5 text-xs font-bold ${
-                    detail.handedOver
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      : detail.ready
-                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                      : 'bg-blue-50 text-blue-700 border border-blue-200'
-                  }`}>
-                    {detail.handedOver ? 'Đã bàn giao' : detail.ready ? 'Chờ bàn giao' : 'Đang làm việc'}
+                  <span className={`rounded-md border px-2.5 py-0.5 text-xs font-bold ${shiftStatusClasses[detailStatus] || shiftStatusClasses['Chưa vào ca']}`}>
+                    {detailStatus}
                   </span>
                   <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
                     Lịch #{String(detail.schedule._id).slice(-6).toUpperCase()}
@@ -405,18 +407,8 @@ export default function PosHandoverPage() {
                   {user?.role === 'ADMIN' && (
                     <span className="mt-1 block text-xs font-medium text-slate-600">{shift.user?.fullName}</span>
                   )}
-                  <span className={`mt-1.5 inline-block rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                    shift.handoverAt
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : shift.status === 'COMPLETED'
-                      ? 'bg-amber-50 text-amber-800'
-                      : shift.status === 'PRESENT'
-                      ? 'bg-blue-50 text-blue-700'
-                      : shift.status === 'ABSENT'
-                      ? 'bg-red-50 text-red-700'
-                      : 'bg-slate-100 text-slate-600'
-                  }`}>
-                    {shift.handoverAt ? 'Đã bàn giao' : shiftStatusLabels[shift.status] || shift.status}
+                  <span className={`mt-1.5 inline-block rounded-md border px-2 py-0.5 text-[10px] font-bold ${shiftStatusClasses[getShiftStatusLabel(shift)] || shiftStatusClasses['Chưa vào ca']}`}>
+                    {getShiftStatusLabel(shift)}
                   </span>
                 </button>
               ))}

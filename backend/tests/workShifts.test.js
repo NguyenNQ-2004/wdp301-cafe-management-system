@@ -92,8 +92,12 @@ test('UC24 configures three non-overlapping shifts in shop settings', async (t) 
     assert.equal(created.status, 201, JSON.stringify(created.data));
     assert.equal((await request('POST', '/api/work-shifts', body, adminToken)).status, 409);
     assert.equal((await request('POST', '/api/work-shifts', { ...body, shiftName: 'Trùng giờ', startTime: '09:00' }, adminToken)).status, 409);
-    assert.equal((await request('POST', '/api/work-shifts', { ...body, endTime: '05:00' }, adminToken)).status, 400);
-    assert.equal((await request('GET', `/api/work-shifts?weekStart=${weekStart}`, null, staffToken)).data.shifts.length, 1);
+    assert.equal((await request('POST', '/api/work-shifts', { ...body, endTime: '06:00' }, adminToken)).status, 400);
+    const overnight = await request('POST', '/api/work-shifts', { ...body, shiftName: 'Ca đêm', startTime: '23:00', endTime: '00:00' }, adminToken);
+    assert.equal(overnight.status, 201, JSON.stringify(overnight.data));
+    assert.equal((await request('POST', '/api/work-shifts', { ...body, shiftName: 'Ca đêm trùng', startTime: '23:30', endTime: '00:30' }, adminToken)).status, 409);
+    assert.equal((await request('POST', '/api/work-shifts', { ...body, shiftName: 'Ca 24 giờ', startTime: '23:00', endTime: '23:00' }, adminToken)).status, 400);
+    assert.equal((await request('GET', `/api/work-shifts?weekStart=${weekStart}`, null, staffToken)).data.shifts.length, 2);
     const path = `/api/work-shifts/${created.data._id}`;
     assert.equal((await request('PUT', path, { ...body, shiftName: 'Ca sáng linh hoạt' }, adminToken)).status, 200);
     const WorkSchedule = require('../models/WorkSchedule');

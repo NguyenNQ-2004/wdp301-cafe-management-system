@@ -76,6 +76,7 @@ export default function AdminShiftsPage() {
           <label>Bắt đầu<input required type="time" value={form.startTime} onChange={e=>setForm({...form,startTime:e.target.value})} className={inputCls}/></label>
           <label>Kết thúc<input required type="time" value={form.endTime} onChange={e=>setForm({...form,endTime:e.target.value})} className={inputCls}/></label>
         </div>
+        <p className="text-sm text-stone-500">Nếu giờ kết thúc sớm hơn giờ bắt đầu, ca được hiểu là kết thúc vào ngày hôm sau.</p>
         <div className="flex gap-3"><button disabled={busy} className="rounded-xl bg-[#800020] px-4 py-2 text-white">{busy?'Đang lưu…':'Lưu ca'}</button><button type="button" onClick={()=>setForm(null)}>Hủy</button></div>
       </form>}
       {loading?<p>Đang tải ca làm…</p>:<div className="overflow-x-auto rounded-2xl border bg-white">
