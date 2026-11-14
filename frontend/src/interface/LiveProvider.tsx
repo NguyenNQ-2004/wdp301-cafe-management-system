@@ -165,6 +165,14 @@ export function DbProvider({ children }: { children: ReactNode }) {
     dbRef.current = next; setDb(next); setDeliveryIssues(nextIssues); setUnavailable(missing); setLoading(false);
   }, [user?.token, user?.role, user?.position, user?._id, normalize, idFor]);
   useEffect(() => { void refresh(); return () => { generation.current++; }; }, [refresh]);
+  // Keep shifts/orders in step with changes made by other roles (e.g. Admin check-in); skip while a write is running.
+  useEffect(() => {
+    if (!user?.token) return;
+    const sync = () => { if (document.visibilityState === 'visible' && !inFlight.current) void refresh({ silent: true }); };
+    const timer = window.setInterval(sync, 30000);
+    document.addEventListener('visibilitychange', sync);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', sync); };
+  }, [user?.token, refresh]);
 
   const notify = (message: string) => { if (inFlight.current) deferredNotice.current = message; else setNotice(message); };
   const perform = (work: () => Promise<unknown>) => {
