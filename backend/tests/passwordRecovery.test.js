@@ -1,0 +1,71 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { randomBytes } = require('crypto');
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+require('dotenv').config();
+const User = require('../models/User');
+const Recovery = require('../models/PasswordRecovery');
+const mailer = require('../utils/recoveryEmail');
+
+test('SWP password recovery uses expiring, single-use OTP and revokes previous sessions', async t => {
+  const dbName = `aura_recovery_test_${randomBytes(5).toString('hex')}`;
+  await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/aura_cafe_erp', { dbName, serverSelectionTimeoutMS: 5000 });
+  await Promise.all([User.init(), Recovery.init()]);
+  const originalSend = mailer.send, originalConfigured = mailer.configured;
+  const sent = [];
+  mailer.configured = () => true;
+  mailer.send = async (email, otp) => { sent.push({ email, otp }); };
+  const app = require('../server');
+  const server = await new Promise(resolve => { const instance = app.listen(0, '127.0.0.1', () => resolve(instance)); });
+  t.after(async () => {
+    mailer.send = originalSend; mailer.configured = originalConfigured;
+    server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
+    assert.match(mongoose.connection.db.databaseName, /^aura_recovery_test_[a-f0-9]+$/);
+    await mongoose.connection.dropDatabase(); await mongoose.disconnect();
+  });
+  const call = async (path, body, token) => {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/auth/${path}`, {
+      method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {})
+    });
+    return { status: response.status, data: await response.json() };
+  };
+  const user = await User.create({ fullName: 'Recovery Customer', phone: '0900000990', email: 'recover@example.com', passwordHash: await bcrypt.hash('old-password', 4), role: 'CUSTOMER' });
+  const oldSession = await call('login', { email: user.email, password: 'old-password' });
+  assert.equal(oldSession.status, 200);
+  mailer.configured = () => false;
+  assert.equal((await call('forgot-password', { email: user.email })).status, 503);
+  mailer.configured = () => true;
+  assert.equal((await call('forgot-password', { email: 'not-an-email' })).status, 400);
+  const unknown = await call('forgot-password', { email: 'unknown@example.com' });
+  const request = await call('forgot-password', { email: ' RECOVER@example.com ' });
+  assert.equal(request.status, 200); assert.equal(unknown.data.message, request.data.message);
+  assert.equal(sent.length, 1); assert.match(sent[0].otp, /^\d{6}$/);
+  assert.equal((await Recovery.findOne({ user: user._id }).lean()).otpHash, undefined);
+  await call('forgot-password', { email: user.email }); assert.equal(sent.length, 1, 'resend cooldown');
+  const incorrect = sent[0].otp === '000000' ? '111111' : '000000';
+  assert.equal((await call('verify-otp', { challenge: request.data.challenge, otp: incorrect })).status, 400);
+  assert.equal((await call('reset-password', { resetToken: request.data.challenge, password: 'new-password', confirmPassword: 'new-password' })).status, 400);
+  const verified = await call('verify-otp', { challenge: request.data.challenge, otp: sent[0].otp });
+  assert.equal(verified.status, 200);
+  assert.equal((await call('verify-otp', { challenge: request.data.challenge, otp: sent[0].otp })).status, 400);
+  const body = { resetToken: verified.data.resetToken, password: 'new-password', confirmPassword: 'new-password' };
+  assert.equal((await call('reset-password', { ...body, confirmPassword: 'wrong' })).status, 400);
+  assert.equal((await call('reset-password', body)).status, 200);
+  assert.equal((await call('reset-password', body)).status, 400);
+  assert.equal((await call('me', null, oldSession.data.token)).status, 401);
+  assert.equal((await call('login', { email: user.email, password: 'old-password' })).status, 401);
+  const newSession = await call('login', { email: user.email, password: 'new-password' });
+  assert.equal(newSession.status, 200);
+  assert.equal((await call('me', null, newSession.data.token)).status, 200, 'new session works immediately after reset');
+  const limited = await call('forgot-password', { email: user.email });
+  const newestOtp = sent.at(-1).otp;
+  const wrong = newestOtp === '000000' ? '111111' : '000000';
+  for (let count = 0; count < 5; count++) assert.equal((await call('verify-otp', { challenge: limited.data.challenge, otp: wrong })).status, 400);
+  assert.equal((await call('verify-otp', { challenge: limited.data.challenge, otp: newestOtp })).status, 400, 'attempt limit');
+  await Recovery.updateOne({ user: user._id }, { $set: { sentAt: new Date(Date.now() - 61000) } });
+  const resend = await call('forgot-password', { email: user.email });
+  assert.equal(sent.length, 3);
+  await Recovery.updateOne({ user: user._id }, { $set: { expiresAt: new Date(Date.now() - 1000) } });
+  assert.equal((await call('verify-otp', { challenge: resend.data.challenge, otp: sent.at(-1).otp })).status, 400, 'OTP expiry before TTL cleanup');
+});

@@ -1,0 +1,36 @@
+import { Link } from 'react-router-dom';
+import { formatVnd } from '../lib/shopApi';
+import { repairDisplayText } from '../lib/displayText';
+import useCartStore from '../store/cartStore';
+import useAuthStore from '../store/authStore';
+import useLoyalty from '../hooks/useLoyalty';
+import useShopRules from '../hooks/useShopRules';
+import '../interface/storefront.css';
+export default function CartPage() {
+  const cart = useCartStore();
+  const user = useAuthStore(state => state.user);
+  const loyalty = useLoyalty(user?.token);
+  const shop = useShopRules();
+  const selected = cart.items.filter(item => item.checked);
+  const subtotal = selected.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  const step = loyalty.summary?.rules?.points_step || 10;
+  const value = loyalty.summary?.rules?.points_step_value ?? 2000;
+  const maxPoints = loyalty.summary?.canRedeem && value > 0 ? Math.min(Math.floor(loyalty.summary.totalPoints / step), Math.floor(subtotal / value)) * step : 0;
+  const points = Math.min(Math.floor((cart.pointsToUse || 0) / step) * step, maxPoints);
+  const discount = points / step * value;
+  const fee = subtotal < shop.rules.freeship_threshold ? shop.rules.delivery_fee : 0;
+  const allSelected = cart.items.length > 0 && cart.items.every(item => item.checked);
+  const ready = !user || (cart.ready && cart.ownerId === user._id && !cart.syncError);
+  return <div className="bg-[#f8fafc] px-3 py-7"><div className="mx-auto max-w-[1140px]"><nav className="mb-2 text-xs text-stone-500"><Link to="/">Trang chủ</Link> › Giỏ hàng của bạn</nav><h1 className="mb-6 text-3xl font-bold">Giỏ hàng của bạn <small className="ml-2 text-sm text-primary">{cart.items.length} món</small></h1>
+    {(cart.syncError || shop.error) && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{cart.syncError || shop.error}</p>}
+    {!cart.items.length ? <div className="swp-store-empty"><span className="material-symbols-outlined text-5xl">shopping_bag</span><h2>Giỏ hàng của bạn đang trống</h2><p>Hãy chọn vài món yêu thích từ thực đơn Aura Café nhé.</p><Link className="swp-primary-button mt-5 inline-block" to="/menu">Xem thực đơn</Link></div> : <div className="grid gap-6 lg:grid-cols-[2fr_1fr]"><div>
+      <div className="mb-4 flex justify-between gap-3 rounded-xl border bg-white p-4 text-sm"><label className="flex items-center gap-2 font-semibold"><input className="accent-primary" type="checkbox" checked={allSelected} onChange={event => cart.toggleAll(event.target.checked)} />Chọn tất cả ({cart.items.length} món)</label><button disabled={!selected.length} className="text-xs text-stone-500 disabled:opacity-40" onClick={cart.removeSelected}>Xóa các món đã chọn</button></div>
+      {cart.items.map(item => <article key={item.cartId} className="mb-4 flex gap-4 rounded-xl border bg-white p-4"><input aria-label={`Chọn ${item.name}`} type="checkbox" className="mt-2 accent-primary" checked={item.checked} onChange={() => cart.toggleItem(item.cartId)} /><img className="h-24 w-24 rounded-xl object-cover" src={item.image || '/cafe-placeholder.svg'} alt={item.name} /><div className="min-w-0 flex-1"><div className="flex justify-between gap-2"><div><p className="text-xs font-semibold uppercase text-primary">{item.categoryTitle}</p><h2 className="font-bold">{item.name}</h2></div><button onClick={() => cart.removeItem(item.cartId)} aria-label={`Xóa ${item.name}`} className="self-start text-stone-400">×</button></div><p className="mt-1 text-xs text-stone-500">Size {item.size}{(item.customization?.topping || []).map(name => ` · ${repairDisplayText(name)}`).join('')}{item.customization?.sugar ? ` · Đường ${item.customization.sugar}` : ''}{item.customization?.ice ? ` · ${item.customization.ice}` : ''}</p><div className="mt-4 flex flex-wrap items-center justify-between gap-3"><span className="text-xs text-stone-500">Đơn giá<br /><strong className="text-stone-900">{formatVnd(item.unitPrice)}</strong></span><div className="swp-cart-qty"><button aria-label={`Giảm ${item.name}`} disabled={item.quantity <= 1} onClick={() => cart.updateQuantity(item.cartId, -1)}>−</button><b className="text-sm">{item.quantity}</b><button aria-label={`Tăng ${item.name}`} disabled={item.quantity >= 99} onClick={() => cart.updateQuantity(item.cartId, 1)}>+</button></div><strong className="text-primary">{formatVnd(item.unitPrice * item.quantity)}</strong></div></div></article>)}
+      <Link to="/menu" className="inline-block py-3 text-sm font-semibold text-primary">← Tiếp tục chọn thêm</Link>
+    </div><aside><section className="swp-checkout-card sticky top-28"><h2>Tóm tắt đơn hàng</h2><p className="mb-4 flex justify-between text-sm"><span>Tổng tiền hàng ({selected.length} món)</span><strong>{formatVnd(subtotal)}</strong></p>
+      <section className="my-4 rounded-xl border border-amber-200 bg-[#fffaf0] p-4 text-sm"><h3 className="font-bold">✦ Dùng điểm Aura</h3>{!user ? <p className="mt-2 text-xs text-stone-500"><Link to="/login" className="font-semibold text-primary">Đăng nhập</Link> để dùng điểm tích lũy.</p> : loyalty.loading ? <p className="mt-2 text-xs">Đang tải điểm...</p> : loyalty.error ? <p role="alert" className="mt-2 text-xs text-red-700">{loyalty.error}</p> : loyalty.summary?.canRedeem ? <><div className="mt-3 flex justify-between text-xs"><span>Dùng điểm Aura</span><strong className="text-primary">{points ? '−' + formatVnd(discount) : 'Chưa dùng điểm'}</strong></div><input aria-label="Dùng điểm Aura" type="range" className="my-3 w-full accent-primary" min={0} max={maxPoints} step={step} value={points} disabled={!ready || !selected.length} onChange={event => { cart.setPointsToUse(Number(event.target.value)); cart.setRewardId(null); }} /><p className="text-xs text-stone-500">Đang dùng <b>{points}</b> / {loyalty.summary.totalPoints} điểm.</p><p className="mt-1 text-xs text-stone-500">Mỗi {step} điểm giảm {formatVnd(value)}. Điểm được trừ khi xác nhận đơn.</p></> : <p className="mt-2 text-xs text-stone-500">Tích/đổi điểm dành cho tài khoản khách hàng.</p>}</section>
+      <div className="space-y-3 border-y py-4 text-sm"><p className="flex justify-between"><span>Phí giao hàng</span><strong>{fee ? formatVnd(fee) : 'Miễn phí'}</strong></p>{points > 0 && <p className="flex justify-between text-primary"><span>Dùng {points} điểm Aura</span><strong>−{formatVnd(discount)}</strong></p>}<p className="flex justify-between"><span>Điểm nhận dự kiến</span><strong className="text-amber-700">+{Math.floor((subtotal - discount) / (loyalty.summary?.rules?.points_earn_unit || 1000))} điểm</strong></p></div>
+      <p className="my-5 flex items-end justify-between"><strong>Tổng thanh toán</strong><strong className="text-2xl text-primary">{formatVnd(subtotal - discount + fee)}</strong></p><Link to="/checkout" aria-disabled={!selected.length || !ready} onClick={event => { if (!selected.length || !ready) event.preventDefault(); }} className={`swp-primary-button block w-full text-center ${!selected.length || !ready ? 'pointer-events-none opacity-50' : ''}`}>Tiến hành đặt hàng ({selected.length} món) →</Link><p className="mt-4 text-xs leading-relaxed text-stone-500">Miễn phí giao hàng cho đơn từ {formatVnd(shop.rules.freeship_threshold)}. Đồ uống được chuẩn bị sau khi xác nhận thanh toán hoặc COD.</p>
+    </section></aside></div>}
+  </div></div>;
+}
