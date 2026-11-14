@@ -1,6 +1,9 @@
 import { NumberInput } from '../../../components/NumberInput';
 import React, { useState } from 'react';
 import ImageInput from '../../../components/ImageInput';
+import { shopApi } from '../../../lib/shopApi';
+import useAuthStore from '../../../store/authStore';
+import { fmtMoney as formatCostMoney } from '../../../data/dbUtils';
 import type { PageRoute, Product } from '../../types';
 import { useDb } from '../../data/DbContext';
 import { fmtMoney, productCost, productCostDetails, productSizes, productToppings } from '../../data/dbUtils';
@@ -38,10 +41,26 @@ const toForm = (p: Product | null, defaultCategory: number): ProductForm => ({
 });
 
 export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate, onShowToast }) => {
-  const { db, transact } = useDb();
+  const { db, transact, rawId, refresh } = useDb();
+  const token = useAuthStore(state => state.user?.token);
   const [searchFilter, setSearchFilter] = useState('');
   const [catFilter, setCatFilter] = useState<number | 'all'>('all');
   const [editing, setEditing] = useState<{ id: number | null; form: ProductForm } | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const handleDelete = async () => {
+    if (!deletingProduct || !token || deleting) return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await shopApi(`/api/products/${rawId(deletingProduct.id)}`, { method: 'DELETE', token });
+      setDeletingProduct(null);
+      await refresh();
+      onShowToast?.('Đã xóa sản phẩm.');
+    } catch (error) { setDeleteError((error as Error).message); }
+    finally { setDeleting(false); }
+  };
 
   const categoryName = (id: number) => db.categories.find(c => c.id === id)?.name ?? '—';
 
@@ -59,6 +78,12 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
     e.preventDefault();
     if (!editing) return;
     const f = editing.form;
+    const name = f.name.normalize('NFC').trim().replace(/\s+/gu, ' ');
+    const nameKey = name.toLocaleLowerCase('vi');
+    if (db.products.some(product => product.id !== editing.id && product.name.normalize('NFC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('vi') === nameKey)) {
+      onShowToast?.('Tên sản phẩm đã tồn tại. Vui lòng chọn tên khác.');
+      return;
+    }
     if (f.base_price < 0) {
       onShowToast?.('Giá bán không được âm (chk_product_price).');
       return;
@@ -66,7 +91,7 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
     const sizes = f.sizes.filter(s => s.name.trim());
     const row: Omit<Product, 'id'> = {
       category_id: f.category_id,
-      name: f.name.trim(),
+      name,
       base_price: f.base_price,
       badge: f.badge.trim() || null,
       subtitle: f.subtitle.trim() || null,
@@ -164,8 +189,6 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
                           <strong className="text-stone-900 block">{p.name}</strong>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span className="font-mono text-primary font-bold text-[10px] bg-primary/10 px-1 rounded">#{p.id}</span>
-                            {p.badge && <span className="text-[10px] text-amber-700 font-bold">{p.badge}</span>}
-                            {p.subtitle && <span className="text-[10px] text-stone-400">{p.subtitle}</span>}
                           </div>
                         </div>
                       </div>
@@ -177,7 +200,7 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
                       {productSizes(p).map(([n, d]) => `${n}${d ? ` (+${d / 1000}k)` : ''}`).join(', ')}
                       {productToppings(p).length > 0 && <span className="block text-stone-400">{productToppings(p).length} topping</span>}
                     </td>
-                    <td className="py-3 px-4 text-right font-mono text-stone-500">{cost === null ? '—' : <>{fmtMoney(cost)}{estimated && <span className="block text-[10px] font-sans text-amber-700">Dự kiến · chưa nhập kho</span>}</>}</td>
+                    <td className="py-3 px-4 text-right font-mono text-stone-500">{cost === null ? '—' : <>{formatCostMoney(cost)}{estimated && <span className="block text-[10px] font-sans text-amber-700">Dự kiến · chưa nhập kho</span>}</>}</td>
                     <td className="py-3 px-4 text-right font-mono font-bold text-stone-900">{fmtMoney(p.base_price)}</td>
                     <td className="py-3 px-4 text-center font-mono">
                       {margin === null ? <span className="text-stone-400">—</span> : <Badge className="bg-emerald-50 text-emerald-800">{margin}%</Badge>}
@@ -194,6 +217,9 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
                       <button onClick={() => setEditing({ id: p.id, form: toForm(p, p.category_id) })} className="p-1 text-stone-400 hover:text-stone-800 rounded" title="Sửa">
                         <span className="material-symbols-outlined text-[16px]">edit</span>
                       </button>
+                      <button type="button" onClick={() => { setDeletingProduct(p); setDeleteError(''); }} className="p-1 text-stone-400 hover:text-red-700 rounded" title="Xóa sản phẩm" aria-label={`Xóa ${p.name}`}>
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                      </button>
                     </td>
                   </tr>
                 );
@@ -203,6 +229,17 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
         </div>
       </div>
 
+      {deletingProduct && (
+        <Modal title="Xóa sản phẩm" onClose={() => { if (!deleting) setDeletingProduct(null); }}>
+          <p className="text-sm text-stone-700">Bạn có chắc muốn xóa sản phẩm <strong>{deletingProduct.name}</strong>?</p>
+          <p className="mt-2 text-xs text-stone-500">Sản phẩm đã có trong đơn hàng chỉ có thể tạm ngưng bán.</p>
+          {deleteError && <p role="alert" className="mt-3 text-sm text-red-700">{deleteError}</p>}
+          <div className="mt-5 flex justify-end gap-3">
+            <button type="button" disabled={deleting} onClick={() => setDeletingProduct(null)} className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">Hủy</button>
+            <button type="button" disabled={deleting} onClick={() => void handleDelete()} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{deleting ? 'Đang xóa...' : 'Xóa sản phẩm'}</button>
+          </div>
+        </Modal>
+      )}
       {editing && (
         <Modal title={editing.id ? `Sửa sản phẩm #${editing.id}` : 'Thêm sản phẩm'} onClose={() => setEditing(null)} wide>
           <form onSubmit={handleSave} className="space-y-3">
@@ -219,16 +256,6 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
               </Field>
               <Field label="Giá cơ bản (VNĐ) *" column="base_price">
                 <NumberInput type="number" min={0} required value={editing.form.base_price} onChange={e => setForm({ base_price: Number(e.target.value) })} className={inputCls} />
-              </Field>
-              <Field label="Nhãn" column="badge">
-                <input list="badge-options" maxLength={50} value={editing.form.badge} onChange={e => setForm({ badge: e.target.value })} className={inputCls} />
-                <datalist id="badge-options">
-                  <option value="BÁN CHẠY" />
-                  <option value="MÓN MỚI" />
-                </datalist>
-              </Field>
-              <Field label="Phụ đề" column="subtitle">
-                <input maxLength={150} value={editing.form.subtitle} onChange={e => setForm({ subtitle: e.target.value })} className={inputCls} />
               </Field>
               <Field label="Ảnh sản phẩm" column="image_url">
                 <ImageInput value={editing.form.image_url} onChange={image_url => setForm({ image_url })} className={inputCls} />

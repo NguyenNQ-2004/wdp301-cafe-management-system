@@ -4,6 +4,8 @@ const workScheduleSchema = new mongoose.Schema({
   workDate: { type: Date, required: true },
   shiftName: { type: String, trim: true, maxlength: 50, required: true },
   shift: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkShift' },
+  shiftStartTime: String,
+  shiftEndTime: String,
   checkInTime: { type: Date },
   checkOutTime: { type: Date },
   startingCash: { type: Number },
