@@ -107,4 +107,29 @@ test('purchase totals, FIFO lots and frozen order costs', async t => {
     await moveStock(free._id, 1, { unitCost: 0 });
     assert.equal((await moveStock(free._id, -1)).cost, 0);
   });
+  await t.test('either receipt can be repriced independently without repricing an exported order', async () => {
+    const first = await purchase(100, 10000);
+    const second = await purchase(200, 40000);
+    assert.equal(first.status, 201);
+    assert.equal(second.status, 201);
+    const correct = (receipt, totalCost, expectedUnitPrice) =>
+      request(`/api/ingredients/${ingredient._id}/purchase-price/${receipt.data._id}`, 'PUT', { totalCost, expectedUnitPrice });
+    const before = await Ingredient.findById(ingredient._id);
+    const firstEdit = await correct(first, 15000, 100);
+    assert.equal(firstEdit.status, 200, JSON.stringify(firstEdit.data));
+    assert.equal((await correct(first, 16000, 100)).status, 409);
+    const secondEdit = await correct(second, 50000, 200);
+    assert.equal(secondEdit.status, 200, JSON.stringify(secondEdit.data));
+    const after = await Ingredient.findById(ingredient._id);
+    assert.equal(after.currentStock, before.currentStock);
+    assert.deepEqual([first, second].map(receipt =>
+      after.stockLots.find(lot => lot.sourceId === receipt.data._id).unitCost), [150, 250]);
+    for (const [receipt, totalCost] of [[first, 15000], [second, 50000]]) {
+      const saved = await require('../models/PurchaseOrder').findById(receipt.data._id);
+      assert.equal(saved.totalCost, totalCost);
+      const line = await require('../models/PurchaseOrderItem').findOne({ purchaseOrder: saved._id, ingredient: ingredient._id });
+      assert.equal(line.totalCost, totalCost);
+    }
+    assert.equal((await Order.findById(order._id)).costTotal, 150000);
+  });
 });

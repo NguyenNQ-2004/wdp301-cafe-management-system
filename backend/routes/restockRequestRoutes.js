@@ -16,6 +16,7 @@ const note = value => {
   if (typeof value !== 'string' || value.trim().length > 500) throw invalid('Ghi chú không được quá 500 ký tự.');
   return value.trim();
 };
+// Normalize quantity, total cost, and unit price before validating each ingredient against the supplier.
 router.get('/', async (req, res) => {
   try {
     const status = req.query.status || 'ALL';
@@ -45,6 +46,7 @@ router.post('/', cashierOnly, async (req, res) => {
     res.status(201).json(await Request.create({ ...fields, requester: req.user._id, history: [{ action: 'create', actor: req.user._id, at: new Date() }] }));
   } catch (failure) { sendError(res, failure); }
 });
+// Validate the requested status transition. Receiving uses the shared workflow that creates stock lots and IN_PURCHASE entries.
 router.put('/:id', cashierOnly, async (req, res) => {
   try {
     const fields = await parseRequest(req.body);
@@ -56,6 +58,7 @@ router.put('/:id', cashierOnly, async (req, res) => {
     res.json(updated);
   } catch (failure) { sendError(res, failure); }
 });
+// Admins see all requests. Cashiers see their own requests.
 router.post('/:id/transition', async (req, res) => {
   try {
     const body = objectBody(req.body);
