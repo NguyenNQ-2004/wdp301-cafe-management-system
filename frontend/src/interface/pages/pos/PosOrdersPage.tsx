@@ -15,7 +15,6 @@ import {
   customizationTags,
   fmtDateTime,
   fmtMoney,
-  fmtTime,
   orderCustomerName,
   orderItemsOf,
   paymentOf,
@@ -205,7 +204,7 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
             <table className="w-full text-left border-collapse text-xs sm:text-sm">
               <thead>
                 <tr className="bg-stone-50 text-stone-500 text-[11px] uppercase font-bold tracking-wider border-b border-stone-200">
-                  <th className="py-2.5 px-3.5">Mã đơn & Giờ</th>
+                  <th className="py-2.5 px-3.5">Mã đơn & ngày giờ</th>
                   <th className="py-2.5 px-3.5">Hình thức</th>
                   <th className="py-2.5 px-3.5">Khách hàng</th>
                   <th className="py-2.5 px-3.5">Món</th>
@@ -229,7 +228,7 @@ export const PosOrdersPage: React.FC<PosOrdersPageProps> = ({ onNavigate, onShow
                     >
                       <td className="py-3 px-3.5">
                         <span className="font-bold text-primary font-mono block">{o.order_code}</span>
-                        <span className="text-[11px] text-stone-400 font-mono">{fmtTime(o.created_at)}</span>
+                        <span className="text-[11px] text-stone-400 font-mono">{fmtDateTime(o.created_at)}</span>
                       </td>
                       <td className="py-3 px-3.5">
                         <span className="inline-block px-2 py-0.5 rounded bg-stone-100 font-bold text-[10px] text-stone-700 mb-1">

@@ -1,7 +1,7 @@
 import { NumberInput } from '../../components/NumberInput';
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { shopApi } from '../../lib/shopApi';
+import { formatVnd, shopApi } from '../../lib/shopApi';
 import useAuthStore from '../../store/authStore';
 import { AdminLayout, inputCls } from './AdminUi';
 
@@ -10,6 +10,23 @@ type AttendanceStatus = 'SCHEDULED' | 'PRESENT' | 'ABSENT' | 'COMPLETED';
 interface Employee { _id: string; fullName: string; phone: string; position: string }
 interface Shift { code: ShiftName; name: string; startTime: string; endTime: string }
 interface RecordItem { _id: string; user: Employee | null; workDate: string; shiftName: ShiftName; shiftInfo?: Shift; status: AttendanceStatus; checkInTime?: string; checkOutTime?: string; note?: string }
+interface CashTransferInfo {
+  required: boolean;
+  ready: boolean;
+  assignedToMe: boolean;
+  expectedCash: number | null;
+  source: { _id: string; cashier: string; checkOutTime: string } | null;
+  discrepancy: { countedCash: number; expectedCash: number; note: string; reportedAt: string; resolvedAt?: string } | null;
+}
+interface CashTransferEvent {
+  _id: string;
+  user: Employee | null;
+  startingCash?: number;
+  cashTransferExpectedCash?: number;
+  cashTransferAcceptedAt?: string;
+  cashTransferFrom?: { user?: Employee | null } | null;
+  cashTransferDiscrepancy?: { expectedCash: number; countedCash: number; note: string; reportedAt: string; resolvedAt?: string; sourceSchedule?: { user?: Employee | null } } | null;
+}
 const fallbackShifts: Shift[] = [
   { code: 'MORNING', name: 'Ca sáng', startTime: '07:00', endTime: '12:00' },
   { code: 'AFTERNOON', name: 'Ca chiều', startTime: '12:00', endTime: '17:00' },
@@ -66,6 +83,8 @@ export default function AdminAttendancePage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [openingCash, setOpeningCash] = useState<Record<string, string>>({});
+  const [cashTransfers, setCashTransfers] = useState<Record<string, CashTransferInfo>>({});
+  const [cashTransferEvents, setCashTransferEvents] = useState<CashTransferEvent[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [clockTick, setClockTick] = useState(Date.now());
@@ -84,10 +103,17 @@ export default function AdminAttendancePage() {
     Promise.all([
       shopApi<RecordItem[]>(`/api/work-schedules/attendance?${query}`, { token }),
       shopApi<{ shifts: Shift[] }>('/api/work-shifts', { token }),
-      isAdmin ? shopApi<Employee[]>('/api/employees', { token }) : Promise.resolve([])
-    ]).then(([history, shiftResponse, staff]) => {
+      isAdmin ? shopApi<Employee[]>('/api/employees', { token }) : Promise.resolve([]),
+      shopApi<CashTransferEvent[]>('/api/work-schedules/cash-transfer-events', { token })
+    ]).then(async ([history, shiftResponse, staff, transferEvents]) => {
       if (!active) return;
-      setRecords(Array.isArray(history) ? history : []);
+      const rows = Array.isArray(history) ? history : [];
+      const pendingCashiers = rows.filter((record) => ['SCHEDULED', 'ABSENT'].includes(record.status) && !record.checkInTime && ['CASHIER', 'MANAGER'].includes(record.user?.position || ''));
+      const transferRows = await Promise.all(pendingCashiers.map(async (record) => [record._id, await shopApi<CashTransferInfo>(`/api/work-schedules/${record._id}/cash-transfer`, { token })] as const));
+      if (!active) return;
+      setCashTransfers(Object.fromEntries(transferRows));
+      setRecords(rows);
+      setCashTransferEvents(Array.isArray(transferEvents) ? transferEvents : []);
       setShifts(Array.isArray(shiftResponse?.shifts) && shiftResponse.shifts.length ? shiftResponse.shifts : fallbackShifts);
       setEmployees(Array.isArray(staff) ? staff : []);
       setError('');
@@ -115,9 +141,14 @@ export default function AdminAttendancePage() {
   const changeAttendance = async (record: RecordItem, action: 'CHECK_IN' | 'CHECK_OUT' | 'ABSENT') => {
     if (!token || busyId) return;
     const recordsCash = action === 'CHECK_IN' && ['CASHIER', 'MANAGER'].includes(record.user?.position || '');
-    const opening = openingCash[record._id] ?? '0';
+    const opening = openingCash[record._id] ?? '';
     if (recordsCash && (!/^\d+$/.test(opening) || !Number.isSafeInteger(Number(opening)))) {
       setError('Tiền đầu ca phải là số nguyên không âm.');
+      return;
+    }
+    const transfer = cashTransfers[record._id];
+    if (recordsCash && transfer?.required) {
+      setError('Thu ngân nhận két cần tự đăng nhập tài khoản của mình để đếm và xác nhận.');
       return;
     }
     setBusyId(record._id);
@@ -149,6 +180,16 @@ export default function AdminAttendancePage() {
 
     {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>}
     {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{notice}</p>}
+    {cashTransferEvents.length > 0 && <section className="rounded-2xl border border-stone-200 bg-white p-4 text-sm">
+      <h2 className="mb-2 font-bold text-stone-900">Thông báo nhận két giữa hai thu ngân</h2>
+      <div className="space-y-2">{cashTransferEvents.slice(0, 10).map(event => {
+        const mismatch = event.cashTransferDiscrepancy && !event.cashTransferDiscrepancy.resolvedAt;
+        return <div key={event._id} className={`rounded-lg p-3 ${mismatch ? 'bg-amber-50 text-amber-900' : 'bg-emerald-50 text-emerald-900'}`}>
+          <strong>{event.cashTransferFrom?.user?.fullName || event.cashTransferDiscrepancy?.sourceSchedule?.user?.fullName || 'Thu ngân giao két'} → {event.user?.fullName || 'Thu ngân nhận két'}</strong>
+          <span className="ml-2">{mismatch ? `Chênh lệch: giao ${formatVnd(event.cashTransferDiscrepancy!.expectedCash)}, đếm ${formatVnd(event.cashTransferDiscrepancy!.countedCash)}. ${event.cashTransferDiscrepancy!.note}` : `Đã đối chiếu khớp ${formatVnd(event.startingCash ?? event.cashTransferExpectedCash ?? 0)} và vào ca.${event.cashTransferDiscrepancy?.resolvedAt ? ` Trước đó báo chênh lệch: đếm ${formatVnd(event.cashTransferDiscrepancy.countedCash)}. ${event.cashTransferDiscrepancy.note}` : ''}`}</span>
+        </div>;
+      })}</div>
+    </section>}
     <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white">
       <table className="w-full min-w-[940px] text-left text-sm">
         <thead><tr className="bg-stone-50 text-stone-700"><th className="p-3">Ngày</th>{isAdmin && <th className="p-3">Nhân viên</th>}<th className="p-3">Ca theo lịch</th><th className="p-3">Vào thực tế</th><th className="p-3">Ra thực tế</th><th className="p-3">Đối chiếu</th><th className="p-3">Trạng thái</th><th className="p-3">Thao tác</th></tr></thead>
@@ -160,6 +201,9 @@ export default function AdminAttendancePage() {
           const workDay = (record.workDate || '').slice(0, 10);
           const canAdminCheckIn = isAdmin && workDay <= today && ['SCHEDULED', 'ABSENT'].includes(record.status) && !record.checkInTime;
           const canAdminCheckOut = isAdmin && record.status === 'PRESENT' && workDay <= today && !record.checkOutTime;
+          const transfer = cashTransfers[record._id];
+          const counted = openingCash[record._id] ?? '';
+          const isCashier = ['CASHIER', 'MANAGER'].includes(record.user?.position || '');
           return <tr key={record._id} className="border-t border-stone-100 align-top">
             <td className="p-3 font-semibold">{workDay ? workDay.split('-').reverse().join('/') : '—'}</td>
             {isAdmin && <td className="p-3"><strong className="block">{record.user?.fullName || 'Nhân viên đã xóa'}</strong><span className="text-xs text-stone-500">{record.user?.phone}</span></td>}
@@ -170,8 +214,10 @@ export default function AdminAttendancePage() {
             <td className="p-3"><span className={`rounded-lg px-2 py-1 text-xs font-semibold ${record.status === 'ABSENT' ? 'bg-red-50 text-red-700' : record.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>{statusLabels[record.status]}</span>{record.note && <p className="mt-2 text-xs text-stone-500">{record.note}</p>}</td>
             <td className="p-3">
               {canAdminCheckIn && <div className="space-y-2">
-                {['CASHIER', 'MANAGER'].includes(record.user?.position || '') && <label className="block text-xs font-semibold text-stone-600">Tiền đầu ca (đ)<NumberInput type="number" min="0" step="1" value={openingCash[record._id] ?? '0'} onChange={(event) => setOpeningCash((current) => ({ ...current, [record._id]: event.target.value }))} className="mt-1 w-28 rounded-lg border border-stone-200 px-2 py-1" /></label>}
-                <button disabled={busyId === record._id} onClick={() => void changeAttendance(record, 'CHECK_IN')} className="rounded-lg bg-[#800020] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Ghi nhận vào ca</button>
+                {isCashier && transfer?.required ? <p className="max-w-xs rounded-lg bg-blue-50 p-2 text-xs text-blue-900">{record.user?.fullName} cần đăng nhập tài khoản của mình để đếm và xác nhận nhận {formatVnd(transfer.expectedCash || 0)} từ {transfer.source?.cashier}. {!transfer.assignedToMe ? 'Thu ngân trước chưa chỉ định người nhận.' : ''} {transfer.discrepancy && !transfer.discrepancy.resolvedAt ? `Đã báo chênh lệch ${formatVnd(transfer.discrepancy.countedCash)}.` : ''}</p> : <>
+                  {isCashier && <label className="block text-xs font-semibold text-stone-600">Tiền đầu ca thực đếm (đ)<NumberInput type="number" min="0" step="1" placeholder="Nhập số vừa đếm" value={counted} onChange={(event) => setOpeningCash((current) => ({ ...current, [record._id]: event.target.value }))} className="mt-1 w-36 rounded-lg border border-stone-200 px-2 py-1" /></label>}
+                  <button disabled={busyId === record._id || (isCashier && (!transfer || !/^\d+$/.test(counted)))} onClick={() => void changeAttendance(record, 'CHECK_IN')} className="rounded-lg bg-[#800020] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Ghi nhận vào ca</button>
+                </>}
               </div>}
               {canAdminCheckOut && <button disabled={busyId === record._id} onClick={() => void changeAttendance(record, 'CHECK_OUT')} className="rounded-lg bg-[#800020] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Ghi nhận kết thúc ca</button>}
               {isAdmin && record.status === 'SCHEDULED' && workDay < today && <button disabled={busyId === record._id} onClick={() => void changeAttendance(record, 'ABSENT')} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-50">Đánh dấu vắng</button>}

@@ -2,8 +2,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { randomBytes } = require('crypto');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
+const getJwtSecret = require('../config/jwtSecret');
 const User = require('../models/User');
+const Category = require('../models/Category');
+const Product = require('../models/Product');
+const WorkSchedule = require('../models/WorkSchedule');
 const Order = require('../models/Order');
 const Payment = require('../models/Payment');
 
@@ -43,4 +48,40 @@ test('SePay credits a matching transfer once and rejects forged or mismatched tr
   assert.equal((await Order.findById(order._id)).status, 'CONFIRMED');
   assert.equal((await User.findById(customer._id)).totalPoints, 40);
   assert.equal(await send({ ...vaPayload, id: 1234568 }), 409);
+
+  const cashier = await User.create({ fullName: 'SePay Cashier', phone: '0900000872', passwordHash: 'test-only', role: 'STAFF', position: 'CASHIER' });
+  await WorkSchedule.create({ user: cashier._id, workDate: new Date(), shiftName: 'TEST', status: 'PRESENT', checkInTime: new Date(Date.now() - 60000) });
+  const cashierToken = jwt.sign({ id: cashier._id }, getJwtSecret());
+  const category = await Category.create({ name: 'SePay counter test' });
+  const product = await Product.create({ name: 'Counter coffee', category: category._id, basePrice: 45000, isAvailable: true });
+  const counterResponse = await fetch(`http://127.0.0.1:${server.address().port}/api/orders`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cashierToken}` },
+    body: JSON.stringify({ orderType: 'DINE_IN', tableNumber: 'T01', paymentMethod: 'BANK_TRANSFER', items: [{ productId: String(product._id), quantity: 1, size: 'M' }] })
+  });
+  assert.equal(counterResponse.status, 201, await counterResponse.text().catch(() => ''));
+  const counterOrder = await Order.findOne({ cashier: cashier._id });
+  const counterPayment = await Payment.findOne({ order: counterOrder._id });
+  assert.equal(counterOrder.status, 'PENDING');
+  assert.equal(counterOrder.paymentMethod, 'BANK_TRANSFER');
+  assert.equal(counterPayment.paymentMethod, 'BANK_TRANSFER');
+  assert.equal(counterPayment.status, 'PENDING');
+  const gatewayResponse = await fetch(`http://127.0.0.1:${server.address().port}/api/payments/order/${counterOrder._id}/gateway`, {
+    method: 'POST', headers: { Authorization: `Bearer ${cashierToken}` }
+  });
+  assert.equal(gatewayResponse.status, 200);
+  const gateway = await gatewayResponse.json();
+  const counterCode = `AU${String(counterPayment._id).toUpperCase()}`;
+  assert.equal(gateway.paymentCode, counterCode);
+  assert.equal(new URL(gateway.qrUrl).searchParams.get('des'), counterCode);
+  const manualConfirm = await fetch(`http://127.0.0.1:${server.address().port}/api/payments/${counterPayment._id}/counter-confirm`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cashierToken}` },
+    body: JSON.stringify({ paymentMethod: 'CASH', receivedAmount: counterOrder.finalAmount })
+  });
+  assert.equal(manualConfirm.status, 409);
+  const counterPayload = { ...payload, id: 1234569, code: counterCode, content: `${counterCode} thanh toan`, transferAmount: counterOrder.finalAmount };
+  assert.equal(await send({ ...counterPayload, transferAmount: 1 }), 409);
+  assert.equal(await send(counterPayload), 200);
+  assert.equal(await send(counterPayload), 200);
+  assert.equal((await Payment.findById(counterPayment._id)).status, 'SUCCESS');
+  assert.equal((await Order.findById(counterOrder._id)).status, 'CONFIRMED');
 });

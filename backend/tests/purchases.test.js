@@ -69,4 +69,14 @@ test('purchase order creation, ordering and receiving update real stock once', a
   const overview = await request('/api/purchase-orders/management-overview');
   assert.deepEqual(overview.data.summary, { DRAFT: 0, ORDERED: 0, RECEIVED: 1, CANCELLED: 0 });
   assert.equal(await PurchaseOrder.countDocuments(), 1);
+
+  const newSupplier = await Supplier.create({ name: 'New Supplier', phone: '0911444002', status: 'ACTIVE' });
+  const otherSource = await request('/api/purchase-orders', { method: 'POST', body: {
+    supplier: newSupplier._id,
+    items: [{ ingredient: coffee._id, quantity: 1000, totalCost: 200000 }]
+  } });
+  assert.equal(otherSource.status, 201);
+  assert.equal(otherSource.data.totalCost, 200000);
+  assert.equal(otherSource.data.items[0].unitPrice, 200);
+  assert.equal(String((await Ingredient.findById(coffee._id)).supplier), String(supplier._id));
 });

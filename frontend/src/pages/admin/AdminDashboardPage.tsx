@@ -1,9 +1,11 @@
-import { API_BASE } from '../../lib/shopApi';
-import React, { useState } from 'react';
+import { API_BASE, formatVnd, shopApi } from '../../lib/shopApi';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import useAuthStore from '../../store/authStore';
 import { AdminLayout } from './AdminUi';
+
+interface CashTransferEvent { _id: string; user?: { fullName: string }; startingCash?: number; cashTransferExpectedCash?: number; cashTransferAcceptedAt?: string; cashTransferFrom?: { user?: { fullName: string } }; cashTransferDiscrepancy?: { expectedCash: number; countedCash: number; note: string; resolvedAt?: string; sourceSchedule?: { user?: { fullName: string } } } }
 
 const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuthStore();
@@ -12,6 +14,17 @@ const AdminDashboard: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [message, setMessage] = useState({ text: '', type: '' });
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [cashTransferEvents, setCashTransferEvents] = useState<CashTransferEvent[]>([]);
+  const [cashTransferReload, setCashTransferReload] = useState(0);
+
+  useEffect(() => {
+    if (!user?.token) return;
+    let active = true;
+    shopApi<CashTransferEvent[]>('/api/work-schedules/cash-transfer-events', { token: user.token })
+      .then(rows => { if (active) setCashTransferEvents(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (active) setCashTransferEvents([]); });
+    return () => { active = false; };
+  }, [user?.token, cashTransferReload]);
 
   if (!user) {
     navigate('/');
@@ -104,6 +117,16 @@ const AdminDashboard: React.FC = () => {
       }
     >
       <div className="space-y-5">
+        <section className="rounded-2xl border border-stone-200 bg-white p-5 text-sm">
+          <div className="flex items-center justify-between gap-3"><h2 className="font-bold text-stone-900">Thông báo giao két giữa thu ngân</h2><div className="flex gap-3"><button type="button" onClick={() => setCashTransferReload(key => key + 1)} className="text-xs font-bold text-[#800020]">Làm mới</button><button type="button" onClick={() => navigate('/admin/attendance')} className="text-xs font-bold text-[#800020]">Xem chấm công →</button></div></div>
+          {cashTransferEvents.length === 0 && <p className="mt-2 text-stone-500">Chưa có kết quả giao két mới.</p>}
+          <div className="mt-3 space-y-2">{cashTransferEvents.slice(0, 5).map(event => {
+            const mismatch = event.cashTransferDiscrepancy && !event.cashTransferDiscrepancy.resolvedAt ? event.cashTransferDiscrepancy : null;
+            const giver = event.cashTransferFrom?.user?.fullName || event.cashTransferDiscrepancy?.sourceSchedule?.user?.fullName || 'Thu ngân giao két';
+            const resolvedNote = event.cashTransferDiscrepancy?.resolvedAt ? ` Trước đó báo chênh lệch: đếm ${formatVnd(event.cashTransferDiscrepancy.countedCash)}. ${event.cashTransferDiscrepancy.note}` : '';
+            return <p key={event._id} className={`rounded-lg p-3 ${mismatch ? 'bg-amber-50 text-amber-900' : 'bg-emerald-50 text-emerald-900'}`}><strong>{giver} → {event.user?.fullName || 'Thu ngân nhận két'}:</strong> {mismatch ? `chênh lệch, giao ${formatVnd(mismatch.expectedCash)}, đếm ${formatVnd(mismatch.countedCash)}. ${mismatch.note}` : `đã nhận khớp ${formatVnd(event.startingCash ?? event.cashTransferExpectedCash ?? 0)}.${resolvedNote}`}</p>;
+          })}</div>
+        </section>
         <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-2xs">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">

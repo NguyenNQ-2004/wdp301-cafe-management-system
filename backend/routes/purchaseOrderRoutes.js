@@ -94,7 +94,7 @@ router.get('/', async (req, res) => {
 });
 
 // K-PN: Kiểm tra trạng thái khởi tạo, chuẩn hóa số lượng và tổng tiền từng dòng, rồi tính đơn giá.
-// Xác thực nhà cung cấp còn hoạt động và các nguyên liệu trên phiếu đều thuộc nhà cung cấp đó.
+// Xác thực nhà cung cấp còn hoạt động và nguyên liệu tồn tại; một nguyên liệu có thể mua từ nhiều nhà cung cấp.
 // K-PN: POST / — Tạo phiếu nhập sau khi kiểm tra nhà cung cấp và chi tiết phiếu.
 router.post('/', async (req, res) => {
   try {
@@ -111,7 +111,6 @@ router.post('/', async (req, res) => {
     const ingredientRecords = await Ingredient.find({ _id: { $in: normalizedItems.map((item) => item.ingredient) } });
     if (!supplierRecord) return res.status(404).json({ message: 'Không tìm thấy nhà cung cấp đang hoạt động.' });
     if (ingredientRecords.length !== normalizedItems.length) return res.status(404).json({ message: 'Có nguyên liệu không tồn tại.' });
-    if (ingredientRecords.some((ingredient) => String(ingredient.supplier) !== String(supplier))) return res.status(400).json({ message: 'Nguyên liệu không thuộc nhà cung cấp đã chọn.' });
 
     const totalCost = normalizedItems.reduce((sum, item) => sum + item.totalCost, 0);
     let order;

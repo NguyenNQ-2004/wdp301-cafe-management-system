@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { shopApi } from '../../../lib/shopApi';
 import useAuthStore from '../../../store/authStore';
-import type { PageRoute, PaymentMethod, Product, User, OrderCustomization } from '../../types';
+import type { PageRoute, Product, User, OrderCustomization } from '../../types';
 import { PosHeader } from './PosHeader';
 import { useDb } from '../../data/DbContext';
 import {
@@ -37,7 +37,7 @@ interface PosCartItem {
 
 const SUGAR_LEVELS = ['0%', '30%', '50%', '70%', '100%'];
 const ICE_LEVELS = ['Không đá', 'Ít đá', 'Đá chuẩn'];
-const METHODS: PaymentMethod[] = ['CASH', 'BANK_TRANSFER'];
+const METHODS: ('CASH' | 'BANK_TRANSFER')[] = ['CASH', 'BANK_TRANSFER'];
 
 export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNavigate, onShowToast }) => {
   const navigate = useNavigate();
@@ -50,7 +50,7 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
   const [orderType, setOrderType] = useState<'DINE_IN' | 'TAKEAWAY'>('DINE_IN');
   const [tableNumber, setTableNumber] = useState('T01');
   const [orderNote, setOrderNote] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'BANK_TRANSFER'>('CASH');
 
   // Khách hàng (users.role = CUSTOMER) tra theo số điện thoại
   const [phoneQuery, setPhoneQuery] = useState('');
@@ -180,8 +180,8 @@ export const PosCreateOrderPage: React.FC<PosCreateOrderPageProps> = ({ onNaviga
       customer_id: customerId,
       cashier_id: session.cashierId,
       order_type: orderType,
-      payment_method: paymentMethod as 'CASH' | 'BANK_TRANSFER',
       status: 'CONFIRMED',
+      payment_method: paymentMethod,
       table_number: orderType === 'DINE_IN' ? tableNumber.trim() : null,
       order_note: orderNote.trim(),
       delivery_fee: 0,

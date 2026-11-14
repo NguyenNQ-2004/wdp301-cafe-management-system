@@ -1,5 +1,5 @@
 import { NumberInput } from '../../components/NumberInput';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { formatVnd, shopApi } from '../../lib/shopApi';
 import useAuthStore from '../../store/authStore';
@@ -20,7 +20,7 @@ interface CounterPayment extends Omit<PaymentRecord, 'order'> {
 }
 
 type CounterMethod = 'CASH' | 'BANK_TRANSFER';
-type GatewayInfo = { bankName: string; accountNo: string; accountName: string; qrUrl: string };
+type GatewayInfo = { bankName: string; accountNo: string; accountName: string; paymentCode: string; qrUrl: string };
 const methodLabels: Record<CounterMethod, string> = { CASH: 'Tiền mặt', BANK_TRANSFER: 'Chuyển khoản' };
 
 export default function CounterPaymentsPage() {
@@ -36,10 +36,11 @@ export default function CounterPaymentsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [cashReceived, setCashReceived] = useState<Record<string, string>>({});
   const [transferReferences, setTransferReferences] = useState<Record<string, string>>({});
+  const previousStatuses = useRef<Record<string, string>>({});
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     if (!user) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const result = await shopApi<CounterPayment[]>('/api/payments', { token: user.token });
       setPayments(result.filter((payment) => payment.order && ['TAKEAWAY', 'DINE_IN'].includes(payment.order.orderType)));
@@ -47,11 +48,24 @@ export default function CounterPaymentsPage() {
     } catch (err) {
       setError((err as Error).message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [user]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  useEffect(() => {
+    const paid = payments.find((payment) => gatewayInfo[payment._id] && previousStatuses.current[payment._id] === 'PENDING' && payment.status === 'SUCCESS');
+    previousStatuses.current = Object.fromEntries(payments.map((payment) => [payment._id, payment.status]));
+    if (paid) setNotice(`Cổng thanh toán đã xác nhận đơn #${paid.order?.orderCode}.`);
+  }, [payments, gatewayInfo]);
+
+  const awaitingGateway = payments.some((payment) => payment.status === 'PENDING' && !!gatewayInfo[payment._id]);
+  useEffect(() => {
+    if (!awaitingGateway) return;
+    const timer = window.setInterval(() => { void refresh(true); }, 5000);
+    return () => window.clearInterval(timer);
+  }, [awaitingGateway, refresh]);
 
   const confirm = async (payment: CounterPayment) => {
     if (!user || busyId) return;
@@ -74,7 +88,7 @@ export default function CounterPaymentsPage() {
         if (!payment.order || payment.paymentMethod !== 'BANK_TRANSFER') throw new Error('Đơn này chưa được tạo với phương thức chuyển khoản.');
         const info = await shopApi<GatewayInfo>(`/api/payments/order/${payment.order._id}/gateway`, { method: 'POST', token: user.token });
         setGatewayInfo((current) => ({ ...current, [payment._id]: info }));
-        setNotice(`Đã tạo mã chuyển khoản cho đơn #${payment.order.orderCode}. Vui lòng chờ cổng thanh toán xác nhận rồi làm mới danh sách.`);
+        setNotice(`Đã tạo mã chuyển khoản cho đơn #${payment.order.orderCode}. Hệ thống sẽ tự cập nhật khi cổng thanh toán xác nhận.`);
       } else {
         const result = await shopApi<{ payment: PaymentRecord }>(`/api/payments/${payment._id}/counter-confirm`, {
           method: 'POST', token: user.token, body: { paymentMethod: selected, ...(selected === 'CASH' ? { receivedAmount } : { transactionCode: reference }) }
@@ -119,7 +133,7 @@ export default function CounterPaymentsPage() {
           {payment.paymentMethod === 'BANK_TRANSFER' && payment.confirmationMode === 'CASHIER' && <label className="mt-3 block text-sm font-semibold">Mã giao dịch chuyển khoản đã đối chiếu
             <input maxLength={100} value={transferReferences[payment._id] || ''} onChange={event => setTransferReferences(current => ({ ...current, [payment._id]: event.target.value }))} className="mt-1 block w-full max-w-md rounded-lg border border-blue-100 p-2.5" />
           </label>}
-          {gatewayInfo[payment._id] && payment.paymentMethod === 'BANK_TRANSFER' && <div className="mt-4 flex flex-wrap items-center gap-4 rounded-lg bg-blue-50 p-4 text-sm"><img src={gatewayInfo[payment._id].qrUrl} alt={`Mã QR thanh toán đơn ${payment.order?.orderCode}`} className="h-40 w-40 bg-white object-contain" /><div><p><strong>Ngân hàng:</strong> {gatewayInfo[payment._id].bankName}</p><p><strong>Tài khoản:</strong> {gatewayInfo[payment._id].accountNo} · {gatewayInfo[payment._id].accountName}</p><p><strong>Nội dung:</strong> {payment.order?.orderCode}</p><p><strong>Mã đối soát:</strong> {payment.transactionCode}</p><p className="mt-2 text-blue-800">Thanh toán vẫn chờ xác nhận từ cổng.</p></div></div>}
+          {gatewayInfo[payment._id] && payment.paymentMethod === 'BANK_TRANSFER' && <div className="mt-4 flex flex-wrap items-center gap-4 rounded-lg bg-blue-50 p-4 text-sm"><img src={gatewayInfo[payment._id].qrUrl} alt={`Mã QR thanh toán đơn ${payment.order?.orderCode}`} className="h-40 w-40 bg-white object-contain" /><div><p><strong>Ngân hàng:</strong> {gatewayInfo[payment._id].bankName}</p><p><strong>Tài khoản:</strong> {gatewayInfo[payment._id].accountNo} · {gatewayInfo[payment._id].accountName}</p><p><strong>Nội dung chuyển khoản:</strong> <span className="select-all font-mono font-bold">{gatewayInfo[payment._id].paymentCode}</span></p><p className="mt-2 text-blue-800">Đang chờ xác nhận chuyển khoản. Trang tự cập nhật sau mỗi 5 giây.</p></div></div>}
         </article>)}</div>
         <h2 className="mt-10 text-xl font-bold">Đã thanh toán ({completed.length})</h2>
         <div className="mt-4 space-y-2">{completed.map((payment) => <div key={payment._id} className="flex flex-wrap justify-between gap-2 rounded-lg border border-blue-100 bg-white p-4"><span>#{payment.order?.orderCode} · {methodLabels[payment.paymentMethod as CounterMethod] || payment.paymentMethod}{payment.transactionCode ? ` · ${payment.transactionCode}` : ''}</span><strong>{formatVnd(payment.amount)}</strong></div>)}</div>
