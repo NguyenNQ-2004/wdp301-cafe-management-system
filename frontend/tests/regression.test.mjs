@@ -8,7 +8,7 @@ import { createServer } from 'vite';
 const memory = new Map([['user', '{invalid json']]);
 globalThis.localStorage = { getItem: key => memory.get(key) ?? null, setItem: (key, value) => memory.set(key, value), removeItem: key => memory.delete(key) };
 globalThis.window = { localStorage: globalThis.localStorage };
-let vite, auth, cart, api, options, credentials, productBadge, BillPage, InterfaceContext, App, SourceScreen, Header, CounterOrderEditor;
+let vite, auth, cart, api, options, credentials, productBadge, shiftStatus, DeliverySidebar, BillPage, InterfaceContext, App, SourceScreen, Header, CounterOrderEditor;
 const account = { _id: 'test-customer', fullName: 'Test Customer', phone: '0999999999', role: 'CUSTOMER', token: 'test-token' };
 const tables = ['users', 'work_schedules', 'categories', 'products', 'orders', 'order_items', 'payments', 'loyalty_transactions', 'customer_reviews', 'suppliers', 'ingredients', 'product_ingredients', 'purchase_orders', 'purchase_order_items', 'inventory_transactions', 'shop_settings'];
 const emptyDb = () => Object.fromEntries(tables.map(table => [table, []]));
@@ -21,8 +21,10 @@ before(async () => {
   options = await vite.ssrLoadModule('/src/lib/cartOptions.ts');
   credentials = await vite.ssrLoadModule('/src/lib/authCredentials.ts');
   productBadge = await vite.ssrLoadModule('/src/lib/productBadge.ts');
+  shiftStatus = await vite.ssrLoadModule('/src/lib/shiftStatus.ts');
   ({ BillPage } = await vite.ssrLoadModule('/src/interface/pages/BillPage.tsx'));
   ({ InterfaceContext } = await vite.ssrLoadModule('/src/interface/LiveProvider.tsx'));
+  ({ DeliverySidebar } = await vite.ssrLoadModule('/src/interface/pages/delivery/DeliverySidebar.tsx'));
   App = (await vite.ssrLoadModule('/src/ConnectedApp.tsx')).default;
   SourceScreen = (await vite.ssrLoadModule('/src/interface/SourceScreen.tsx')).default;
   ({ Header } = await vite.ssrLoadModule('/src/components/Header.tsx'));
@@ -32,6 +34,27 @@ after(async () => { await vite?.close(); });
 beforeEach(() => { cart.getState().clear(); });
 
 test('Corrupt stored authentication does not crash startup', () => assert.equal(auth.getState().user, null));
+test('shift status requires check-in and delivery shows when no shift is assigned', () => {
+  assert.equal(shiftStatus.getShiftStatusLabel({ status: 'SCHEDULED' }), 'Chưa vào ca');
+  assert.equal(shiftStatus.getShiftStatusLabel({ status: 'PRESENT' }), 'Chưa vào ca');
+  assert.equal(shiftStatus.getShiftStatusLabel({ status: 'PRESENT', checkInTime: '2026-11-15T01:00:00Z' }), 'Đang làm việc');
+  assert.equal(shiftStatus.getShiftStatusLabel({ status: 'PRESENT', checkInTime: '2026-11-15T01:00:00Z', checkOutTime: '2026-11-15T09:00:00Z' }), 'Chờ bàn giao');
+
+  const renderSidebar = (db, shipperId) => renderToString(React.createElement(InterfaceContext.Provider, {
+    value: { db, session: { shipperId } }
+  }, React.createElement(DeliverySidebar, { currentRoute: 'delivery-cod', onNavigate() {} })));
+  const unassignedHtml = renderSidebar({ ...emptyDb(), users: [], work_schedules: [], orders: [] }, 0);
+  assert.match(unassignedHtml, /Trạng thái ca:/);
+  assert.match(unassignedHtml, /Chưa được phân ca/);
+
+  const assignedHtml = renderSidebar({
+    ...emptyDb(),
+    users: [{ id: 1, full_name: 'Shipper One', phone: '0900000000' }],
+    work_schedules: [{ id: 1, user_id: 1, work_date: '2026-11-15', shift_name: 'EVENING', status: 'SCHEDULED', check_in_time: null, check_out_time: null }],
+    orders: []
+  }, 1);
+  assert.match(assignedHtml, /Chưa vào ca/);
+});
 test('Legacy mojibake product badges are normalized for home-page filters', () => {
   assert.equal(productBadge.normalizeProductBadge('B├üN CHß║áY'), 'BÁN CHẠY');
   assert.equal(productBadge.normalizeProductBadge('M├ôN Mß╗ÜI'), 'MÓN MỚI');

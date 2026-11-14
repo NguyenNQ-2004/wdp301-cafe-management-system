@@ -16,8 +16,9 @@ export const PosHeader: React.FC<PosHeaderProps> = ({ currentRoute, onNavigate }
   const canRequest = useAuthStore(state => state.user?.role === 'STAFF' && state.user?.position === 'CASHIER');
   const [timeStr, setTimeStr] = useState('');
   const cashier = db.users.find(u => u.id === session.cashierId);
-  // Ca đang làm của thu ngân (work_schedules.status = PRESENT)
-  const schedule = db.work_schedules.find(s => s.user_id === session.cashierId && s.status === 'PRESENT');
+  const schedule = db.work_schedules.find(s =>
+    s.user_id === session.cashierId && s.status === 'PRESENT' && !!s.check_in_time && !s.check_out_time
+  );
 
   useEffect(() => {
     const update = () => setTimeStr(new Date().toLocaleTimeString('vi-VN', { hour12: false }));

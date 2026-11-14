@@ -123,7 +123,7 @@ router.get('/', async (req, res) => {
       filter.user = req.query.userId;
     }
     const schedules = WorkSchedule.find(filter);
-    if (req.user.role === 'STAFF') schedules.select('user workDate shiftName shiftStartTime shiftEndTime note');
+    if (req.user.role === 'STAFF') schedules.select('user workDate shiftName shiftStartTime shiftEndTime checkInTime checkOutTime status note');
     res.json(await attachShiftInfo(await populateUser(schedules)));
   } catch (error) { handleError(error, res); }
 });
