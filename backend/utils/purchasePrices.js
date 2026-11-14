@@ -1,6 +1,7 @@
 const PurchaseOrder = require('../models/PurchaseOrder');
 const PurchaseOrderItem = require('../models/PurchaseOrderItem');
 
+// K-PN: latestPurchasePrices — Tra đơn giá mới nhất của phiếu đã nhận cho từng nguyên liệu, có hỗ trợ dữ liệu cũ.
 async function latestPurchasePrices() {
   const orders = await PurchaseOrder.find({ status: 'RECEIVED' }).sort({ createdAt: -1, _id: -1 }).select('items').lean();
   const prices = new Map();

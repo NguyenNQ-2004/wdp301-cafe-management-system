@@ -15,10 +15,14 @@ type Order = { _id: string; supplier: Supplier | null; creator: { _id: string; f
 type ManagementData = { summary: Record<Status, number>; orders: Order[]; suppliers: Supplier[]; ingredients: Ingredient[] };
 
 const META: Record<Status, [string, string]> = { DRAFT: ['Nháp / Đề xuất', 'bg-stone-100 text-stone-700'], ORDERED: ['Đã đặt hàng', 'bg-blue-100 text-blue-700'], RECEIVED: ['Đã nhập kho', 'bg-emerald-100 text-emerald-800'], CANCELLED: ['Đã hủy', 'bg-rose-100 text-rose-700'] };
+// K-PN: money — Định dạng tổng tiền bằng đồng.
 const money = (value: number) => `${value.toLocaleString('vi-VN')}đ`;
+// K-PN: code — Tạo mã phiếu ngắn từ bốn ký tự cuối của ID.
 const code = (id: string) => `PO-${id.slice(-4).toUpperCase()}`;
+// K-PN: dateTime — Định dạng ngày giờ tạo phiếu.
 const dateTime = (value: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
 
+// K-PN: AdminPurchasesPage — Hiển thị danh sách, chi tiết và biểu mẫu phiếu nhập.
 export default function AdminPurchasesPage() {
   const navigate = useNavigate();
   const token = useAuthStore((state) => state.user?.token);
@@ -34,6 +38,7 @@ export default function AdminPurchasesPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
+  // K-PN: loadData — Tải phiếu, nhà cung cấp và nguyên liệu cho màn quản lý.
   const loadData = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -58,8 +63,11 @@ export default function AdminPurchasesPage() {
   const supplierIngredients = ingredients.filter((ingredient) => ingredient.supplier?._id === supplierId);
   const draftTotal = items.reduce((sum, item) => sum + Number(item.totalCost || 0), 0);
 
+  // K-PN: itemForIngredient — Tạo dòng nhập mặc định cho nguyên liệu.
   const itemForIngredient = (ingredient: Ingredient): FormItem => newPurchaseLine(ingredient);
-  // Reset the supplier and ingredient lines when opening the form. New purchase orders are submitted as drafts.
+  // K-PN: Khởi tạo lại nhà cung cấp và các dòng nguyên liệu mỗi lần mở biểu mẫu.
+  // Khi lưu, giao diện gửi phiếu ở trạng thái DRAFT (Nháp / Đề xuất).
+  // K-PN: openCreate — Mở biểu mẫu tạo phiếu nháp.
   const openCreate = () => {
     const firstSupplier = suppliers[0];
     const firstIngredient = ingredients.find((ingredient) => ingredient.supplier?._id === firstSupplier?._id);
@@ -69,13 +77,16 @@ export default function AdminPurchasesPage() {
     setNote('');
     setCreateOpen(true);
   };
+  // K-PN: changeSupplier — Đổi nhà cung cấp và làm mới dòng nguyên liệu tương ứng.
   const changeSupplier = (nextSupplierId: string) => {
     const firstIngredient = ingredients.find((ingredient) => ingredient.supplier?._id === nextSupplierId);
     setSupplierId(nextSupplierId);
     setItems(firstIngredient ? [itemForIngredient(firstIngredient)] : []);
   };
+  // K-PN: updateItem — Cập nhật dòng nguyên liệu theo vị trí trong biểu mẫu.
   const updateItem = (index: number, patch: Partial<FormItem>) => setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
 
+  // K-PN: createOrder — Gửi dữ liệu tạo phiếu nháp và tải lại danh sách.
   const createOrder = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!token || !supplierId || items.length === 0 || saving) return;
@@ -92,7 +103,9 @@ export default function AdminPurchasesPage() {
     }
   };
 
-  // The receive action moves an ordered purchase to received. The API adds stock and records inventory movements.
+  // K-PN: Gửi trạng thái đích cho API. Khi xác nhận Nhập kho, API chuyển ORDERED sang RECEIVED,
+  // cộng tồn theo từng dòng nguyên liệu và ghi lại giao dịch nhập.
+  // K-PN: changeStatus — Gửi yêu cầu đặt hàng, nhận hàng hoặc hủy phiếu.
   const changeStatus = async (order: Order, next: Status) => {
     if (!token || saving) return;
     const warning = next === 'RECEIVED' ? `Xác nhận đã nhận hàng cho ${code(order._id)}? Tồn kho sẽ được cập nhật.` : next === 'CANCELLED' ? `Hủy ${code(order._id)}?` : '';

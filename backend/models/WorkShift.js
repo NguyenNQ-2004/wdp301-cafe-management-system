@@ -9,6 +9,6 @@ const workShiftSchema = new mongoose.Schema({
 workShiftSchema.index({ weekStart: 1, shiftName: 1 }, { unique: true });
 workShiftSchema.pre('validate', function () {
   if (this.weekStart && (this.weekStart.getUTCDay() !== 1 || this.weekStart.getUTCHours() !== 0)) this.invalidate('weekStart', 'Tuần phải bắt đầu vào thứ Hai.');
-  if (this.startTime >= this.endTime) this.invalidate('endTime', 'Giờ kết thúc phải sau giờ bắt đầu.');
+  if (this.startTime === this.endTime) this.invalidate('endTime', 'Giờ bắt đầu và kết thúc không được trùng nhau.');
 });
 module.exports = mongoose.model('WorkShift', workShiftSchema);

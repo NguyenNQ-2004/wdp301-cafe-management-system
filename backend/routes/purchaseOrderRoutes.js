@@ -16,12 +16,14 @@ const ALLOWED_TRANSITIONS = { DRAFT: ['ORDERED', 'CANCELLED'], ORDERED: ['RECEIV
 
 router.use(protect, adminOnly);
 
+// K-PN: populateOrder — Gắn thông tin nhà cung cấp, người tạo và nguyên liệu vào dữ liệu phiếu.
 const populateOrder = (query) => query
   .populate('supplier', 'name phone address status')
   .populate('creator', 'fullName phone role')
   .populate('items.ingredient', 'name unit currentStock minStockLevel supplier');
 
-// Complete payload used by the Purchase Order management screen.
+// K-PN: Trả dữ liệu tổng quan cho màn Phiếu nhập hàng, gồm danh sách phiếu và dữ liệu dùng để tạo phiếu.
+// K-PN: GET /management-overview — Tải dữ liệu cho màn quản lý phiếu nhập.
 router.get('/management-overview', async (req, res) => {
   try {
     const [orders, suppliers, ingredients, latestPrices] = await Promise.all([
@@ -41,7 +43,8 @@ router.get('/management-overview', async (req, res) => {
   }
 });
 
-// Aggregated data used by the Restock Request screen.
+// K-PN: Tổng hợp dữ liệu tồn, giá nhập và các phiếu đang mở cho luồng bổ sung hàng.
+// K-PN: GET /restock-overview — Tổng hợp dữ liệu phục vụ luồng bổ sung hàng.
 router.get('/restock-overview', async (req, res) => {
   try {
     const [ingredients, orders, latestPrices] = await Promise.all([
@@ -71,6 +74,7 @@ router.get('/restock-overview', async (req, res) => {
   }
 });
 
+// K-PN: GET / — Liệt kê phiếu nhập theo bộ lọc.
 router.get('/', async (req, res) => {
   try {
     const filter = {};
@@ -89,7 +93,9 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Check the role and current status before transitioning, and record the actor in the request history.
+// K-PN: Kiểm tra trạng thái khởi tạo, chuẩn hóa số lượng và tổng tiền từng dòng, rồi tính đơn giá.
+// Xác thực nhà cung cấp còn hoạt động và các nguyên liệu trên phiếu đều thuộc nhà cung cấp đó.
+// K-PN: POST / — Tạo phiếu nhập sau khi kiểm tra nhà cung cấp và chi tiết phiếu.
 router.post('/', async (req, res) => {
   try {
     const { supplier, items, note, status = 'DRAFT' } = req.body;
@@ -127,7 +133,9 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Keep suppliers referenced by ingredients or purchase orders so historical records retain their links.
+// K-PN: Chỉ chuyển trạng thái theo các bước được phép. Khi nhận hàng, gọi luồng chung để tạo lô và giao dịch IN_PURCHASE.
+// Với các bước còn lại, chỉ cập nhật nếu trạng thái trong database vẫn khớp với trạng thái vừa đọc.
+// K-PN: PUT /:id/status — Kiểm tra và cập nhật trạng thái phiếu nhập.
 router.put('/:id/status', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã phiếu nhập không hợp lệ.' });

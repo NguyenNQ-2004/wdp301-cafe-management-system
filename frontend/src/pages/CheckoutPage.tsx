@@ -52,6 +52,8 @@ export default function CheckoutPage({ onRequestAuth }: { onRequestAuth: () => v
   const step = loyalty?.rules?.points_step || 10;
   const stepValue = loyalty?.rules?.points_step_value ?? 2000;
   const points = loyalty?.canRedeem && stepValue > 0 ? Math.min(Math.floor((cart.pointsToUse || 0) / step), Math.floor(loyalty.totalPoints / step), Math.floor(subtotal / stepValue)) * step : 0;
+  // [DT13] . Điểm dùng lấy từ lựa chọn ở giỏ hàng, làm tròn theo bậc và giới hạn bởi số dư cùng tiền món; giảm giá không tính vào phí giao hàng.
+  // [DT13] ... Khi xác nhận đơn, pointsToRedeem được gửi trong POST /api/orders để backend kiểm tra lại. [DT14]
   const discount = points / step * stepValue;
   const selectedArea = areas.find(a => a.district.toLowerCase() === district.trim().toLowerCase());
   const configuredDistrictFee = selectedArea?.deliveryFee ?? 0;

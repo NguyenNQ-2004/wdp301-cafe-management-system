@@ -10,8 +10,10 @@ import useAuthStore from '../../store/authStore';
 type Ingredient = { _id: string; name: string; unit: string; currentStock: number; minStockLevel: number; isActive?: boolean };
 type RequestRow = { _id: string; requester?: { fullName: string }; reviewer?: { fullName: string }; status: string; reason: string; note: string; reviewNote?: string; createdAt: string; updatedAt: string; history?: { actor?: { fullName: string }; action: string; at: string; note?: string }[]; items: { ingredient: Ingredient | null; quantity: number; itemNote?: string }[] };
 const labels: Record<string, string> = { DRAFT: 'Bản nháp', PENDING_APPROVAL: 'Chờ duyệt', APPROVED: 'Đã duyệt', REJECTED: 'Từ chối', CANCELLED: 'Đã hủy' };
+// K-DX: AdminRestockRequestsPage — Hiển thị danh sách và thao tác đề xuất theo vai trò.
 export default function AdminRestockRequestsPage({ cashier = false }: { cashier?: boolean }) {
   const [editing, setEditing] = useState<RequestRow | null>(null);
+  // K-DX: wrap — Chọn bố cục cho thu ngân hoặc quản trị viên.
   const wrap = (children: ReactNode) => cashier ? <><CashierWorkHeader currentRoute="pos-restock" /><main className="mx-auto max-w-6xl p-6"><h1 className="mb-5 text-2xl font-bold">Đề xuất nhập hàng</h1>{children}</main></> : <AdminLayout title="Đề xuất nhập hàng" activePath="/admin/restock-requests" subtitle="Xem lịch sử và xác nhận hoặc từ chối đề xuất của thu ngân." actions={<Link to="/admin/purchases">Phiếu nhập hàng →</Link>}>{children}</AdminLayout>;
   const token = useAuthStore(state => state.user?.token);
   const [rows, setRows] = useState<RequestRow[]>([]);
@@ -36,13 +38,16 @@ export default function AdminRestockRequestsPage({ cashier = false }: { cashier?
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [token, revision]);
+  // K-DX: create — Gửi dữ liệu tạo đề xuất nhập hàng.
   const create = async (event: FormEvent) => {
     event.preventDefault(); if (busy || !token) return;
     setBusy(true); setError('');
     try { await shopApi(`/api/restock-requests${editing ? '/' + editing._id : ''}`, { method: editing ? 'PUT' : 'POST', token, body: { status, reason, note, items: [{ ingredient, quantity }, ...(editing?.items.slice(1).map(item => ({ ingredient: item.ingredient?._id, quantity: item.quantity })) || [])], ...(editing ? { expectedUpdatedAt: editing.updatedAt } : {}) } }); setEditing(null); setQuantity(''); setReason(''); setNote(''); setRevision(value => value + 1); }
     catch (failure) { setError((failure as Error).message); } finally { setBusy(false); }
   };
-  // Send submission, cancellation, and review actions through the same endpoint. The API checks the actor and current status.
+  // K-DX: Gửi, hủy, duyệt và từ chối đề xuất qua cùng API chuyển trạng thái.
+  // API kiểm tra quyền, trạng thái hiện tại và quyền sở hữu khi thu ngân thao tác.
+  // K-DX: transition — Gửi yêu cầu chuyển trạng thái đề xuất.
   const transition = async (id: string, action: string) => {
     if (busy || !token) return; setBusy(true); setError('');
     try { await shopApi(`/api/restock-requests/${id}/transition`, { method: 'POST', token, body: { action, reviewNote: reviewNotes[id] || '' } }); setRevision(value => value + 1); }

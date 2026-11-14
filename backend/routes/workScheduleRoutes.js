@@ -123,7 +123,7 @@ router.get('/', async (req, res) => {
       filter.user = req.query.userId;
     }
     const schedules = WorkSchedule.find(filter);
-    if (req.user.role === 'STAFF') schedules.select('user workDate shiftName shiftStartTime shiftEndTime note');
+    if (req.user.role === 'STAFF') schedules.select('user workDate shiftName shiftStartTime shiftEndTime checkInTime checkOutTime status note');
     res.json(await attachShiftInfo(await populateUser(schedules)));
   } catch (error) { handleError(error, res); }
 });
@@ -256,7 +256,9 @@ router.put('/:id/shift-action', async (req, res) => {
       if (workDay < today) {
         const [year, month, day] = workDay.split('-').map(Number);
         const [hour, minute] = shiftEnd.split(':').map(Number);
-        changes.checkOutTime = new Date(Date.UTC(year, month - 1, day, hour - 7, minute));
+        const checkOutDay = new Date(Date.UTC(year, month - 1, day));
+        if (shiftEnd <= shiftStart) checkOutDay.setUTCDate(checkOutDay.getUTCDate() + 1);
+        changes.checkOutTime = new Date(Date.UTC(checkOutDay.getUTCFullYear(), checkOutDay.getUTCMonth(), checkOutDay.getUTCDate(), hour - 7, minute));
       } else changes.checkOutTime = now;
       changes.status = 'COMPLETED';
       if (cash !== undefined) changes.endingCashActual = cash;

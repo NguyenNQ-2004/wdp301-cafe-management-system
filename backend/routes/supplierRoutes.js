@@ -11,6 +11,7 @@ const PHONE_PATTERN = /^[0-9+().\s-]{8,20}$/;
 
 router.use(protect, adminOnly);
 
+// K-NCC: normalizePayload — Chuẩn hóa dữ liệu biểu mẫu nhà cung cấp.
 const normalizePayload = (body) => ({
   name: typeof body.name === 'string' ? body.name.trim() : '',
   phone: typeof body.phone === 'string' ? body.phone.trim() : '',
@@ -18,6 +19,7 @@ const normalizePayload = (body) => ({
   status: body.status || 'ACTIVE'
 });
 
+// K-NCC: validatePayload — Kiểm tra dữ liệu bắt buộc và trạng thái nhà cung cấp.
 const validatePayload = (payload) => {
   if (!payload.name) return 'Tên nhà cung cấp là bắt buộc.';
   if (payload.name.length > 120) return 'Tên nhà cung cấp không được vượt quá 120 ký tự.';
@@ -27,6 +29,7 @@ const validatePayload = (payload) => {
   return null;
 };
 
+// K-NCC: duplicateFilter — Tạo bộ lọc kiểm tra trùng tên hoặc số điện thoại.
 const duplicateFilter = (payload, excludedId) => {
   const conditions = [{ name: { $regex: `^${payload.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }];
   if (payload.phone) conditions.push({ phone: payload.phone });
@@ -35,6 +38,7 @@ const duplicateFilter = (payload, excludedId) => {
   return filter;
 };
 
+// K-NCC: GET /overview — Tổng hợp nhà cung cấp cùng nguyên liệu và số phiếu liên quan.
 router.get('/overview', async (req, res) => {
   try {
     const [suppliers, ingredientGroups, orderGroups] = await Promise.all([
@@ -67,6 +71,7 @@ router.get('/overview', async (req, res) => {
   }
 });
 
+// K-NCC: GET / — Liệt kê nhà cung cấp theo bộ lọc.
 router.get('/', async (req, res) => {
   try {
     const filter = {};
@@ -80,6 +85,7 @@ router.get('/', async (req, res) => {
   }
 });
 
+// K-NCC: GET /:id — Đọc chi tiết nhà cung cấp theo ID.
 router.get('/:id', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã nhà cung cấp không hợp lệ.' });
@@ -91,6 +97,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// K-NCC: POST / — Tạo nhà cung cấp sau khi kiểm tra dữ liệu trùng.
 router.post('/', async (req, res) => {
   try {
     const payload = normalizePayload(req.body);
@@ -103,6 +110,7 @@ router.post('/', async (req, res) => {
   }
 });
 
+// K-NCC: PUT /:id — Cập nhật nhà cung cấp sau khi kiểm tra dữ liệu trùng.
 router.put('/:id', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã nhà cung cấp không hợp lệ.' });
@@ -118,7 +126,9 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Cashiers can edit their own draft or rejected requests. The update timestamp detects stale edits.
+// K-NCC: Chặn xóa nhà cung cấp đang được nguyên liệu hoặc phiếu nhập tham chiếu để giữ liên kết lịch sử.
+// Nếu đã ngừng hợp tác, có thể cập nhật trạng thái thay vì xóa hồ sơ.
+// K-NCC: DELETE /:id — Xóa nhà cung cấp khi đã kiểm tra các liên kết.
 router.delete('/:id', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã nhà cung cấp không hợp lệ.' });

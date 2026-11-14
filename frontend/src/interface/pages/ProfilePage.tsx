@@ -52,6 +52,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
   }, [user?.id, user?.full_name, user?.phone, user?.email, user?.birthday, user?.address]);
 
   const updateForm = (patch: Partial<typeof formData>) => {
+    // [HS01] . Cập nhật ô vừa sửa và đánh dấu dirty để dữ liệu tải lại không ghi đè nội dung đang nhập.
     dirty.current = true;
     setProfileError('');
     setFormData(current => ({ ...current, ...patch }));
@@ -67,12 +68,15 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
     .sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : b.id - a.id));
   let running = user.total_points;
   const historyWithBalance = history.map(h => {
+    // [HS08] . Tính số dư lùi từ điểm hiện tại qua lịch sử mới nhất trước, chỉ hiển thị giao dịch của khách đang đăng nhập.
     const balanceAfter = running;
     running -= h.points_change;
     return { ...h, balanceAfter };
   });
 
   const handleSaveProfile = async (e: React.FormEvent) => {
+    // [HS02] . Nút Lưu thay đổi hồ sơ gửi tên, số điện thoại, email, ngày sinh và địa chỉ; kiểm tra số điện thoại trước khi gửi.
+    // [HS02] ... Gửi PUT /api/auth/profile kèm token để lưu hồ sơ của chính người đang đăng nhập. [HS03]
     e.preventDefault();
     if (!account?.token || isSaving) return;
     setIsSaving(true);
@@ -84,6 +88,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
       if (updated.phone !== phone) throw new Error('Máy chủ chưa lưu số điện thoại mới. Vui lòng khởi động lại backend bản mới và thử lại.');
       dirty.current = false;
       setFormData({ full_name: updated.fullName, phone: updated.phone, email: updated.email ?? '', birthday: updated.birthday?.slice(0, 10) ?? '', address: updated.address ?? '' });
+      // [HS04] .. Hồ sơ được lưu thì đồng bộ form và phiên đăng nhập, tải lại dữ liệu rồi báo thành công; lỗi nằm tại profileError.
       useAuthStore.getState().login({ ...account, ...updated, address: updated.address ?? undefined });
       await refresh();
       onShowToast?.('Đã cập nhật thông tin cá nhân thành công!');
@@ -92,6 +97,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
+    // [HS05] . Kiểm tra mật khẩu mới và xác nhận giống nhau; mật khẩu hiện tại gửi để backend đối chiếu.
+    // [HS05] ... Gửi PUT /api/auth/change-password cùng oldPassword, newPassword, confirmPassword. [HS06]
     e.preventDefault();
     const newPasswordValidationError = passwordError(passwordData.newPassword);
     if (newPasswordValidationError) {
@@ -106,6 +113,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
     try {
       await shopApi('/api/auth/change-password', { method: 'PUT', token: account.token, body: { oldPassword: passwordData.oldPassword, newPassword: passwordData.newPassword, confirmPassword: passwordData.confirmPassword } });
       setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
+      // [HS07] .. Đổi thành công thì xóa các ô mật khẩu, đăng xuất và về trang chủ để đăng nhập lại.
       useAuthStore.getState().logout();
       onNavigate('home');
       onShowToast?.('Đổi mật khẩu thành công. Vui lòng đăng nhập lại.');
@@ -183,11 +191,14 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
               <h2 className="text-lg font-bold text-stone-900">Thông tin cá nhân</h2>
               <p className="text-xs text-stone-500">Địa chỉ được dùng làm địa chỉ giao hàng mặc định.</p>
             </div>
+            {/* [HS01] . Tab Thông tin cá nhân mở form này; Lưu thay đổi hồ sơ hoặc Enter gọi handleSaveProfile(). */}
+            {/* [HS01] ... Kiểm tra và gửi các trường vừa sửa. [HS02] */}
             <form onSubmit={handleSaveProfile} className="space-y-4 text-xs">
               {profileError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-red-700">{profileError}</p>}
               <fieldset disabled={isSaving} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
+                  {/* [HS01] . Họ tên cập nhật full_name qua updateForm(), bắt buộc nhập. */}
                   <label className="font-bold text-stone-700 block mb-1">Họ và tên *</label>
                   <input
                     type="text"
@@ -199,6 +210,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
                   />
                 </div>
                 <div>
+                  {/* [HS01] . Số điện thoại cập nhật phone; số mới dùng cho đăng nhập và liên hệ sau khi lưu. */}
                   <label htmlFor="profile-phone" className="font-bold text-stone-700 block mb-1">Số điện thoại *</label>
                   <input
                     id="profile-phone"
@@ -216,6 +228,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
+                  {/* [HS01] . Email đăng nhập cập nhật email, không được để trống khi lưu. */}
                   <label className="font-bold text-stone-700 block mb-1">Gmail / Email đăng nhập *</label>
                   <input
                     type="email"
@@ -227,6 +240,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
                   />
                 </div>
                 <div>
+                  {/* [HS01] . Ngày sinh cập nhật birthday theo giá trị của ô date. */}
                   <label className="font-bold text-stone-700 block mb-1">Ngày sinh</label>
                   <input
                     type="date"
@@ -237,6 +251,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
                 </div>
               </div>
               <div>
+                {/* [HS01] . Địa chỉ cập nhật address, tối đa 500 ký tự; chỉ ghi database khi lưu. */}
                 <label className="font-bold text-stone-700 block mb-1">Địa chỉ</label>
                 <textarea
                   rows={2}
@@ -307,6 +322,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
               <h2 className="text-lg font-bold text-stone-900">Đổi mật khẩu</h2>
               <p className="text-xs text-stone-500">Mật khẩu được băm và lưu vào users.password_hash.</p>
             </div>
+            {/* [HS05] . Ba ô cập nhật oldPassword, newPassword và confirmPassword trong passwordData. */}
+            {/* [HS05] . Nút mắt chỉ hiện/ẩn ký tự ô tương ứng, không đổi giá trị mật khẩu; nút cập nhật gửi form đến handleChangePassword(). */}
             <form onSubmit={handleChangePassword} className="space-y-4 max-w-md text-xs">
               {([
                 { key: 'oldPassword', label: 'Mật khẩu hiện tại', placeholder: 'Nhập mật khẩu hiện tại' },

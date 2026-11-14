@@ -3,6 +3,8 @@ import { shopApi } from '../lib/shopApi';
 import type { LoyaltySummary } from '../types/shop';
 
 export default function useLoyalty(token?: string) {
+  // [DT13] . Giỏ hàng và checkout đọc số dư/khả năng đổi điểm qua /api/rewards, đọc tỷ lệ qua /api/loyalty-transactions/rules.
+  // [DT13] .. Chưa đăng nhập thì không đọc điểm; lỗi API được trả về màn hình, không tự coi là 0 điểm.
   const [summary, setSummary] = useState<LoyaltySummary | null>(null);
   const [loading, setLoading] = useState(!!token);
   const [error, setError] = useState('');

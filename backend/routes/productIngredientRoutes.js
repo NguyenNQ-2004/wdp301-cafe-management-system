@@ -7,12 +7,15 @@ const { atomicRouter } = require('../utils/atomicRoute');
 const router = atomicRouter(express.Router());
 router.use(protect);
 router.get('/', async (req, res) => {
+  // [CT00] . Đọc công thức, có thể lọc theo productId; populate tên sản phẩm và thông tin nguyên liệu để hiển thị.
   try {
     const filter = req.query.productId ? { product: objectId(req.query.productId) } : {};
     res.json(await ProductIngredient.find(filter).populate('product', 'name basePrice imageUrl').populate('ingredient', 'name unit currentStock'));
   } catch (error) { sendError(res, error); }
 });
 router.put('/product/:productId', adminOnly, async (req, res) => {
+  // [CT03] . Nhận toàn bộ các dòng công thức của một sản phẩm, không chỉ dòng vừa chỉnh trên form.
+  // [CT03] ... Chuyển danh sách items sang changeRecipe() để kiểm tra và đồng bộ công thức. [CT04]
   try {
     objectBody(req.body);
     const recipe = await changeRecipe(req.params.productId, () => req.body.items);

@@ -1,7 +1,8 @@
 import React from 'react';
 import type { PageRoute } from '../../types';
 import { useDb } from '../../data/DbContext';
-import { SCHEDULE_STATUS_LABEL, SHIFT_LABEL, initials } from '../../data/dbUtils';
+import { SHIFT_LABEL, initials } from '../../data/dbUtils';
+import { getShiftStatusLabel } from '../../../lib/shiftStatus';
 
 interface DeliverySidebarProps {
   currentRoute: PageRoute;
@@ -15,6 +16,9 @@ export const DeliverySidebar: React.FC<DeliverySidebarProps> = ({ currentRoute, 
   const schedule = db.work_schedules
     .filter(s => s.user_id === session.shipperId && s.status !== 'COMPLETED')
     .sort((a, b) => (a.work_date < b.work_date ? -1 : 1))[0];
+  const scheduleStatus = schedule
+    ? getShiftStatusLabel({ status: schedule.status, checkInTime: schedule.check_in_time, checkOutTime: schedule.check_out_time })
+    : 'Chưa được phân ca';
   const activeCount = db.orders.filter(o => o.shipper_id === session.shipperId && (o.status === 'READY' || o.status === 'DELIVERING')).length;
 
   return (
@@ -45,12 +49,10 @@ export const DeliverySidebar: React.FC<DeliverySidebarProps> = ({ currentRoute, 
                 {schedule ? `${SHIFT_LABEL[schedule.shift_name] || schedule.shift_name || 'Chưa đặt tên'} ${schedule.work_date}` : 'Chưa xếp ca'}
               </span>
             </div>
-            {schedule && (
-              <div className="flex items-center justify-between">
-                <span className="text-stone-500">Trạng thái ca:</span>
-                <span className="font-semibold text-emerald-700">{SCHEDULE_STATUS_LABEL[schedule.status]}</span>
-              </div>
-            )}
+            <div className="flex items-center justify-between">
+              <span className="text-stone-500">Trạng thái ca:</span>
+              <span className={`font-semibold ${!schedule ? 'text-stone-500' : scheduleStatus === 'Đang làm việc' ? 'text-emerald-700' : scheduleStatus === 'Vắng mặt' ? 'text-red-700' : 'text-amber-700'}`}>{scheduleStatus}</span>
+            </div>
           </div>
         </div>
 

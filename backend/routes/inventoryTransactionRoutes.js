@@ -13,6 +13,7 @@ const TRANSACTION_TYPES = ['IN_PURCHASE', 'OUT_ORDER', 'ADJUSTMENT', 'SPOILAGE']
 
 router.use(protect);
 
+// K-XN: inferredDelta — Xác định lượng tăng hoặc giảm, kể cả giao dịch cũ thiếu stockDelta.
 const inferredDelta = (transaction) => {
   if (typeof transaction.stockDelta === 'number') return transaction.stockDelta;
   return ['OUT_ORDER', 'SPOILAGE'].includes(transaction.transactionType)
@@ -20,12 +21,14 @@ const inferredDelta = (transaction) => {
     : transaction.quantity;
 };
 
+// K-XN: transactionJson — Chuẩn hóa giao dịch kho trước khi trả về giao diện.
 const transactionJson = (transaction) => {
   const value = transaction.toObject ? transaction.toObject() : transaction;
   return { ...value, stockDelta: inferredDelta(value) };
 };
 
-// Dashboard payload for the Inventory Management screen.
+// K-XN: Trả về số lượng, tình trạng và giá trị tồn để hiển thị tổng quan kho.
+// K-XN: GET /overview — Tổng hợp tồn kho và giá trị tồn.
 router.get('/overview', adminOnly, async (req, res) => {
   try {
     const ingredients = await Ingredient.find()
@@ -57,7 +60,8 @@ router.get('/overview', adminOnly, async (req, res) => {
   }
 });
 
-// Inventory history with optional filters and bounded pagination.
+// K-XN: Đọc lịch sử biến động kho theo bộ lọc tùy chọn và giới hạn số bản ghi trả về.
+// K-XN: GET / — Tra cứu lịch sử xuất nhập.
 router.get('/', adminOnly, async (req, res) => {
   try {
     const filter = {};
@@ -83,7 +87,9 @@ router.get('/', adminOnly, async (req, res) => {
   }
 });
 
-// Record adjustments and spoilage here. Stock reductions follow FIFO, and the ledger records the lot allocations.
+// K-XN: Ghi nhận điều chỉnh tăng, giảm hoặc hao hụt. Khi giảm tồn, trừ các lô theo FIFO.
+// Lưu số lượng, chi phí và phân bổ theo lô trong giao dịch để tra cứu lại.
+// K-XN: POST / — Ghi phiếu điều chỉnh hoặc hao hụt.
 router.post('/', adminOnly, async (req, res) => {
   let release;
   try {

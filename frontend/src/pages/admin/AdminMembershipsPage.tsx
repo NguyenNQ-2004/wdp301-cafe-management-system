@@ -116,6 +116,8 @@ export const AdminMembershipsPage: React.FC = () => {
 
   // 1. Fetch Rules
   const fetchRules = useCallback(async () => {
+    // [DT01] . Mở trang thì đọc tỷ lệ tích/đổi điểm bằng GET /api/loyalty-transactions/rules.
+    // [DT01] ... Backend đọc quy tắc từ ShopSetting. [DT02]
     if (!user?.token) return;
     try {
       const res = await fetch(`${API_BASE}/api/loyalty-transactions/rules`, {
@@ -124,6 +126,7 @@ export const AdminMembershipsPage: React.FC = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Không tải được cấu hình tích điểm.');
       if (res.ok) {
+        // [DT03] .. Gán quy tắc vào ba ô cấu hình; dùng mặc định khi phản hồi thiếu giá trị tương ứng.
         setRules({
           points_earn_unit: data.points_earn_unit || 1000,
           points_step: data.points_step || 10,
@@ -138,6 +141,7 @@ export const AdminMembershipsPage: React.FC = () => {
 
   // 2. Fetch Stats
   const fetchStats = useCallback(async () => {
+    // [DT10] . GET /stats đọc số khách có điểm, tổng điểm, giá trị quy đổi và số giao dịch để hiển thị thống kê.
     if (!user?.token) return;
     try {
       const res = await fetch(`${API_BASE}/api/loyalty-transactions/stats`, {
@@ -153,6 +157,8 @@ export const AdminMembershipsPage: React.FC = () => {
 
   // 3. Fetch Real-time Logs
   const fetchLogs = useCallback(async () => {
+    // [DT10] . Bộ lọc loại giao dịch đổi filterType, useEffect tải tối đa 50 giao dịch bằng GET /api/loyalty-transactions.
+    // [DT10] ... Backend lọc lịch sử theo quyền và loại giao dịch. [DT11]
     if (!user?.token) return;
     setLogsLoading(true);
     try {
@@ -165,6 +171,7 @@ export const AdminMembershipsPage: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Không tải được lịch sử tích điểm.');
+      // [DT12] .. Nhận lịch sử cho bảng: khách hàng, điểm tăng/giảm, số dư, loại, lý do và người thực hiện.
       setLogs(data.transactions || []);
     } catch (err: any) {
       showToast(err.message || 'Không tải được lịch sử tích điểm.', 'error');
@@ -184,6 +191,8 @@ export const AdminMembershipsPage: React.FC = () => {
 
   // Handle Search Phone Lookup
   const handleSearchPhone = async (e?: React.FormEvent) => {
+    // [DT07] . Nút tra cứu gửi số điện thoại đã nhập bằng GET /lookup?phone=... kèm token; ô trống thì dừng.
+    // [DT07] ... Backend tìm CUSTOMER theo số điện thoại. [DT08]
     if (e) e.preventDefault();
     if (!searchPhone.trim() || !user?.token) return;
     setLookupLoading(true);
@@ -194,6 +203,7 @@ export const AdminMembershipsPage: React.FC = () => {
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Không tìm thấy khách hàng');
+      // [DT09] .. Có kết quả thì hiện hồ sơ, điểm, giá trị quy đổi và các nút điều chỉnh; không tìm thấy thì xóa kết quả cũ, báo lỗi.
       setLookupResult(data);
       showToast(`Đã tìm thấy hội viên: ${data.user.fullName}`);
     } catch (err: any) {
@@ -206,6 +216,8 @@ export const AdminMembershipsPage: React.FC = () => {
 
   // Handle Save Rules
   const handleSaveRules = async (e: React.FormEvent) => {
+    // [DT04] . Lưu quy tắc kiểm tra đơn vị tích và bậc đổi lớn hơn 0, giá trị quy đổi không âm.
+    // [DT04] ... Gửi PUT /api/loyalty-transactions/rules để Admin lưu cấu hình. [DT05]
     e.preventDefault();
     if (!user?.token) return;
     if (rules.points_earn_unit <= 0 || rules.points_step <= 0 || rules.points_step_value < 0) {
@@ -224,6 +236,7 @@ export const AdminMembershipsPage: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Lỗi lưu quy tắc');
+      // [DT06] .. Lưu thành công thì hiện thông báo, tải lại quy tắc và thống kê theo tỷ lệ mới.
       showToast(data.message || 'Đã lưu cấu hình quy tắc thành công!');
       fetchRules();
       fetchStats();
@@ -236,6 +249,7 @@ export const AdminMembershipsPage: React.FC = () => {
 
   // Handle Adjust Points (Earn / Redeem)
   const handleAdjustPoints = async (e: React.FormEvent) => {
+    // [CD02] . Nhận form xác nhận; cần có khách đã tra cứu, phiên đăng nhập và số điểm lớn hơn 0.
     e.preventDefault();
     if (!adjustModal || !lookupResult || !user?.token) return;
     if (adjustModal.points <= 0) {
@@ -243,6 +257,7 @@ export const AdminMembershipsPage: React.FC = () => {
       return;
     }
 
+    // [CD02] . Cộng điểm dùng số dương; cùng hàm này dùng số âm khi chọn trừ điểm và chặn trừ vượt số dư.
     const pointsDelta = adjustModal.type === 'add' ? adjustModal.points : -adjustModal.points;
 
     if (adjustModal.type === 'subtract' && adjustModal.points > lookupResult.user.totalPoints) {
@@ -252,6 +267,8 @@ export const AdminMembershipsPage: React.FC = () => {
 
     setSubmittingAdjust(true);
     try {
+      // [CD02] . Gửi mã khách, số điểm thay đổi, lý do và token bằng POST /api/loyalty-transactions/adjust.
+      // [CD02] ... Chuyển yêu cầu sang backend để kiểm tra quyền và dữ liệu điều chỉnh. [CD03]
       const res = await fetch(`${API_BASE}/api/loyalty-transactions/adjust`, {
         method: 'POST',
         headers: {
@@ -267,12 +284,15 @@ export const AdminMembershipsPage: React.FC = () => {
         })
       });
       const data = await res.json();
+      // [CD06] . Đọc kết quả API; thất bại thì hiện lỗi, giữ form để người dùng kiểm tra lại.
       if (!res.ok) throw new Error(data.message || 'Lỗi điều chỉnh điểm');
 
+      // [CD06] .. Cộng điểm thành công thì hiện thông báo và đóng form.
       showToast(data.message);
       setAdjustModal(null);
 
       // Refresh lookup, stats & logs
+      // [CD06] . Tải lại kết quả tra cứu khách, thống kê và lịch sử để hiển thị số điểm vừa lưu.
       handleSearchPhone();
       fetchStats();
       fetchLogs();
@@ -342,6 +362,7 @@ export const AdminMembershipsPage: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* [DT04] . points_earn_unit là tiền hàng sau giảm giá cần cho 1 điểm; ô này sửa quy tắc, chưa cộng điểm cho khách. */}
             <Field label="Chi tiêu để được 1 điểm (VNĐ) *" column="points_earn_unit">
               <NumberInput
                 type="number"
@@ -353,6 +374,7 @@ export const AdminMembershipsPage: React.FC = () => {
               />
             </Field>
 
+            {/* [DT04] . points_step là số điểm của mỗi bậc đổi; khi đổi điểm hệ thống làm tròn theo bậc này. */}
             <Field label="Bậc đổi điểm (điểm) *" column="points_step">
               <NumberInput
                 type="number"
@@ -364,6 +386,7 @@ export const AdminMembershipsPage: React.FC = () => {
               />
             </Field>
 
+            {/* [DT04] . points_step_value là số tiền giảm tương ứng mỗi bậc; Lưu quy tắc gửi cả ba trường qua handleSaveRules(). */}
             <Field label="Giá trị mỗi bậc (VNĐ) *" column="points_step_value">
               <NumberInput
                 type="number"
@@ -404,6 +427,7 @@ export const AdminMembershipsPage: React.FC = () => {
             </p>
           </div>
 
+          {/* [DT07] . Ô số điện thoại cập nhật searchPhone; nút tra cứu hoặc Enter gửi form đến handleSearchPhone(). */}
           <form onSubmit={handleSearchPhone} className="flex gap-2">
             <div className="relative flex-1">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 text-[18px]">
@@ -472,6 +496,9 @@ export const AdminMembershipsPage: React.FC = () => {
 
               {/* Action Buttons for Cashier / Staff */}
               <div className="flex gap-2 pt-1">
+                {/* [CD01] . Nút Cộng điểm mở form cho khách đã tra cứu, chọn loại add, mặc định 10 điểm và lý do trống. */}
+                {/* [CD01] .. Bước này chỉ mở form, chưa thay đổi điểm trong database. */}
+                {/* [CD01] ... Nhập số điểm, lý do rồi bấm Xác nhận cộng điểm để gọi handleAdjustPoints(). [CD02] */}
                 <button
                   type="button"
                   onClick={() => setAdjustModal({ type: 'add', points: 10, reason: '' })}
@@ -482,6 +509,7 @@ export const AdminMembershipsPage: React.FC = () => {
                 </button>
                 <button
                   type="button"
+                  // [DT07] . Đổi/Trừ điểm mở bản nháp loại subtract, mặc định 10 điểm; chỉ khi xác nhận mới gửi số âm qua luồng điều chỉnh CD02.
                   onClick={() => setAdjustModal({ type: 'subtract', points: 10, reason: '' })}
                   className="flex-1 py-2 bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold rounded-xl transition-colors flex items-center justify-center gap-1 cursor-pointer"
                 >
@@ -642,6 +670,7 @@ export const AdminMembershipsPage: React.FC = () => {
           }
           onClose={() => setAdjustModal(null)}
         >
+          {/* [CD02] . Form nối thao tác xác nhận với handleAdjustPoints(); ô số điểm và lý do cập nhật adjustModal. */}
           <form onSubmit={handleAdjustPoints} className="space-y-3.5 text-xs">
             <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-1">
               <div className="flex justify-between">
@@ -658,6 +687,7 @@ export const AdminMembershipsPage: React.FC = () => {
             </div>
 
             <Field
+              // [CD02] . Ô số điểm cập nhật adjustModal.points bằng số nguyên từ 1; loại add/subtract quyết định dấu khi gửi.
               label={adjustModal.type === 'add' ? 'Số điểm cộng thêm *' : 'Số điểm trừ/quy đổi *'}
               column="Điều chỉnh điểm (ADJUST)"
             >
@@ -671,6 +701,7 @@ export const AdminMembershipsPage: React.FC = () => {
               />
             </Field>
 
+            {/* [CD02] . Lý do cập nhật adjustModal.reason; nếu trống, handleAdjustPoints() gửi lý do mặc định theo cộng/trừ. */}
             <Field label="Lý do / Ghi chú giao dịch" column="loyalty_transactions.reason">
               <input
                 value={adjustModal.reason}
@@ -684,6 +715,7 @@ export const AdminMembershipsPage: React.FC = () => {
               />
             </Field>
 
+            {/* [CD02] . Xác nhận gửi form; Hủy hoặc đóng cửa sổ chỉ xóa adjustModal, không gửi yêu cầu cộng điểm. */}
             <FormActions
               onCancel={() => setAdjustModal(null)}
               submitLabel={adjustModal.type === 'add' ? 'Xác nhận cộng điểm' : 'Xác nhận trừ điểm'}

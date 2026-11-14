@@ -76,7 +76,7 @@ test('UC25 assigns weekly shifts and keeps staff schedules private', async (t) =
   assert.deepEqual((await request('GET', `/api/work-schedules${week}&userId=${staffB._id}`, null, adminToken)).data.map((item) => item._id), [second.data._id]);
   const ownSchedules = (await request('GET', `/api/work-schedules${week}&userId=${staffB._id}`, null, staffToken)).data;
   assert.deepEqual(ownSchedules.map((item) => item._id), [created.data._id]);
-  assert.equal('status' in ownSchedules[0], false);
+  assert.equal(ownSchedules[0].status, 'SCHEDULED');
   assert.equal('checkInTime' in ownSchedules[0], false);
   assert.equal('checkOutTime' in ownSchedules[0], false);
   assert.deepEqual((await request('GET', `/api/work-schedules${week}`, null, otherToken)).data.map((item) => item._id), [second.data._id]);
@@ -88,6 +88,9 @@ test('UC25 assigns weekly shifts and keeps staff schedules private', async (t) =
   assert.equal((await request('GET', '/api/work-schedules?weekStart=2026-10-19', null, staffToken)).data.length, 0);
   assert.equal((await request('PUT', `/api/work-schedules/${second.data._id}/shift-action`, { action: 'CHECK_IN' }, staffToken)).status, 403);
   await WorkSchedule.updateOne({ _id: created.data._id }, { $set: { status: 'PRESENT', checkInTime: new Date() } });
+  const checkedInSchedules = (await request('GET', `/api/work-schedules${week}`, null, staffToken)).data;
+  assert.equal(checkedInSchedules[0].status, 'PRESENT');
+  assert.ok(checkedInSchedules[0].checkInTime);
   assert.equal((await request('DELETE', `/api/work-schedules/${created.data._id}`, null, adminToken)).status, 409);
   assert.equal((await request('PUT', `/api/work-schedules/${created.data._id}`, { note: 'Sửa' }, adminToken)).status, 409);
   assert.equal((await request('DELETE', `/api/work-schedules/${second.data._id}`, null, staffToken)).status, 403);

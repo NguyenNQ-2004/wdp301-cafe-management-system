@@ -4,7 +4,8 @@ const InventoryTransaction = require('../models/InventoryTransaction');
 const { invalid } = require('./adminValidation');
 const { lockIngredients, normalizedLots, quantity, money } = require('./stockLots');
 
-// Admin corrections affect remaining stock. Historical order allocations stay frozen.
+// K-NL: Điều chỉnh của Admin áp dụng cho phần còn tồn. Phân bổ giá vốn đã ghi trên đơn hàng được giữ nguyên.
+// K-NL: editIngredient — Áp dụng điều chỉnh nguyên liệu và ghi giao dịch kho khi cần.
 async function editIngredient(id, fields, options, userId) {
   const release = lockIngredients([id]);
   let ledger;
@@ -18,6 +19,7 @@ async function editIngredient(id, fields, options, userId) {
     const total = options.stockTotalCost;
     if (total !== undefined && (!Number.isSafeInteger(total) || total < 0 || target <= 0)) throw invalid('Tổng giá trị tồn phải là số nguyên không âm và số lượng tồn phải lớn hơn 0.');
     const lots = normalizedLots(previous);
+    // K-NL: valueOf — Tính giá trị tồn từ các lô hoặc trả về giá chưa xác định.
     const valueOf = rows => rows.some(row => row.remainingQuantity > 0 && row.unitCost == null) ? null : money(rows.reduce((sum, row) => sum + row.remainingQuantity * (row.unitCost ?? 0), 0));
     const valueBefore = valueOf(lots);
     const delta = quantity(target - previous.currentStock);
@@ -33,7 +35,7 @@ async function editIngredient(id, fields, options, userId) {
       lots.push({ _id: new mongoose.Types.ObjectId(), sourceType: 'ADJUSTMENT', receivedAt: new Date(), quantity: delta, remainingQuantity: delta, unitCost: null });
     }
     if (total !== undefined) {
-      // Preserve original lot prices and exhausted history; move corrected stock into its own lot.
+      // K-NL: Giữ lại đơn giá gốc và lịch sử các lô cũ. Chuyển phần tồn được định giá lại sang một lô điều chỉnh riêng.
       lots.forEach(lot => { lot.remainingQuantity = 0; });
       lots.push({ _id: new mongoose.Types.ObjectId(), sourceType: 'ADJUSTMENT', receivedAt: new Date(), quantity: target, remainingQuantity: target, unitCost: total / target });
     }

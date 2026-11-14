@@ -1,6 +1,9 @@
 const mongoose = require('mongoose');
 const { invalid, objectBody } = require('./adminValidation');
 
+// K-PN: Chuẩn hóa số lượng và tổng tiền từng dòng trước khi lưu phiếu.
+// Đơn giá bằng tổng tiền chia cho số lượng và có thể là số lẻ.
+// K-PN: normalizePurchaseItems — Kiểm tra và chuẩn hóa các dòng nguyên liệu trước khi lưu phiếu.
 function normalizePurchaseItems(items) {
   if (!Array.isArray(items) || !items.length || items.length > 100) throw invalid('Cần ít nhất một nguyên liệu nhập.');
   const normalized = items.map(item => {

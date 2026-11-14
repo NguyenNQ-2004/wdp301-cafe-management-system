@@ -36,6 +36,9 @@ function readStoredUser(): User | null {
 const useAuthStore = create<AuthState>((set) => ({
   user: readStoredUser(),
   login: (user) => {
+    // [LG11] . Lưu phiên vào localStorage và state; vẫn giữ trong bộ nhớ nếu không ghi được localStorage.
+    // [LG11] .. Xóa giỏ thuộc tài khoản khác trước khi lưu phiên.
+    // [LG11] ... Chọn trang sau đăng nhập. [LG12]
     const cart = useCartStore.getState();
     if (cart.ownerId && cart.ownerId !== user._id) cart.clear();
     try { localStorage.setItem('user', JSON.stringify(user)); } catch { /* Keep the session in memory. */ }

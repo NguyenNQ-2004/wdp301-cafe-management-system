@@ -8,6 +8,8 @@ const emailFilter = email => {
 const normalizePhone = value => typeof value === 'string' ? value.replace(/\s+/g, '') : '';
 const validPhone = value => typeof value === 'string' && /^\+?[0-9]{9,15}$/.test(value);
 const validLogin = value => validEmail(normalizeEmail(value)) || validPhone(normalizePhone(value));
+// [LG06] . Chọn điều kiện tìm theo email hoặc số điện thoại.
+// [LG06] ... Tìm tài khoản theo điều kiện vừa tạo. [LG07]
 const loginFilter = value => validEmail(normalizeEmail(value))
   ? emailFilter(normalizeEmail(value))
   : { phone: normalizePhone(value) };
