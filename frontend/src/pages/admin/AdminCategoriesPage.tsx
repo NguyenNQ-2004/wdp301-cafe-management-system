@@ -13,18 +13,6 @@ interface AdminCategoriesPageProps {
 
 type CategoryForm = Omit<Category, 'id'>;
 const EMPTY: CategoryForm = { name: '', icon: 'local_cafe', description: '', image_url: '', status: 'ACTIVE' };
-const ICONS = [
-  'coffee_maker',
-  'local_cafe',
-  'emoji_food_beverage',
-  'icecream',
-  'bakery_dining',
-  'liquor',
-  'local_bar',
-  'lunch_dining',
-  'restaurant',
-  'cake'
-];
 
 export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavigate = () => {}, onShowToast }) => {
   const { db, refresh } = useDb();
@@ -233,7 +221,7 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
             <thead className="bg-stone-50 text-stone-500 uppercase text-[10px] font-bold border-b border-stone-200">
               <tr>
                 <th className="py-3 px-4">MÃ DANH MỤC</th>
-                <th className="py-3 px-4">ẢNH / ICON</th>
+                <th className="py-3 px-4">ẢNH</th>
                 <th className="py-3 px-4">TÊN DANH MỤC</th>
                 <th className="py-3 px-4">MÔ TẢ</th>
                 <th className="py-3 px-4 text-right">SỐ MÓN</th>
@@ -272,11 +260,7 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
                               className="w-10 h-10 rounded-lg object-cover border border-stone-100 shrink-0"
                             />
                           )}
-                          <span className="w-8 h-8 rounded-lg bg-stone-100 text-[#800020] flex items-center justify-center shrink-0">
-                            <span className="material-symbols-outlined text-[18px]">
-                              {c.icon ?? 'category'}
-                            </span>
-                          </span>
+                          {!imgUrl && <span className="text-stone-400">—</span>}
                         </div>
                       </td>
                       <td className="py-3.5 px-4 font-bold text-stone-900">{c.name}</td>
@@ -365,25 +349,6 @@ export const AdminCategoriesPage: React.FC<AdminCategoriesPageProps> = ({ onNavi
                   className={inputCls}
                   placeholder="VD: Cà phê pha máy, Trà trái cây..."
                 />
-              </Field>
-
-              <Field label="Icon (Material Symbols)" column="icon">
-                <div className="flex gap-2">
-                  <select
-                    value={form.icon ?? ''}
-                    onChange={e => setForm({ ...form, icon: e.target.value })}
-                    className={inputCls}
-                  >
-                    {[...new Set([form.icon ?? '', ...ICONS])].filter(Boolean).map(i => (
-                      <option key={i} value={i}>
-                        {i}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="w-10 h-10 rounded-xl bg-[#800020] text-white flex items-center justify-center shrink-0 shadow-xs">
-                    <span className="material-symbols-outlined text-[20px]">{form.icon || 'category'}</span>
-                  </span>
-                </div>
               </Field>
 
               <Field label="Mô tả" column="description">

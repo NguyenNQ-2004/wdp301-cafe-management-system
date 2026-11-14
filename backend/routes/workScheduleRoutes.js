@@ -103,7 +103,7 @@ router.get('/attendance', adminOnly, async (req, res) => {
       filter.user = req.query.userId;
     }
     const records = await WorkSchedule.find(filter)
-      .select('user workDate shiftName checkInTime checkOutTime status note')
+      .select('user workDate shiftName shiftStartTime shiftEndTime checkInTime checkOutTime status note')
       .populate('user', 'fullName phone position status')
       .sort({ workDate: -1, shiftName: 1 });
     res.json(await attachShiftInfo(records));
@@ -123,8 +123,8 @@ router.get('/', async (req, res) => {
       filter.user = req.query.userId;
     }
     const schedules = WorkSchedule.find(filter);
-    if (req.user.role === 'STAFF') schedules.select('user workDate shiftName note');
-    res.json(await populateUser(schedules));
+    if (req.user.role === 'STAFF') schedules.select('user workDate shiftName shiftStartTime shiftEndTime note');
+    res.json(await attachShiftInfo(await populateUser(schedules)));
   } catch (error) { handleError(error, res); }
 });
 
@@ -136,7 +136,7 @@ router.post('/', adminOnly, async (req, res) => {
     const schedule = await withWeekLock(mondayOf(data.workDate), async () => {
       const shift = await WorkShift.findOne({ weekStart: mondayOf(data.workDate), shiftName: data.shiftName });
       if (!shift) throw badRequest('Ca làm không tồn tại trong tuần của ngày làm việc.');
-      return WorkSchedule.create({ ...data, shift: shift._id });
+      return WorkSchedule.create({ ...data, shift: shift._id, shiftStartTime: shift.startTime, shiftEndTime: shift.endTime });
     });
     await schedule.populate('user', 'fullName phone position status');
     res.status(201).json(schedule);
@@ -158,7 +158,7 @@ router.put('/:id', adminOnly, async (req, res) => {
     await withWeekLock(mondayOf(targetDate), async () => {
       const shift = await WorkShift.findOne({ weekStart: mondayOf(targetDate), shiftName: changes.shiftName || schedule.shiftName });
       if (!shift) throw badRequest('Ca làm không tồn tại trong tuần của ngày làm việc.');
-      Object.assign(schedule, changes, { shift: shift._id });
+      Object.assign(schedule, changes, { shift: shift._id, shiftStartTime: shift.startTime, shiftEndTime: shift.endTime });
       await schedule.save();
     });
     await schedule.populate('user', 'fullName phone position status');
