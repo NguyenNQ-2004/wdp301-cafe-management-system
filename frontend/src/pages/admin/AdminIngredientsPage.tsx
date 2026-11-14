@@ -19,7 +19,41 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
   const { db, refresh } = useDb();
   const token = useAuthStore(state => state.user?.token);
   const [saving, setSaving] = useState(false);
+  const [purchaseEdit, setPurchaseEdit] = useState<{ id: string; name: string; orderId: string; unitPrice: number; quantity: number; total: number | '' } | null>(null);
+  const [purchaseError, setPurchaseError] = useState('');
+  const editablePurchaseLines = (id: string) => db.purchase_order_items
+    .filter(line => String(line.ingredient_id) === id && line.order_id && line.quantity > 0
+      && ['RECEIVED', 'ORDERED'].includes(line.status))
+    .map(line => ({ ...line, orderId: line.order_id }))
+    .sort((a, b) => Date.parse(b.purchasedAt) - Date.parse(a.purchasedAt));
+  const selectPurchaseLine = (id: string, name: string, line: any) => {
+    const unitPrice = line.unitPrice ?? line.unit_price;
+    setPurchaseError('');
+    setPurchaseEdit({ id, name, orderId: String(line.orderId), unitPrice,
+      quantity: line.quantity, total: Math.round(line.totalCost ?? unitPrice * line.quantity) });
+  };
+  // Update the selected purchase line. The API also revalues any remaining stock from that receipt.
+  const savePurchasePrice = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!purchaseEdit || !token || saving) return;
+    if (purchaseEdit.total === '' || !Number.isSafeInteger(purchaseEdit.total) || purchaseEdit.total < 0) {
+      setPurchaseError('Nhập tổng tiền là số nguyên không âm.');
+      return;
+    }
+    setSaving(true);
+    setPurchaseError('');
+    try {
+      await shopApi(`/api/ingredients/${purchaseEdit.id}/purchase-price/${purchaseEdit.orderId}`, {
+        token, method: 'PUT', body: { totalCost: purchaseEdit.total, expectedUnitPrice: purchaseEdit.unitPrice }
+      });
+      await refresh();
+      setPurchaseEdit(null);
+      notify('Đã cập nhật đơn giá trên phiếu.');
+    } catch (error) { setPurchaseError((error as Error).message); }
+    finally { setSaving(false); }
+  };
   const [valuation, setValuation] = useState<{ id: string; name: string; unit: string; quantity: number; total: number | '' } | null>(null);
+  // Count stock outside tracked lots and the remaining quantity of lots without a unit cost.
   const unpricedQuantity = (i: any) => {
     const lots = i.stockLots ?? [];
     const tracked = lots.reduce((sum: number, lot: any) => sum + lot.remainingQuantity, 0);
@@ -199,10 +233,12 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
             </thead>
             <tbody className="divide-y divide-stone-100">
               {rows.map(i => {
+                // Prefer the received purchase price, then the average cost of valued stock, then the price on an outstanding order.
                 const purchasePrice = lastPurchasePrice(db, i.id);
                 const value = stockValue(i);
                 const price = purchasePrice ?? (value !== null && i.current_stock > 0 ? value / i.current_stock : null);
                 const orderedPrice = lastOrderedPrice(db, i.id);
+                const priceLine = editablePurchaseLines(String(i.id))[0];
                 const low = isLowStock(i);
                 return (
                   <tr key={i.id || i._id} className="hover:bg-stone-50">
@@ -226,6 +262,7 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
                       </Badge>
                     </td>
                     <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                      {priceLine && <button type="button" className="mr-2 text-primary underline" onClick={() => selectPurchaseLine(String(i.id), i.name, priceLine)}>Sửa giá nhập</button>}
                       {unpricedQuantity(i) > 0 && <button type="button" className="mr-2 text-primary underline" onClick={() => setValuation({ id: String(i.id), name: i.name, unit: i.unit, quantity: unpricedQuantity(i), total: '' })}>Nhập giá tồn cũ</button>}
                       <button
                         onClick={() => {
@@ -290,7 +327,7 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
                   ))}
                 </select>
               </Field>
-              <Field label="Tồn hiện tại">
+              <Field label="Tồn kho hiện tại">
                 <NumberInput
                   type="number"
                   min={0}
@@ -334,6 +371,28 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
           </form>
         </Modal>
       )}
+      {purchaseEdit && <Modal title={`Sửa giá nhập: ${purchaseEdit.name}`} onClose={() => { if (!saving) setPurchaseEdit(null); }}>
+        <form onSubmit={savePurchasePrice} className="space-y-4">
+          <Field label="Phiếu nhập">
+            <select className={inputCls} value={purchaseEdit.orderId} disabled={saving} onChange={event => {
+              const line = editablePurchaseLines(purchaseEdit.id).find(row => String(row.orderId) === event.target.value);
+              if (line) selectPurchaseLine(purchaseEdit.id, purchaseEdit.name, line);
+            }}>
+              {editablePurchaseLines(purchaseEdit.id).map(line => <option key={line.orderId} value={line.orderId}>
+                PO-{String(line.orderId).slice(-4).toUpperCase()} · {line.status === 'RECEIVED' ? 'Đã nhập kho' : 'Đã đặt hàng'} · {fmtMoney(line.unitPrice ?? line.unit_price)}
+              </option>)}
+            </select>
+          </Field>
+          <p className="text-sm">Số lượng trên phiếu: {fmtNumber(purchaseEdit.quantity)}</p>
+          <Field label="Tổng tiền của nguyên liệu trên phiếu (đ)">
+            <NumberInput required type="number" min="0" step="1" disabled={saving} className={inputCls} value={purchaseEdit.total}
+              onChange={event => setPurchaseEdit({ ...purchaseEdit, total: event.target.value === '' ? '' : Number(event.target.value) })} />
+          </Field>
+          {purchaseEdit.total !== '' && <p className="text-sm">Đơn giá mới: {fmtMoney(purchaseEdit.total / purchaseEdit.quantity)}</p>}
+          {purchaseError && <p role="alert" className="text-sm text-rose-700">{purchaseError}</p>}
+          <FormActions loading={saving} onCancel={() => setPurchaseEdit(null)} submitLabel="Lưu giá nhập" />
+        </form>
+      </Modal>}
       {valuation && <Modal title={`Giá tồn cũ: ${valuation.name}`} onClose={() => setValuation(null)}><form onSubmit={saveValuation} className="space-y-4"><p className="text-sm">Lượng chưa có giá: <b>{fmtNumber(valuation.quantity)} {valuation.unit}</b>. Nhập tổng tiền của đúng lượng này.</p><Field label="Tổng giá trị (đ)"><NumberInput required type="number" min="0" step="1" className={inputCls} value={valuation.total} onChange={e => setValuation({ ...valuation, total: e.target.value === '' ? '' : Number(e.target.value) })} /></Field><FormActions loading={saving} onCancel={() => setValuation(null)} submitLabel="Lưu giá vốn" /></form></Modal>}
     </AdminLayout>
   );

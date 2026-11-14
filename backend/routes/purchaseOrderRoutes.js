@@ -89,6 +89,7 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Check the role and current status before transitioning, and record the actor in the request history.
 router.post('/', async (req, res) => {
   try {
     const { supplier, items, note, status = 'DRAFT' } = req.body;
@@ -126,6 +127,7 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Keep suppliers referenced by ingredients or purchase orders so historical records retain their links.
 router.put('/:id/status', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã phiếu nhập không hợp lệ.' });
