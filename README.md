@@ -101,7 +101,9 @@ npm run dev
 ---
 
 ## 👤 Tài khoản mẫu cho môi trường local
-`backend/seed.js` chỉ chạy ở local sau khi bật xác nhận phá hủy dữ liệu; script xóa dữ liệu hiện có trước khi tạo dữ liệu mẫu. Trong PowerShell, vào thư mục `backend`, đặt `$env:ALLOW_DESTRUCTIVE_SEED = "true"`, rồi chạy `node seed.js`. Mật khẩu mặc định của sáu tài khoản mẫu là `123456`. Có thể thay bằng `$env:SEED_USER_PASSWORD = "<mat-khau-rieng>"` (ít nhất 6 ký tự) trước khi chạy.
+`backend/seed.js` chứa cả dữ liệu và mã nạp trong một file, gồm các liên kết ObjectId được xuất từ MongoDB hiện tại. Script chỉ nạp sau khi bật `$env:ALLOW_DESTRUCTIVE_SEED = "true"` và sẽ thay thế các collection trong snapshot, nên chỉ dùng cho database local đã sao lưu. Trong thư mục `backend`, chạy `node seed.js` để nạp. Các tài khoản được nạp dùng chung mật khẩu `AuraCafe123!`, hoặc `$env:SEED_USER_PASSWORD = "<mat-khau-rieng>"` (ít nhất 8 ký tự, gồm chữ và số, không có khoảng trắng, tối đa 72 byte). Mật khẩu thật, mã OTP và token khôi phục không được xuất vào seed. Thao tác xuất không đổi mật khẩu hay dữ liệu của database đang chạy.
+
+Để cập nhật seed theo dữ liệu MongoDB mới nhất, chạy `npm run seed:export` (tương đương `node seed.js --export`) trong thư mục `backend`. Lệnh này chỉ đọc database trong `MONGO_URI` và cập nhật phần dữ liệu bên trong `seed.js`. Kiểm tra việc nạp bằng `npm run test:seed`; bài kiểm thử chỉ tạo và xóa một database tạm riêng.
 
 Tài khoản Admin mẫu dùng Gmail `auracafe.admin.demo@gmail.com` hoặc số điện thoại `0900000001`. Các Gmail mẫu trong `seed.js` chỉ là tên đăng nhập, không phải hộp thư đã được xác minh để nhận email. Không dùng mật khẩu mẫu trên môi trường triển khai.
 
