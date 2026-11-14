@@ -118,6 +118,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// Cashiers can edit their own draft or rejected requests. The update timestamp detects stale edits.
 router.delete('/:id', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Mã nhà cung cấp không hợp lệ.' });

@@ -19,6 +19,7 @@ function normalizedLots(ingredient) {
   const difference = quantity(ingredient.currentStock - tracked);
   if (difference > EPSILON) lots.unshift({ _id: new mongoose.Types.ObjectId(), sourceType: 'OPENING', receivedAt: new Date(0), quantity: difference, remainingQuantity: difference, unitCost: null });
   if (difference < -EPSILON) throw invalid('Số lượng lô không khớp tồn kho. Vui lòng kiểm tra lại.', 409);
+  // Sort lots by receipt time for FIFO, with opening stock ahead of purchased lots.
   return lots.sort((a, b) => new Date(a.receivedAt) - new Date(b.receivedAt) || String(a._id).localeCompare(String(b._id)));
 }
 

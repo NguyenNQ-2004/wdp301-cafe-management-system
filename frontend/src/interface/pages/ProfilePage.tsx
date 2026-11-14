@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import type { PageRoute } from '../types';
 import { useDb } from '../data/DbContext';
 import useAuthStore from '../../store/authStore';
@@ -34,6 +35,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
   const [isSaving, setIsSaving] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [passwordData, setPasswordData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
+  const [visiblePasswords, setVisiblePasswords] = useState({ oldPassword: false, newPassword: false, confirmPassword: false });
 
   useEffect(() => {
     if (user && (!dirty.current || formUserId.current !== user.id)) {
@@ -312,15 +314,29 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
                 { key: 'confirmPassword', label: 'Xác nhận mật khẩu mới', placeholder: 'Nhập lại mật khẩu mới' }
               ] as const).map(f => (
                 <div key={f.key}>
-                  <label className="font-bold text-stone-700 block mb-1">{f.label}</label>
-                  <input
-                    type="password"
-                    required
-                    value={passwordData[f.key]}
-                    onChange={e => setPasswordData({ ...passwordData, [f.key]: e.target.value })}
-                    placeholder={f.placeholder}
-                    className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl outline-none focus:border-primary text-stone-900"
-                  />
+                  <label htmlFor={`profile-${f.key}`} className="font-bold text-stone-700 block mb-1">{f.label}</label>
+                  <div className="relative">
+                    <input
+                      id={`profile-${f.key}`}
+                      type={visiblePasswords[f.key] ? 'text' : 'password'}
+                      autoComplete={f.key === 'oldPassword' ? 'current-password' : 'new-password'}
+                      required
+                      value={passwordData[f.key]}
+                      onChange={e => setPasswordData({ ...passwordData, [f.key]: e.target.value })}
+                      placeholder={f.placeholder}
+                      className="w-full pl-3.5 pr-12 py-2.5 border border-stone-300 rounded-xl outline-none focus:border-primary text-stone-900"
+                    />
+                    <button
+                      type="button"
+                      aria-label={`${visiblePasswords[f.key] ? 'Ẩn' : 'Hiện'} ${f.label.toLowerCase()}`}
+                      aria-pressed={visiblePasswords[f.key]}
+                      aria-controls={`profile-${f.key}`}
+                      onClick={() => setVisiblePasswords(current => ({ ...current, [f.key]: !current[f.key] }))}
+                      className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-xl text-stone-500 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      {visiblePasswords[f.key] ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                    </button>
+                  </div>
                 </div>
               ))}
               <button type="submit" className="px-6 py-2.5 bg-primary text-white font-bold rounded-xl hover:bg-primary-container transition-colors shadow-xs">

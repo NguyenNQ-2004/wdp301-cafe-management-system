@@ -4,6 +4,8 @@ const Payment = require('../models/Payment');
 const Ingredient = require('../models/Ingredient');
 const PurchaseOrder = require('../models/PurchaseOrder');
 const CustomerReview = require('../models/CustomerReview');
+const InventoryTransaction = require('../models/InventoryTransaction');
+const RestockRequest = require('../models/RestockRequest');
 const { protect, adminOnly } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
@@ -35,6 +37,7 @@ router.get('/', async (req, res) => {
     if (startDate > endDate) {
       return res.status(400).json({ message: 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.' });
     }
+    if ((endDate - startDate) / 86400000 >= 366) return res.status(400).json({ message: 'Khoảng báo cáo không được vượt quá 366 ngày.' });
 
     const endExclusive = new Date(endDate);
     endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
@@ -151,6 +154,17 @@ router.get('/', async (req, res) => {
               }
             },
             { $sort: { _id: 1 } }
+          ],
+          salesByOrderType: [
+            { $group: { _id: '$order.orderType', sales: { $sum: '$amount' }, orderCount: { $sum: 1 } } },
+            { $sort: { sales: -1 } }
+          ],
+          topProducts: [
+            { $unwind: '$order.items' },
+            { $group: { _id: '$order.items.productNameAtTime', quantity: { $sum: '$order.items.quantity' }, orderIds: { $addToSet: '$order._id' } } },
+            { $sort: { quantity: -1, _id: 1 } },
+            { $limit: 5 },
+            { $project: { _id: 0, productName: '$_id', quantity: 1, orderCount: { $size: '$orderIds' } } }
           ]
         }
       }
@@ -180,9 +194,19 @@ router.get('/', async (req, res) => {
         }
       }
     ]);
-    const [pendingPurchaseOrders, pendingReviews] = await Promise.all([
+    const [pendingPurchaseOrders, pendingReviews, pendingRestockRequests, ingredientUsage] = await Promise.all([
       PurchaseOrder.countDocuments({ status: { $in: ['DRAFT', 'ORDERED'] } }),
-      CustomerReview.countDocuments({ status: 'PENDING' })
+      CustomerReview.countDocuments({ status: { $in: ['PENDING', 'IN_PROGRESS'] } }),
+      RestockRequest.countDocuments({ status: 'PENDING_APPROVAL' }),
+      InventoryTransaction.aggregate([
+        { $match: { transactionType: 'OUT_ORDER', createdAt: { $gte: startDate, $lt: endExclusive } } },
+        { $group: { _id: '$ingredient', quantity: { $sum: '$quantity' } } },
+        { $lookup: { from: Ingredient.collection.name, localField: '_id', foreignField: '_id', as: 'ingredient' } },
+        { $unwind: { path: '$ingredient', preserveNullAndEmptyArrays: true } },
+        { $sort: { quantity: -1, _id: 1 } },
+        { $limit: 10 },
+        { $project: { _id: 0, ingredientId: { $toString: '$_id' }, name: { $ifNull: ['$ingredient.name', 'Nguyên liệu đã xóa'] }, unit: '$ingredient.unit', quantity: 1 } }
+      ])
     ]);
     const [orders = {}] = orderReport;
     const [overview = {}] = orders.overview || [];
@@ -193,7 +217,7 @@ router.get('/', async (req, res) => {
     const revenue = completedPaymentOverview.revenue || 0;
 
     return res.json({
-      filters: { startDate: req.query.startDate, endDate: req.query.endDate, groupBy },
+      filters: { startDate: req.query.startDate, endDate: req.query.endDate, groupBy, revenueBasis: 'paidAt', ordersBasis: 'createdAt', timeZone: TIME_ZONE },
       overview: {
         orderCount: overview.orderCount || 0,
         completedOrderCount,
@@ -207,11 +231,12 @@ router.get('/', async (req, res) => {
         method: _id || 'UNKNOWN',
         ...method
       })),
-      salesByOrderType: (orders.salesByOrderType || []).map(({ _id, ...orderType }) => ({
+      salesByOrderType: (payments.salesByOrderType || []).map(({ _id, ...orderType }) => ({
         orderType: _id || 'UNKNOWN',
         ...orderType
       })),
-      topProducts: orders.topProducts || [],
+      topProducts: payments.topProducts || [],
+      ingredientUsage,
       orderStatuses: (orders.statuses || []).map(({ _id, ...status }) => ({
         status: _id || 'UNKNOWN',
         ...status
@@ -221,7 +246,7 @@ router.get('/', async (req, res) => {
         lowStockCount: inventoryOverview.lowStockCount || 0,
         lowStockItems: inventoryReport.lowStockItems || []
       },
-      attention: { pendingPurchaseOrders, pendingReviews }
+      attention: { pendingPurchaseOrders, pendingReviews, pendingRestockRequests }
     });
   } catch (error) {
     if (error.message.includes('YYYY-MM-DD') || error.message.includes('không hợp lệ') || error.message.includes('Ngày bắt đầu')) {

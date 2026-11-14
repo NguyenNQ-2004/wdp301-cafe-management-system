@@ -1,7 +1,6 @@
 // =====================================================
-// Kiểu dữ liệu khớp 1-1 với database aura_cafe_erp (aura_cafe.sql)
-// Tên field giữ nguyên tên cột. Cột đánh dấu [Bổ sung] là cột thêm vào SQL cho giao diện.
-// DECIMAL -> number, DATE/DATETIME -> string ('YYYY-MM-DD' / 'YYYY-MM-DD HH:mm:ss')
+// View models adapted from MongoDB documents by LiveProvider.
+// Numeric UI IDs map back to MongoDB ObjectIds; snake_case is a client convention.
 // =====================================================
 
 export type UserRole = 'ADMIN' | 'STAFF' | 'CUSTOMER';
@@ -92,6 +91,7 @@ export type OrderStatus =
 
 // 5. orders
 export interface Order {
+  delivery?: { status?: 'ASSIGNED' | 'ACCEPTED' | 'DELIVERING' | 'DELIVERED' | 'RETURNED' | 'CANCELLED'; acceptedAt?: string; deliveredAt?: string; history?: Array<{ action: string; at: string }> };
   kitchen_eligible?: boolean;
   payment_status?: 'PENDING' | 'SUCCESS' | 'FAILED';
   update_token?: string;
@@ -114,6 +114,7 @@ export interface Order {
   order_note: string | null;
   cancel_reason: string | null; // [Bổ sung]
   created_at: string;
+  updated_at?: string;
 }
 
 // order_items.customization — VD: {"size":"L","topping":["Jelly"]}; sugar/ice/note là khoá thêm trong cùng JSON
@@ -143,6 +144,9 @@ export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
 
 // 7. payments
 export interface Payment {
+  remittance_id?: string;
+  remittance_schedule?: string;
+  received_by?: string;
   id: number;
   order_id: number;
   payment_method: PaymentMethod;

@@ -37,6 +37,7 @@ export default function AdminSuppliersPage() {
 
   const openCreate = () => { setEditing(null); setForm(EMPTY_FORM); setModalOpen(true); };
   const openEdit = (supplier: Supplier) => { setEditing(supplier); setForm({ name: supplier.name, phone: supplier.phone || '', address: supplier.address || '', status: supplier.status }); setModalOpen(true); };
+  // Reuse the form for both creation and editing, then refresh the supplier list and totals after saving.
   const saveSupplier = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!token) return;

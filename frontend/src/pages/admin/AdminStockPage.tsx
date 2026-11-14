@@ -30,6 +30,7 @@ export default function AdminStockPage() {
   const [toast, setToast] = useState('');
   const [form, setForm] = useState<{ ingredientId: string; type: 'ADJUSTMENT' | 'SPOILAGE'; quantity: number | '' }>({ ingredientId: '', type: 'SPOILAGE', quantity: '' });
 
+  // Load stock balances, recent movements, and summary figures for the inventory view.
   const loadInventory = useCallback(async () => {
     if (!token) return;
     setLoading(true);

@@ -59,6 +59,7 @@ export default function AdminPurchasesPage() {
   const draftTotal = items.reduce((sum, item) => sum + Number(item.totalCost || 0), 0);
 
   const itemForIngredient = (ingredient: Ingredient): FormItem => newPurchaseLine(ingredient);
+  // Reset the supplier and ingredient lines when opening the form. New purchase orders are submitted as drafts.
   const openCreate = () => {
     const firstSupplier = suppliers[0];
     const firstIngredient = ingredients.find((ingredient) => ingredient.supplier?._id === firstSupplier?._id);
@@ -91,6 +92,7 @@ export default function AdminPurchasesPage() {
     }
   };
 
+  // The receive action moves an ordered purchase to received. The API adds stock and records inventory movements.
   const changeStatus = async (order: Order, next: Status) => {
     if (!token || saving) return;
     const warning = next === 'RECEIVED' ? `Xác nhận đã nhận hàng cho ${code(order._id)}? Tồn kho sẽ được cập nhật.` : next === 'CANCELLED' ? `Hủy ${code(order._id)}?` : '';

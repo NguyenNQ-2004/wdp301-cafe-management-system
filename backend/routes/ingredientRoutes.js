@@ -27,6 +27,7 @@ async function parse(body, creating) {
   for (const key of ['currentStock', 'minStockLevel']) {
     if (body[key] !== undefined) fields[key] = nonnegative(body[key], key === 'currentStock' ? 'Tồn kho' : 'Mức tối thiểu');
   }
+  // Record valued opening stock as an OPENING lot with unit cost derived from the entered total.
   if (creating && body.openingTotalCost !== undefined) {
     if (!Number.isSafeInteger(body.openingTotalCost) || body.openingTotalCost < 0 || !(fields.currentStock > 0)) throw invalid('Cần nhập số lượng tồn đầu và tổng tiền hợp lệ.');
     fields.stockLots = [{ sourceType: 'OPENING', receivedAt: new Date(0), quantity: fields.currentStock, remainingQuantity: fields.currentStock, unitCost: body.openingTotalCost / fields.currentStock }];
@@ -56,6 +57,7 @@ router.post('/', adminOnly, async (req, res) => {
   try { res.status(201).json(await Ingredient.create(await parse(req.body, true))); }
   catch (error) { sendError(res, error); }
 });
+// Update the purchase line and its detail records. For received orders, revalue only the stock remaining in the matching lot.
 router.put('/:id/purchase-price/:orderId', adminOnly, async (req, res) => {
   let release;
   try {
@@ -101,6 +103,7 @@ router.put('/:id/purchase-price/:orderId', adminOnly, async (req, res) => {
   } catch (error) { sendError(res, error); }
   finally { release?.(); }
 });
+// Apply a total value to stock that does not yet have a unit cost.
 router.put('/:id/unpriced-stock-cost', adminOnly, async (req, res) => {
   let release;
   try {

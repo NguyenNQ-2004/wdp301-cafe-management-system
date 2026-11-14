@@ -4,7 +4,7 @@ import type { PageRoute, Ingredient } from '../../types';
 import { useDb } from '../../data/DbContext';
 import { shopApi } from '../../lib/shopApi';
 import useAuthStore from '../../store/authStore';
-import { fmtMoney, fmtNumber, isLowStock, lastPurchasePrice, lastOrderedPrice, purchaseLines } from '../../data/dbUtils';
+import { fmtMoney, fmtNumber, isLowStock, lastPurchasePrice, lastOrderedPrice } from '../../data/dbUtils';
 import { AdminLayout, Badge, Field, FormActions, Modal, PrimaryButton, StatCard, inputCls } from './AdminUi';
 
 interface AdminIngredientsPageProps {
@@ -21,13 +21,18 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
   const [saving, setSaving] = useState(false);
   const [purchaseEdit, setPurchaseEdit] = useState<{ id: string; name: string; orderId: string; unitPrice: number; quantity: number; total: number | '' } | null>(null);
   const [purchaseError, setPurchaseError] = useState('');
-  const editablePurchaseLines = (id: string) => purchaseLines(db, id, ['RECEIVED', 'ORDERED']).filter(line => line.orderId && line.quantity > 0);
+  const editablePurchaseLines = (id: string) => db.purchase_order_items
+    .filter(line => String(line.ingredient_id) === id && line.order_id && line.quantity > 0
+      && ['RECEIVED', 'ORDERED'].includes(line.status))
+    .map(line => ({ ...line, orderId: line.order_id }))
+    .sort((a, b) => Date.parse(b.purchasedAt) - Date.parse(a.purchasedAt));
   const selectPurchaseLine = (id: string, name: string, line: any) => {
     const unitPrice = line.unitPrice ?? line.unit_price;
     setPurchaseError('');
     setPurchaseEdit({ id, name, orderId: String(line.orderId), unitPrice,
       quantity: line.quantity, total: Math.round(line.totalCost ?? unitPrice * line.quantity) });
   };
+  // Update the selected purchase line. The API also revalues any remaining stock from that receipt.
   const savePurchasePrice = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!purchaseEdit || !token || saving) return;
@@ -48,6 +53,7 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
     finally { setSaving(false); }
   };
   const [valuation, setValuation] = useState<{ id: string; name: string; unit: string; quantity: number; total: number | '' } | null>(null);
+  // Count stock outside tracked lots and the remaining quantity of lots without a unit cost.
   const unpricedQuantity = (i: any) => {
     const lots = i.stockLots ?? [];
     const tracked = lots.reduce((sum: number, lot: any) => sum + lot.remainingQuantity, 0);
@@ -227,6 +233,7 @@ export const AdminIngredientsPage: React.FC<AdminIngredientsPageProps> = ({ onNa
             </thead>
             <tbody className="divide-y divide-stone-100">
               {rows.map(i => {
+                // Prefer the received purchase price, then the average cost of valued stock, then the price on an outstanding order.
                 const purchasePrice = lastPurchasePrice(db, i.id);
                 const value = stockValue(i);
                 const price = purchasePrice ?? (value !== null && i.current_stock > 0 ? value / i.current_stock : null);

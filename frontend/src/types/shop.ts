@@ -78,6 +78,7 @@ export interface PaymentRecord {
   amount: number;
   status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
   transactionCode?: string;
+  confirmationMode?: 'CASHIER' | 'GATEWAY';
   paidAt?: string;
   receivedAmount?: number;
   changeAmount?: number;

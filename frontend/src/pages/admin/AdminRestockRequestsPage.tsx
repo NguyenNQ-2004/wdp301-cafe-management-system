@@ -42,6 +42,7 @@ export default function AdminRestockRequestsPage({ cashier = false }: { cashier?
     try { await shopApi(`/api/restock-requests${editing ? '/' + editing._id : ''}`, { method: editing ? 'PUT' : 'POST', token, body: { status, reason, note, items: [{ ingredient, quantity }, ...(editing?.items.slice(1).map(item => ({ ingredient: item.ingredient?._id, quantity: item.quantity })) || [])], ...(editing ? { expectedUpdatedAt: editing.updatedAt } : {}) } }); setEditing(null); setQuantity(''); setReason(''); setNote(''); setRevision(value => value + 1); }
     catch (failure) { setError((failure as Error).message); } finally { setBusy(false); }
   };
+  // Send submission, cancellation, and review actions through the same endpoint. The API checks the actor and current status.
   const transition = async (id: string, action: string) => {
     if (busy || !token) return; setBusy(true); setError('');
     try { await shopApi(`/api/restock-requests/${id}/transition`, { method: 'POST', token, body: { action, reviewNote: reviewNotes[id] || '' } }); setRevision(value => value + 1); }

@@ -83,7 +83,7 @@ router.get('/', adminOnly, async (req, res) => {
   }
 });
 
-// Record a movement and update stock in one guarded database operation.
+// Record adjustments and spoilage here. Stock reductions follow FIFO, and the ledger records the lot allocations.
 router.post('/', adminOnly, async (req, res) => {
   let release;
   try {
