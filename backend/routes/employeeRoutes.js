@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const { protect, adminOnly } = require('../middlewares/authMiddleware');
 const { normalizeEmail, validEmail } = require('../utils/accountEmail');
+const { passwordError } = require('../utils/passwordPolicy');
 
 const router = express.Router();
 router.use(protect, adminOnly);
@@ -61,6 +62,8 @@ function parseEmployee(body, creating) {
   }
   if (creating && body.password === undefined) throw badRequest('Cần nhập mật khẩu cho tài khoản nhân viên.');
   if (body.password !== undefined) {
+    const passwordValidationError = passwordError(body.password);
+    if (passwordValidationError) throw badRequest(passwordValidationError);
     if (typeof body.password !== 'string' || body.password.length < 8 || body.password.length > 72) throw badRequest('Mật khẩu phải có từ 8 đến 72 ký tự.');
     data.password = body.password;
   }

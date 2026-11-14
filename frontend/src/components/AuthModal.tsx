@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { loginCredentials, registrationPayload } from '../lib/authCredentials';
+import { loginCredentials, registrationPayload, validateRegistration } from '../lib/authCredentials';
+import type { RegistrationErrors } from '../lib/authCredentials';
 import PasswordRecoveryForm from './PasswordRecoveryForm';
 
 interface AuthModalProps {
@@ -31,6 +32,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(true);
+  const [registerSubmitted, setRegisterSubmitted] = useState(false);
+  const [registerServerErrors, setRegisterServerErrors] = useState<RegistrationErrors>({});
+  const registerInput = { fullName: regName, phone: regPhone, email: regEmail, password: regPassword, confirmPassword, termsAccepted };
+  const registerErrors = { ...registerServerErrors, ...(registerSubmitted ? validateRegistration(registerInput) : {}) };
+  const clearRegisterError = (field: keyof RegistrationErrors) => {
+    setRegisterError('');
+    setRegisterServerErrors(current => { const next = { ...current }; delete next[field]; if (field === 'password') delete next.confirmPassword; return next; });
+  };
+  const registerField = (field: keyof RegistrationErrors) => ({ id: `register-${field}`, 'aria-invalid': !!registerErrors[field], 'aria-describedby': registerErrors[field] ? `register-${field}-error` : undefined });
+  const registerBorder = (field: keyof RegistrationErrors) => registerErrors[field] ? ' !border !border-red-500 !bg-red-50 focus:!ring-red-200' : '';
+  const registerFieldError = (field: keyof RegistrationErrors) => registerErrors[field] ? <p id={`register-${field}-error`} role="alert" className="text-xs text-red-700">{registerErrors[field]}</p> : null;
 
   if (!isOpen) return null;
 
@@ -58,7 +71,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       if (!response.ok) {
         setLoginError(response.status === 401
-          ? 'Email hoặc mật khẩu không đúng. Mật khẩu phân biệt chữ hoa và chữ thường.'
+          ? 'Email, số điện thoại hoặc mật khẩu không đúng. Mật khẩu phân biệt chữ hoa và chữ thường.'
           : data.message || 'Không thể đăng nhập. Vui lòng thử lại.');
         return;
       }
@@ -76,10 +89,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     e.preventDefault();
     if (isRegistering) return;
     setRegisterError('');
-    if (regPassword !== confirmPassword) { setRegisterError('Mật khẩu xác nhận không khớp.'); return; }
-    let payload;
-    try { payload = registrationPayload({ fullName: regName, phone: regPhone, email: regEmail, password: regPassword }); }
-    catch (error) { setRegisterError((error as Error).message); return; }
+    setRegisterSubmitted(true);
+    setRegisterServerErrors({});
+    if (Object.keys(validateRegistration(registerInput)).length) return;
+    const payload = registrationPayload(registerInput);
     setIsRegistering(true);
     try {
       const response = await fetch(`${(import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '')}/api/auth/register`, {
@@ -91,7 +104,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const data = await response.json();
 
       if (!response.ok) {
-        setRegisterError(data.message || 'Không thể đăng ký. Vui lòng kiểm tra Gmail và số điện thoại liên hệ.');
+        if (data.errors && typeof data.errors === 'object') setRegisterServerErrors(data.errors);
+        else if (/đã.*(đăng ký|sử dụng)/i.test(data.message || '') && /email/i.test(data.message)) setRegisterServerErrors({ email: data.message });
+        else if (/đã.*(đăng ký|sử dụng)/i.test(data.message || '') && /điện thoại/i.test(data.message)) setRegisterServerErrors({ phone: data.message });
+        else setRegisterError(data.message || 'Không thể đăng ký. Vui lòng thử lại.');
         return;
       }
 
@@ -100,6 +116,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setLoginPassword('');
       setRegPassword('');
       setConfirmPassword('');
+      setRegisterSubmitted(false);
+      setRegisterServerErrors({});
       setLoginError('');
       setActiveTab('login');
     } catch {
@@ -232,7 +250,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   Chào mừng trở lại
                 </h2>
                 <p className="font-body-sm text-body-sm text-secondary">
-                  Đăng nhập bằng Gmail
+                  Đăng nhập bằng email hoặc số điện thoại
                 </p>
               </div>
 
@@ -240,7 +258,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div className="space-y-space-xs mt-space-xs">
                 <label className="font-label-md text-label-md text-on-surface font-medium block">
-                    Gmail
+                    Email hoặc số điện thoại
                 </label>
                 <div className="relative flex items-center">
                   <span className="material-symbols-outlined absolute left-space-md text-secondary pointer-events-none text-[20px]">
@@ -248,7 +266,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </span>
                   <input
                     type="text"
-                    name="email"
+                    name="identifier"
                     autoComplete="username"
                     inputMode="text"
                     autoCapitalize="none"
@@ -256,7 +274,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
                     required
-                    placeholder="tenban@gmail.com"
+                    placeholder="Email hoặc số điện thoại"
                     className="w-full h-11 pl-11 pr-space-md bg-surface-container-low rounded text-on-surface placeholder:text-secondary/60 font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary-container/20 transition-all border-0"
                   />
                 </div>
@@ -331,52 +349,56 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           {/* TAB 2: REGISTER FORM */}
           {activeTab === 'register' && (
-            <form className="flex flex-col gap-space-md" onSubmit={handleRegisterSubmit}>
+            <form noValidate className="flex flex-col gap-space-md" onSubmit={handleRegisterSubmit}>
               <div className="space-y-1">
                 <h2 className="font-headline-md text-headline-md text-on-surface font-semibold tracking-tight">
                   Tạo tài khoản Aura
                 </h2>
                 <p className="font-body-sm text-body-sm text-secondary">
-                  Dùng Gmail để đăng nhập; số điện thoại chỉ dùng cho thông tin liên hệ và giao hàng.
+                  Dùng email hoặc số điện thoại đã đăng ký để đăng nhập.
                 </p>
               </div>
 
               {registerError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{registerError}</p>}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-md mt-space-xs">
                 <div className="space-y-space-xs">
-                  <label className="font-label-md text-label-md text-on-surface font-medium block">
+                  <label htmlFor="register-fullName" className="font-label-md text-label-md text-on-surface font-medium block">
                     Họ và tên
                   </label>
                   <input
                     type="text"
                     required
                     name="fullName"
+                    {...registerField('fullName')}
                     autoComplete="name"
                     value={regName}
-                    onChange={(e) => setRegName(e.target.value)}
+                    onChange={(e) => { setRegName(e.target.value); clearRegisterError('fullName'); }}
                     placeholder="Nguyễn Văn A"
-                    className="w-full h-11 px-space-md bg-surface-container-low rounded text-on-surface placeholder:text-secondary/60 font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary-container/20 border-0"
+                    className={'w-full h-11 px-space-md bg-surface-container-low rounded text-on-surface placeholder:text-secondary/60 font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary-container/20 border-0' + registerBorder('fullName')}
                   />
+                  {registerFieldError('fullName')}
                 </div>
                 <div className="space-y-space-xs">
-                  <label className="font-label-md text-label-md text-on-surface font-medium block">
+                  <label htmlFor="register-phone" className="font-label-md text-label-md text-on-surface font-medium block">
                     Số điện thoại liên hệ
                   </label>
                   <input
                     type="tel"
                     required
                     name="phone"
+                    {...registerField('phone')}
                     autoComplete="tel"
                     value={regPhone}
-                    onChange={(e) => setRegPhone(e.target.value)}
+                    onChange={(e) => { setRegPhone(e.target.value); clearRegisterError('phone'); }}
                     placeholder="0908xxxxxx"
-                    className="w-full h-11 px-space-md bg-surface-container-low rounded text-on-surface placeholder:text-secondary/60 font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary-container/20 border-0"
+                    className={'w-full h-11 px-space-md bg-surface-container-low rounded text-on-surface placeholder:text-secondary/60 font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary-container/20 border-0' + registerBorder('phone')}
                   />
+                  {registerFieldError('phone')}
                 </div>
               </div>
 
               <div className="space-y-space-xs">
-                <label className="font-label-md text-label-md text-on-surface font-medium block">
+                <label htmlFor="register-email" className="font-label-md text-label-md text-on-surface font-medium block">
                   Gmail / Email đăng nhập
                 </label>
                 <div className="relative flex items-center">
@@ -387,17 +409,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type="email"
                     required
                     name="email"
+                    {...registerField('email')}
                     autoComplete="email"
                     value={regEmail}
-                    onChange={(e) => setRegEmail(e.target.value)}
+                    onChange={(e) => { setRegEmail(e.target.value); clearRegisterError('email'); }}
                     placeholder="khachhang@gmail.com"
-                    className="w-full h-11 pl-11 pr-space-md bg-surface-container-low rounded text-on-surface placeholder:text-secondary/60 font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary-container/20 border-0"
+                    className={'w-full h-11 pl-11 pr-space-md bg-surface-container-low rounded text-on-surface placeholder:text-secondary/60 font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary-container/20 border-0' + registerBorder('email')}
                   />
                 </div>
+                {registerFieldError('email')}
               </div>
 
               <div className="space-y-space-xs">
-                <label className="font-label-md text-label-md text-on-surface font-medium block">
+                <label htmlFor="register-password" className="font-label-md text-label-md text-on-surface font-medium block">
                   Mật khẩu bảo mật
                 </label>
                 <div className="relative flex items-center">
@@ -408,12 +432,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type={showRegPassword ? 'text' : 'password'}
                     required
                     name="password"
+                    {...registerField('password')}
                     autoComplete="new-password"
                     value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    minLength={6}
-                    placeholder="Mật khẩu tài khoản Aura Café, tối thiểu 6 ký tự"
-                    className="w-full h-11 pl-11 pr-11 bg-surface-container-low rounded text-on-surface placeholder:text-secondary/60 font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary-container/20 border-0"
+                    onChange={(e) => { setRegPassword(e.target.value); clearRegisterError('password'); }}
+                    minLength={8}
+                    placeholder="Mật khẩu tối thiểu 8 ký tự, gồm chữ và số"
+                    className={'w-full h-11 pl-11 pr-11 bg-surface-container-low rounded text-on-surface placeholder:text-secondary/60 font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary-container/20 border-0' + registerBorder('password')}
                   />
                   <button
                     type="button"
@@ -427,20 +452,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
-              <label className="block text-sm font-medium">Xác nhận mật khẩu<input type="password" name="confirmPassword" autoComplete="new-password" required minLength={6} value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} className="mt-2 w-full h-11 rounded bg-surface-container-low px-3" /></label>
+              {registerFieldError('password')}
+              <div>
+                <label htmlFor="register-confirmPassword" className="block text-sm font-medium">Xác nhận mật khẩu</label>
+                <input {...registerField('confirmPassword')} type="password" name="confirmPassword" autoComplete="new-password" required minLength={8} value={confirmPassword} onChange={event => { setConfirmPassword(event.target.value); clearRegisterError('confirmPassword'); }} className={'mt-2 w-full h-11 rounded bg-surface-container-low px-3' + registerBorder('confirmPassword')} />
+                {registerFieldError('confirmPassword')}
+              </div>
               <div className="flex items-center gap-space-sm pt-space-xs">
                 <input
                   type="checkbox"
-                  defaultChecked
+                  checked={termsAccepted}
+                  onChange={event => { setTermsAccepted(event.target.checked); clearRegisterError('termsAccepted'); }}
                   required
                   id="terms-agree"
-                  className="w-4 h-4 rounded text-primary-container accent-primary-container cursor-pointer"
+                  aria-invalid={!!registerErrors.termsAccepted}
+                  aria-describedby={registerErrors.termsAccepted ? 'register-termsAccepted-error' : undefined}
+                  className={'w-4 h-4 rounded text-primary-container accent-primary-container cursor-pointer' + registerBorder('termsAccepted')}
                 />
                 <label htmlFor="terms-agree" className="font-body-sm text-body-sm text-secondary cursor-pointer">
                   Tôi đồng ý với{' '}
                   <span className="text-primary hover:underline">Quy chế bảo mật</span> và điều khoản vận hành nội bộ.
                 </label>
               </div>
+              {registerFieldError('termsAccepted')}
 
               <button
                 type="submit"

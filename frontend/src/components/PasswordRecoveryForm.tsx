@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { shopApi } from '../lib/shopApi';
+import { passwordError } from '../lib/authCredentials';
 
 export default function PasswordRecoveryForm({ onLogin }: { onLogin: () => void }) {
   const [step, setStep] = useState<'email' | 'otp' | 'reset' | 'done'>('email');
@@ -29,6 +30,8 @@ export default function PasswordRecoveryForm({ onLogin }: { onLogin: () => void 
         setResetToken(data.resetToken); setNotice(data.message); setStep('reset'); setOtp('');
       }
       if (step === 'reset') {
+        const passwordValidationError = passwordError(password);
+        if (passwordValidationError) throw new Error(passwordValidationError);
         if (password !== confirmation) throw new Error('Mật khẩu xác nhận không khớp.');
         const data = await shopApi<{ message: string }>('/api/auth/reset-password', { method: 'POST', body: { resetToken, password, confirmPassword: confirmation } });
         setPassword(''); setConfirmation(''); setResetToken(''); setChallenge(''); setNotice(data.message); setStep('done');
@@ -44,12 +47,12 @@ export default function PasswordRecoveryForm({ onLogin }: { onLogin: () => void 
     finally { setBusy(false); }
   };
   return <form onSubmit={submit} className="flex flex-col gap-space-md">
-    <div><h2 className="text-xl font-semibold">{step === 'reset' ? 'Đặt mật khẩu mới' : step === 'done' ? 'Đã đổi mật khẩu' : 'Khôi phục quyền truy cập'}</h2><p className="mt-2 text-sm text-secondary">{step === 'email' ? 'Nhập email tài khoản để nhận mã OTP khôi phục mật khẩu.' : step === 'otp' ? `Nhập mã 6 chữ số gửi đến ${email}. Mã có hiệu lực 10 phút.` : step === 'reset' ? 'Mật khẩu mới cần có ít nhất 6 ký tự.' : 'Bạn có thể đăng nhập bằng mật khẩu mới.'}</p></div>
+    <div><h2 className="text-xl font-semibold">{step === 'reset' ? 'Đặt mật khẩu mới' : step === 'done' ? 'Đã đổi mật khẩu' : 'Khôi phục quyền truy cập'}</h2><p className="mt-2 text-sm text-secondary">{step === 'email' ? 'Nhập email tài khoản để nhận mã OTP khôi phục mật khẩu.' : step === 'otp' ? `Nhập mã 6 chữ số gửi đến ${email}. Mã có hiệu lực 10 phút.` : step === 'reset' ? 'Mật khẩu mới cần có ít nhất 8 ký tự, gồm chữ và số.' : 'Bạn có thể đăng nhập bằng mật khẩu mới.'}</p></div>
     {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {notice && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
     {step === 'email' && <label className="text-sm font-medium">Địa chỉ email<input className={input} type="email" autoComplete="email" required maxLength={254} value={email} onChange={event => setEmail(event.target.value)} placeholder="khachhang@gmail.com" /></label>}
     {step === 'otp' && <><label className="text-sm font-medium">Mã OTP<input className={input} type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={otp} onChange={event => setOtp(event.target.value.replace(/\D/g, ''))} /></label><div className="flex justify-between text-sm"><button type="button" disabled={busy} onClick={() => void resend()} className="font-semibold text-primary">Gửi lại mã OTP</button><button type="button" disabled={busy} onClick={() => { setStep('email'); setError(''); setNotice(''); }}>Đổi email</button></div></>}
-    {step === 'reset' && <><label className="text-sm font-medium">Mật khẩu mới<input className={input} type="password" autoComplete="new-password" minLength={6} required value={password} onChange={event => setPassword(event.target.value)} /></label><label className="text-sm font-medium">Xác nhận mật khẩu<input className={input} type="password" autoComplete="new-password" minLength={6} required value={confirmation} onChange={event => setConfirmation(event.target.value)} /></label></>}
+    {step === 'reset' && <><label className="text-sm font-medium">Mật khẩu mới<input className={input} type="password" autoComplete="new-password" minLength={8} required value={password} onChange={event => setPassword(event.target.value)} /></label><label className="text-sm font-medium">Xác nhận mật khẩu<input className={input} type="password" autoComplete="new-password" minLength={8} required value={confirmation} onChange={event => setConfirmation(event.target.value)} /></label></>}
     {step !== 'done' && <button disabled={busy} className="h-12 rounded bg-primary text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Đang xử lý...' : step === 'email' ? 'Gửi mã khôi phục' : step === 'otp' ? 'Xác minh OTP' : 'Lưu mật khẩu mới'}</button>}
     <button type="button" onClick={onLogin} className="h-11 rounded bg-surface-container-low text-sm font-medium">Quay lại đăng nhập</button>
   </form>;

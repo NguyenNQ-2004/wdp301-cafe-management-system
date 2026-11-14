@@ -192,7 +192,7 @@ export function DbProvider({ children }: { children: ReactNode }) {
       endpoint = own ? '/api/auth/profile' : person?.role === 'STAFF' || data.role === 'STAFF' ? '/api/employees' : '/api/users/customers';
       Object.assign(body, { fullName: data.full_name, baseSalary: data.base_salary, hireDate: data.hire_date });
       if (data.password) body.password = data.password;
-      if (own) { for (const key of Object.keys(body)) if (!['fullName', 'email', 'birthday', 'address'].includes(key)) delete body[key]; }
+      if (own) { for (const key of Object.keys(body)) if (!['fullName', 'phone', 'email', 'birthday', 'address'].includes(key)) delete body[key]; }
       if (id && !own && action !== 'POST') endpoint += '/' + rawId(id);
     } else if (table === 'payments' || table === 'work_schedules') throw new Error('Thao tác này cần thực hiện ở màn hình thanh toán hoặc chấm công tương ứng.');
     else if (id && action !== 'POST') endpoint += '/' + rawId(id);

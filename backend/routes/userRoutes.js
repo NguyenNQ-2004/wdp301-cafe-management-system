@@ -10,9 +10,12 @@ const { invalid, objectBody, objectId, text } = require('../utils/adminValidatio
 const { validEmail, normalizeEmail } = require('../utils/accountEmail');
 const PurchaseOrder = require('../models/PurchaseOrder');
 const WorkSchedule = require('../models/WorkSchedule');
+const { passwordError } = require('../utils/passwordPolicy');
 
 function validateCustomer(body, creating) {
   objectBody(body);
+  const passwordValidationError = creating ? passwordError(body.password) : null;
+  if (passwordValidationError) throw invalid(passwordValidationError);
   if (creating && (typeof body.password !== 'string' || body.password.length < 8 || Buffer.byteLength(body.password, 'utf8') > 72)) throw invalid('Mật khẩu phải có ít nhất 8 ký tự và tối đa 72 byte.');
   if (creating || body.fullName !== undefined) text(body.fullName, 'Họ tên', 100);
   if (creating || body.phone !== undefined) {
@@ -306,7 +309,8 @@ router.post('/', adminOnly, async (req, res) => {
     const { fullName, phone, email, password, role, position, baseSalary, hireDate, birthday, address } = req.body;
 
     if (typeof fullName !== 'string' || !fullName.trim() || typeof phone !== 'string' || !phone.trim()) return res.status(400).json({ message: 'Họ tên và số điện thoại là bắt buộc.' });
-    if (typeof password !== 'string' || password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) return res.status(400).json({ message: 'Mật khẩu phải có ít nhất 8 ký tự và tối đa 72 byte.' });
+    const passwordValidationError = passwordError(password);
+    if (passwordValidationError) return res.status(400).json({ message: passwordValidationError });
     
     const existing = await User.findOne({ phone });
     if (existing) return res.status(400).json({ message: 'Số điện thoại này đã được sử dụng.' });

@@ -111,6 +111,19 @@ test('Missing API routes produce an actionable error for an HTML 404 response', 
 
 const renderWithDb = (component, db, overrides = {}) => renderToString(React.createElement(InterfaceContext.Provider, { value: { db, session: { customerId: 1 }, loading: false, unavailable: [], rawId: id => String(id), idFor: (_table, id) => Number(id), notify() {}, ...overrides } }, component));
 const bill = id => React.createElement(BillPage, { orderId: id, onSelectOrder() {}, onNavigate() {} });
+
+test('Customer profile exposes an editable phone field with the supported profile limits', async () => {
+  const { ProfilePage } = await vite.ssrLoadModule('/src/interface/pages/ProfilePage.tsx');
+  const db = emptyDb();
+  db.users = [{ id: 1, full_name: 'Customer', phone: '0901234567', email: 'customer@gmail.com', birthday: null, address: null, total_points: 0, status: 'ACTIVE', role: 'CUSTOMER', created_at: null }];
+  const html = renderWithDb(React.createElement(ProfilePage, { onNavigate() {} }), db);
+  const phone = html.match(/<input[^>]*id="profile-phone"[^>]*>/)?.[0];
+  assert.ok(phone);
+  assert.match(phone, /type="tel"/);
+  assert.doesNotMatch(phone, /disabled|readOnly/i);
+  assert.match(html, /maxLength="100"/i);
+  assert.match(html, /maxLength="500"/i);
+});
 const sampleOrder = { id: 1, order_code: 'ONLY-ORDER-001', order_type: 'TAKEAWAY', status: 'PENDING', created_at: '2026-10-20 10:00:00', total_amount: 30000, final_amount: 30000, customer_id: null, discount_amount: 0, delivery_fee: 0 };
 test('An unknown bill ID never displays another order', () => {
   const db = emptyDb(); db.orders = [sampleOrder];
@@ -137,24 +150,38 @@ test('Login route renders the password form', () => {
   const html = renderToString(React.createElement(MemoryRouter, { initialEntries: ['/login'] }, React.createElement(App)));
   assert.match(html, /type="password"/); assert.match(html, /autoComplete="current-password"/i);
   assert.match(html, /type="text"/);
-  assert.match(html, /name="email"/);
-  assert.match(html, />Gmail<\/label>/);
+  assert.match(html, /name="identifier"/);
+  assert.match(html, /Email hoặc số điện thoại/);
   assert.doesNotMatch(html, /name="phone"/);
 });
 test('Email login payload normalizes email and preserves the account password', () => {
   assert.deepEqual(credentials.loginCredentials(' My.Email@Gmail.com ', ' Case-Sensitive Password '), { email: 'my.email@gmail.com', password: ' Case-Sensitive Password ' });
 });
-test('Only full email identifiers are accepted for login', () => {
+test('Email and phone login are accepted without allowing usernames', () => {
   assert.equal(credentials.loginCredentials(' Coffee.User@GMAIL.com ', 'password').email, 'coffee.user@gmail.com');
-  for (const identifier of ['0901234567', 'coffee.user', 'user@', 'a b@gmail.com']) assert.throws(() => credentials.loginCredentials(identifier, 'password'));
+  assert.deepEqual(credentials.loginCredentials(' 090 123 4567 ', ' password '), { identifier: '0901234567', password: ' password ' });
+  assert.deepEqual(credentials.loginCredentials(' +84 901234567 ', 'password'), { identifier: '+84901234567', password: 'password' });
+  for (const identifier of ['coffee.user', 'user@', 'a b@gmail.com', '123', '0901234567abc', '{"$ne":null}']) assert.throws(() => credentials.loginCredentials(identifier, 'password'));
   assert.throws(() => credentials.loginCredentials('valid@gmail.com', ''));
 });
 test('Registration sends email credentials and a separate normalized contact phone', () => {
-  assert.deepEqual(credentials.registrationPayload({ fullName: ' Test Customer ', email: ' TEST@gmail.com ', phone: '090 123 4567', password: 'account-password' }), { fullName: 'Test Customer', email: 'test@gmail.com', phone: '0901234567', password: 'account-password' });
+  assert.deepEqual(credentials.registrationPayload({ fullName: ' Test Customer ', email: ' TEST@gmail.com ', phone: '090 123 4567', password: 'account1234' }), { fullName: 'Test Customer', email: 'test@gmail.com', phone: '0901234567', password: 'account1234' });
 });
 test('Registration requires valid email, contact phone and an account password', () => {
-  const input = { fullName: 'Test Customer', email: 'test@gmail.com', phone: '0901234567', password: 'account-password' };
-  for (const patch of [{ email: '' }, { phone: 'invalid' }, { fullName: ' ' }, { password: 'short' }]) assert.throws(() => credentials.registrationPayload({ ...input, ...patch }));
+  const input = { fullName: 'Test Customer', email: 'test@gmail.com', phone: '0901234567', password: 'account1234' };
+  for (const patch of [{ email: '' }, { email: '0901234567' }, { phone: 'invalid' }, { fullName: ' ' }, { fullName: '13123' }, { fullName: 'Nguyễn123' }, { fullName: '@@@' }, { password: 'short' }]) assert.throws(() => credentials.registrationPayload({ ...input, ...patch }));
+  for (const fullName of ['Nguyễn Quốc Nguyên', 'Đỗ Mỹ An'.normalize('NFD'), 'Anne-Marie', "O'Connor", 'D’Arcy']) assert.equal(credentials.validateRegistration({ ...input, fullName }).fullName, undefined);
+});
+
+test('Registration reports every invalid field together and clears corrected fields independently', () => {
+  const input = { fullName: '13123', email: 'invalid', phone: '012345678911111111111111', password: '123', confirmPassword: 'other', termsAccepted: false };
+  const errors = credentials.validateRegistration(input);
+  assert.deepEqual(Object.keys(errors).sort(), ['fullName', 'email', 'phone', 'password', 'confirmPassword', 'termsAccepted'].sort());
+  assert.match(errors.phone, /quá dài/);
+  const corrected = credentials.validateRegistration({ ...input, email: 'valid@gmail.com', phone: '0901234567' });
+  assert.equal(corrected.email, undefined); assert.equal(corrected.phone, undefined);
+  assert.ok(corrected.fullName); assert.ok(corrected.password); assert.ok(corrected.confirmPassword); assert.ok(corrected.termsAccepted);
+  assert.deepEqual(credentials.validateRegistration({ fullName: 'Customer', email: 'customer@gmail.com', phone: '0901234567', password: 'password1', confirmPassword: 'password1', termsAccepted: true }), {});
 });
 test('Guest header exposes separate login and registration links and a mobile account row', () => {
   const html = renderToString(React.createElement(MemoryRouter, null, React.createElement(Header, { currentRoute: 'home', cartCount: 0, onNavigate() {}, onOpenAuth() {} })));
@@ -169,6 +196,8 @@ test('Registration route opens the registration form directly', () => {
   assert.match(html, /Tạo tài khoản Aura/);
   assert.match(html, /autoComplete="new-password"/i);
   assert.match(html, /Số điện thoại liên hệ/);
+  assert.match(html, /<form[^>]*novalidate/i);
+  for (const field of ['fullName', 'phone', 'email', 'password', 'confirmPassword']) assert.ok(html.includes(`id="register-${field}"`));
   assert.doesNotMatch(html, /autoComplete="current-password"/i);
 });
 test('Authenticated header exposes account and logout instead of guest links', () => {

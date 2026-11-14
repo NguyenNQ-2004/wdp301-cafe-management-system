@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { PageRoute } from '../types';
 import { useDb } from '../data/DbContext';
 import useAuthStore from '../../store/authStore';
 import { shopApi } from '../../lib/shopApi';
+import { passwordError } from '../../lib/authCredentials';
 import {
   USER_STATUS_LABEL,
   fmtDate,
@@ -27,19 +28,32 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
   const [activeTab, setActiveTab] = useState<'info' | 'loyalty' | 'security'>('info');
 
   // Các trường khớp bảng users
-  const [formData, setFormData] = useState({ full_name: '', email: '', birthday: '', address: '' });
+  const [formData, setFormData] = useState({ full_name: '', phone: '', email: '', birthday: '', address: '' });
+  const dirty = useRef(false);
+  const formUserId = useRef<number | undefined>(undefined);
+  const [isSaving, setIsSaving] = useState(false);
+  const [profileError, setProfileError] = useState('');
   const [passwordData, setPasswordData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
 
   useEffect(() => {
-    if (user) {
+    if (user && (!dirty.current || formUserId.current !== user.id)) {
+      dirty.current = false;
+      formUserId.current = user.id;
       setFormData({
         full_name: user.full_name,
+        phone: user.phone,
         email: user.email ?? '',
         birthday: user.birthday ?? '',
         address: user.address ?? ''
       });
     }
-  }, [user?.id]);
+  }, [user?.id, user?.full_name, user?.phone, user?.email, user?.birthday, user?.address]);
+
+  const updateForm = (patch: Partial<typeof formData>) => {
+    dirty.current = true;
+    setProfileError('');
+    setFormData(current => ({ ...current, ...patch }));
+  };
 
   if (!user) {
     return <div className="p-10 text-center text-stone-500">Vui lòng đăng nhập để xem hồ sơ.</div>;
@@ -58,19 +72,28 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!account?.token) return;
+    if (!account?.token || isSaving) return;
+    setIsSaving(true);
+    setProfileError('');
     try {
-      const updated = await shopApi<{ fullName: string; address?: string }>('/api/auth/profile', { method: 'PUT', token: account.token, body: { fullName: formData.full_name.trim(), email: formData.email.trim() || null, birthday: formData.birthday || null, address: formData.address.trim() || null } });
-      useAuthStore.getState().login({ ...account, ...updated });
+      const phone = formData.phone.replace(/\s+/g, '');
+      if (!/^\+?[0-9]{9,15}$/.test(phone)) throw new Error('Số điện thoại phải có từ 9 đến 15 chữ số.');
+      const updated = await shopApi<{ fullName: string; phone: string; email?: string; birthday?: string | null; address?: string | null }>('/api/auth/profile', { method: 'PUT', token: account.token, body: { fullName: formData.full_name.trim(), phone, email: formData.email.trim() || null, birthday: formData.birthday || null, address: formData.address.trim() || null } });
+      if (updated.phone !== phone) throw new Error('Máy chủ chưa lưu số điện thoại mới. Vui lòng khởi động lại backend bản mới và thử lại.');
+      dirty.current = false;
+      setFormData({ full_name: updated.fullName, phone: updated.phone, email: updated.email ?? '', birthday: updated.birthday?.slice(0, 10) ?? '', address: updated.address ?? '' });
+      useAuthStore.getState().login({ ...account, ...updated, address: updated.address ?? undefined });
       await refresh();
       onShowToast?.('Đã cập nhật thông tin cá nhân thành công!');
-    } catch (error) { onShowToast?.((error as Error).message); }
+    } catch (error) { setProfileError((error as Error).message); }
+    finally { setIsSaving(false); }
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordData.newPassword.length < 6) {
-      onShowToast?.('Mật khẩu mới tối thiểu 6 ký tự.');
+    const newPasswordValidationError = passwordError(passwordData.newPassword);
+    if (newPasswordValidationError) {
+      onShowToast?.(newPasswordValidationError);
       return;
     }
     if (passwordData.newPassword !== passwordData.confirmPassword) {
@@ -159,27 +182,34 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
               <p className="text-xs text-stone-500">Địa chỉ được dùng làm địa chỉ giao hàng mặc định.</p>
             </div>
             <form onSubmit={handleSaveProfile} className="space-y-4 text-xs">
+              {profileError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-red-700">{profileError}</p>}
+              <fieldset disabled={isSaving} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="font-bold text-stone-700 block mb-1">Họ và tên *</label>
                   <input
                     type="text"
                     required
-                    maxLength={120}
+                    maxLength={100}
                     value={formData.full_name}
-                    onChange={e => setFormData({ ...formData, full_name: e.target.value })}
+                    onChange={e => updateForm({ full_name: e.target.value })}
                     className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl outline-none focus:border-primary text-stone-900 font-medium"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Số điện thoại liên hệ</label>
+                  <label htmlFor="profile-phone" className="font-bold text-stone-700 block mb-1">Số điện thoại *</label>
                   <input
-                    type="text"
-                    disabled
-                    value={user.phone}
-                    className="w-full px-3.5 py-2.5 border border-stone-200 bg-stone-50 rounded-xl outline-none text-stone-500 font-mono"
-                    title="Số điện thoại được lưu trong hồ sơ để liên hệ và giao hàng."
+                    id="profile-phone"
+                    name="phone"
+                    type="tel"
+                    autoComplete="tel"
+                    required
+                    maxLength={24}
+                    value={formData.phone}
+                    onChange={e => updateForm({ phone: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl outline-none focus:border-primary text-stone-900 font-mono"
                   />
+                  <p className="mt-1 text-stone-500">Số mới sẽ được dùng để đăng nhập, liên hệ và giao hàng.</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -190,7 +220,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
                     required
                     maxLength={254}
                     value={formData.email}
-                    onChange={e => setFormData({ ...formData, email: e.target.value })}
+                    onChange={e => updateForm({ email: e.target.value })}
                     className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl outline-none focus:border-primary text-stone-900"
                   />
                 </div>
@@ -199,7 +229,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
                   <input
                     type="date"
                     value={formData.birthday}
-                    onChange={e => setFormData({ ...formData, birthday: e.target.value })}
+                    onChange={e => updateForm({ birthday: e.target.value })}
                     className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl outline-none focus:border-primary text-stone-900 font-mono"
                   />
                 </div>
@@ -208,8 +238,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
                 <label className="font-bold text-stone-700 block mb-1">Địa chỉ</label>
                 <textarea
                   rows={2}
+                  maxLength={500}
                   value={formData.address}
-                  onChange={e => setFormData({ ...formData, address: e.target.value })}
+                  onChange={e => updateForm({ address: e.target.value })}
                   placeholder="Số nhà, tên đường, phường/xã, quận/huyện..."
                   className="w-full px-3.5 py-2.5 border border-stone-300 rounded-xl outline-none focus:border-primary text-stone-900"
                 />
@@ -220,9 +251,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
                   className="px-6 py-2.5 bg-primary text-white font-bold rounded-xl hover:bg-primary-container transition-colors shadow-xs flex items-center gap-2"
                 >
                   <span className="material-symbols-outlined text-[18px]">save</span>
-                  Lưu thay đổi hồ sơ
+                  {isSaving ? 'Đang lưu...' : 'Lưu thay đổi hồ sơ'}
                 </button>
               </div>
+              </fieldset>
             </form>
           </section>
         )}
@@ -276,7 +308,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, onShowToas
             <form onSubmit={handleChangePassword} className="space-y-4 max-w-md text-xs">
               {([
                 { key: 'oldPassword', label: 'Mật khẩu hiện tại', placeholder: 'Nhập mật khẩu hiện tại' },
-                { key: 'newPassword', label: 'Mật khẩu mới', placeholder: 'Tối thiểu 6 ký tự' },
+                { key: 'newPassword', label: 'Mật khẩu mới', placeholder: 'Tối thiểu 8 ký tự, gồm chữ và số' },
                 { key: 'confirmPassword', label: 'Xác nhận mật khẩu mới', placeholder: 'Nhập lại mật khẩu mới' }
               ] as const).map(f => (
                 <div key={f.key}>

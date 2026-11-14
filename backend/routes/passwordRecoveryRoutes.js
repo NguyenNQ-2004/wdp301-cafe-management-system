@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Recovery = require('../models/PasswordRecovery');
 const mailer = require('../utils/recoveryEmail');
 const { normalizeEmail, validEmail, emailFilter } = require('../utils/EmailUtil');
+const { passwordError } = require('../utils/passwordPolicy');
 const router = express.Router();
 const { atomicRoute } = require('../utils/atomicRoute');
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -58,8 +59,10 @@ router.post('/verify-otp', async (req, res) => {
 router.post('/reset-password', atomicRoute(async (req, res) => {
   try {
     const { resetToken, password, confirmPassword } = validBody(req.body) ? req.body : {};
+    const passwordValidationError = passwordError(password);
+    if (passwordValidationError) return error(res, 400, passwordValidationError);
     if (typeof resetToken !== 'string' || !/^[a-f0-9]{64}$/.test(resetToken)) return error(res, 400, 'Phiên đổi mật khẩu không hợp lệ.');
-    if (typeof password !== 'string' || password.length < 6 || Buffer.byteLength(password, 'utf8') > 72) return error(res, 400, 'Mật khẩu phải có ít nhất 6 ký tự và tối đa 72 byte.');
+    if (typeof password !== 'string' || password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) return error(res, 400, 'Mật khẩu phải có ít nhất 8 ký tự và tối đa 72 byte.');
     if (password !== confirmPassword) return error(res, 400, 'Mật khẩu xác nhận không khớp.');
     const passwordHash = await bcrypt.hash(password, 10);
     // Consume the reset token once, before changing the password.
