@@ -10,6 +10,7 @@ const shiftHandoverSchema = new mongoose.Schema({
   openingCash: { type: Number, required: true },
   cashSales: { type: Number, required: true, default: 0 },
   codReceipts: { type: Number, default: 0, min: 0 },
+  cashRefunds: { type: Number, default: 0, min: 0 },
   expectedCash: { type: Number, required: true },
   actualCash: { type: Number, required: true },
   difference: { type: Number, required: true, default: 0 },

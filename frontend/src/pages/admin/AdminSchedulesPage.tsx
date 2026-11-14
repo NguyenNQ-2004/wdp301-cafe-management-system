@@ -8,8 +8,8 @@ import { AdminLayout, inputCls } from './AdminUi';
 type ShiftName = string;
 type ScheduleStatus = 'SCHEDULED' | 'PRESENT' | 'ABSENT' | 'COMPLETED';
 interface Employee { _id: string; fullName: string; phone: string; position: string; status: string }
-interface Schedule { _id: string; user: Employee | null; workDate: string; shiftName: ShiftName; status: ScheduleStatus; note?: string }
-interface Shift { code: ShiftName; name: string; startTime: string; endTime: string }
+interface Schedule { _id: string; user: Employee | null; workDate: string; shiftName: ShiftName; status: ScheduleStatus; note?: string; checkInTime?: string; checkOutTime?: string; shiftInfo?: { startTime: string; endTime: string } }
+interface Shift { code: ShiftName; name: string; startTime: string; endTime: string; historical?: boolean }
 interface FormState { id?: string; originalUserId?: string; userId: string; workDate: string; shiftName: ShiftName; note: string }
 
 const defaultShifts: Shift[] = [
@@ -72,7 +72,12 @@ export default function AdminSchedulesPage() {
       .then(([weekSchedules, shiftResponse, staff]) => {
         if (!active) return;
         setSchedules(weekSchedules);
-        setShifts(shiftResponse.shifts.length ? shiftResponse.shifts : [...new Map(weekSchedules.map(schedule => [schedule.shiftName, { code: schedule.shiftName, name: schedule.shiftName, startTime: '', endTime: '' }])).values()]);
+        const activeCodes = new Set(shiftResponse.shifts.map(shift => shift.code));
+        const historical = new Map<string, Shift>();
+        for (const schedule of weekSchedules) if (!activeCodes.has(schedule.shiftName)) historical.set(schedule.shiftName, {
+          code: schedule.shiftName, name: schedule.shiftName, startTime: schedule.shiftInfo?.startTime || '', endTime: schedule.shiftInfo?.endTime || '', historical: true
+        });
+        setShifts([...shiftResponse.shifts, ...historical.values()]);
         setEmployees(staff);
         setError('');
       })
@@ -85,6 +90,7 @@ export default function AdminSchedulesPage() {
     ? schedules.filter((schedule) => schedule.user?._id === employeeFilter)
     : schedules, [schedules, employeeFilter]);
   const activeEmployees = employees.filter((employee) => employee.status === 'ACTIVE');
+  const removableSchedules = visible.filter(schedule => schedule.status === 'SCHEDULED' && !schedule.checkInTime && !schedule.checkOutTime);
   const options = form?.originalUserId && !activeEmployees.some((employee) => employee._id === form.originalUserId)
     ? [...activeEmployees, ...employees.filter((employee) => employee._id === form.originalUserId)]
     : activeEmployees;
@@ -136,6 +142,29 @@ export default function AdminSchedulesPage() {
     } catch (err) { setError((err as Error).message); }
     finally { setBusy(false); }
   };
+  const removeUnstartedSchedules = async () => {
+    if (!isAdmin || !token || loading || busy || !removableSchedules.length) return;
+    const targets = [...removableSchedules];
+    const scope = employeeFilter ? 'của nhân viên đang lọc' : 'của tất cả nhân viên';
+    if (!window.confirm(`Xóa ${targets.length} ca chưa chấm công ${scope} trong tuần ${days[0].display} – ${days[6].display}? Các ca đã chấm công được giữ lại.`)) return;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    setForm(null);
+    let removed = 0;
+    const failures: string[] = [];
+    try {
+      for (const schedule of targets) {
+        try {
+          await shopApi(`/api/work-schedules/${schedule._id}`, { method: 'DELETE', token });
+          removed++;
+        } catch (error) { failures.push((error as Error).message); }
+      }
+      if (removed) setNotice(`Đã xóa ${removed} ca chưa chấm công. Bạn có thể phân ca lại.`);
+      if (failures.length) setError(`${failures.length} ca chưa xóa được: ${[...new Set(failures)].join(' ')}`);
+      setReloadKey(key => key + 1);
+    } finally { setBusy(false); }
+  };
 
   const content = <div className="mx-auto max-w-[1500px] space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-white p-4">
@@ -144,6 +173,7 @@ export default function AdminSchedulesPage() {
         <div className="mt-1 text-lg font-bold text-stone-900">{days[0].display} – {days[6].display}</div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        {isAdmin && <button type="button" disabled={loading || busy || !removableSchedules.length} onClick={() => void removeUnstartedSchedules()} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50">Xóa ca chưa chấm công ({removableSchedules.length})</button>}
         {isAdmin && <select aria-label="Lọc nhân viên" value={employeeFilter} onChange={(event) => setEmployeeFilter(event.target.value)} className={inputCls}>
           <option value="">Tất cả nhân viên</option>
           {employees.map((employee) => <option key={employee._id} value={employee._id}>{employee.fullName} · {employee.phone}</option>)}
@@ -169,7 +199,7 @@ export default function AdminSchedulesPage() {
         <label className="text-xs font-semibold text-stone-700">Ngày làm việc<input type="date" required min={days[0].key} max={days[6].key} value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} className={`mt-1 ${inputCls}`} /></label>
         <label className="text-xs font-semibold text-stone-700">Ca làm
           <select value={form.shiftName} onChange={(event) => setForm({ ...form, shiftName: event.target.value as ShiftName })} className={`mt-1 ${inputCls}`}>
-            {shifts.map((shift) => <option key={shift.code} value={shift.code}>{shift.name} · {shift.startTime}–{shift.endTime}</option>)}
+            {shifts.filter(shift => !shift.historical).map((shift) => <option key={shift.code} value={shift.code}>{shift.name} · {shift.startTime}–{shift.endTime}</option>)}
           </select>
         </label>
         <label className="text-xs font-semibold text-stone-700">Ghi chú<input value={form.note} maxLength={500} onChange={(event) => setForm({ ...form, note: event.target.value })} className={`mt-1 ${inputCls}`} /></label>
@@ -187,7 +217,7 @@ export default function AdminSchedulesPage() {
           {days.map((day) => <th key={day.key} className="border-b border-r border-stone-200 p-3 last:border-r-0">{day.label}<span className="block text-xs font-normal text-stone-500">{day.display}</span></th>)}
         </tr></thead>
         <tbody>{shifts.map((shift) => <tr key={shift.code}>
-          <th className="align-top border-r border-b border-stone-200 p-3 font-semibold text-stone-900">{shift.name}<span className="mt-1 block text-xs font-normal text-stone-500">{shift.startTime}–{shift.endTime}</span></th>
+          <th className="align-top border-r border-b border-stone-200 p-3 font-semibold text-stone-900">{shift.name}<span className="mt-1 block text-xs font-normal text-stone-500">{shift.startTime}–{shift.endTime}</span>{shift.historical && <span className="mt-1 block text-xs font-normal text-stone-400">Lịch sử · khung ca đã xóa/đổi tên</span>}</th>
           {days.map((day) => {
             const items = visible.filter((schedule) => schedule.workDate.slice(0, 10) === day.key && schedule.shiftName === shift.code);
             return <td key={day.key} className="h-32 align-top border-r border-b border-stone-200 p-2 last:border-r-0">
@@ -195,13 +225,14 @@ export default function AdminSchedulesPage() {
                 <strong className="block text-xs text-stone-900">{isAdmin ? schedule.user?.fullName || 'Nhân viên đã xóa' : shift.name}</strong>
                 {isAdmin && <span className="text-[11px] text-stone-500">{schedule.user?.position || ''}</span>}
                 {isAdmin && <span className="block text-[11px] text-[#800020]">{statusNames[schedule.status]}</span>}
+                {schedule.shiftInfo?.startTime && <span className="block text-[11px] text-stone-500">{schedule.shiftInfo.startTime}–{schedule.shiftInfo.endTime}</span>}
                 {schedule.note && <p className="mt-1 break-words text-[11px] text-stone-600">{schedule.note}</p>}
                 {isAdmin && schedule.user && schedule.status === 'SCHEDULED' && <div className="mt-2 flex gap-2 text-[11px] font-semibold">
                   <button type="button" onClick={() => openEdit(schedule)} className="text-[#800020]">Sửa</button>
                   <button type="button" disabled={busy} onClick={() => void remove(schedule)} className="text-red-600 disabled:opacity-50">Bỏ ca</button>
                 </div>}
               </div>)}</div>
-              {isAdmin && <button type="button" onClick={() => openCreate(day.key, shift.code)} disabled={activeEmployees.length === 0} className="mt-2 text-xs font-semibold text-[#800020] disabled:text-stone-400">+ Phân ca</button>}
+              {isAdmin && !shift.historical && <button type="button" onClick={() => openCreate(day.key, shift.code)} disabled={activeEmployees.length === 0} className="mt-2 text-xs font-semibold text-[#800020] disabled:text-stone-400">+ Phân ca</button>}
               {!isAdmin && items.length === 0 && <span className="text-xs text-stone-400">Không có ca</span>}
             </td>;
           })}

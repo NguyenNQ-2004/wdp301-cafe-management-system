@@ -1,17 +1,25 @@
 const express = require('express');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
+const OrderItem = require('../models/OrderItem');
+const Cart = require('../models/Cart');
 const Category = require('../models/Category');
 const catalogImage = require('../utils/catalogImage');
 const ProductIngredient = require('../models/ProductIngredient');
 const { protect, adminOnly } = require('../middlewares/authMiddleware');
 const { invalid, objectBody, objectId, text, nonnegative, sendError } = require('../utils/adminValidation');
 const { atomicRouter } = require('../utils/atomicRoute');
+const { normalizeProductName, productNameKey } = require('../utils/productName');
 const router = atomicRouter(express.Router());
-async function parse(body, creating) {
+async function parse(body, creating, id) {
   objectBody(body);
   const fields = {};
-  if (creating || body.name !== undefined) fields.name = text(body.name, 'Tên sản phẩm');
+  if (creating || body.name !== undefined) {
+    fields.name = normalizeProductName(text(body.name, 'Tên sản phẩm'));
+    fields.nameKey = productNameKey(fields.name);
+    const candidates = await Product.find(id ? { _id: { $ne: id } } : {}).select('name').lean();
+    if (candidates.some(product => productNameKey(product.name) === fields.nameKey)) throw invalid('Tên sản phẩm đã tồn tại. Vui lòng chọn tên khác.', 409);
+  }
   if (creating || body.category !== undefined) {
     fields.category = objectId(body.category);
     if (!await Category.exists({ _id: fields.category })) throw invalid('Danh mục không tồn tại.', 404);
@@ -67,21 +75,28 @@ router.get('/:id', async (req, res) => {
   } catch (error) { sendError(res, error); }
 });
 router.post('/', protect, adminOnly, async (req, res) => {
-  try { res.status(201).json(await Product.create(await parse(req.body, true))); } catch (error) { sendError(res, error); }
+  try { res.status(201).json(await Product.create(await parse(req.body, true))); } catch (error) { productError(res, error); }
 });
 router.put('/:id', protect, adminOnly, async (req, res) => {
   try {
-    const product = await Product.findByIdAndUpdate(objectId(req.params.id), { $set: await parse(req.body, false) }, { returnDocument: 'after', runValidators: true });
+    const id = objectId(req.params.id);
+    const product = await Product.findByIdAndUpdate(id, { $set: await parse(req.body, false, id) }, { returnDocument: 'after', runValidators: true });
     if (!product) throw invalid('Không tìm thấy sản phẩm.', 404);
     res.json(product);
-  } catch (error) { sendError(res, error); }
+  } catch (error) { productError(res, error); }
 });
 router.delete('/:id', protect, adminOnly, async (req, res) => {
   try {
     const id = objectId(req.params.id);
+    if (await Order.exists({ 'items.product': id }) || await OrderItem.exists({ product: id })) throw invalid('Sản phẩm đã có trong đơn hàng nên không thể xóa. Vui lòng chọn Tạm ngưng bán.', 409);
     if (!await Product.findByIdAndDelete(id)) throw invalid('Không tìm thấy sản phẩm.', 404);
     await ProductIngredient.deleteMany({ product: id });
+    await Cart.updateMany({ 'items.product': id }, { $pull: { items: { product: id } } });
     res.json({ message: 'Đã xóa sản phẩm.' });
   } catch (error) { sendError(res, error); }
 });
 module.exports = router;
+function productError(res, error) {
+  if (error.code === 11000 && error.keyPattern?.nameKey) return res.status(409).json({ message: 'Tên sản phẩm đã tồn tại. Vui lòng chọn tên khác.' });
+  return sendError(res, error);
+}

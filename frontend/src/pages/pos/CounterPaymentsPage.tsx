@@ -35,6 +35,7 @@ export default function CounterPaymentsPage() {
   const [gatewayInfo, setGatewayInfo] = useState<Record<string, GatewayInfo>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [cashReceived, setCashReceived] = useState<Record<string, string>>({});
+  const [transferReferences, setTransferReferences] = useState<Record<string, string>>({});
 
   const refresh = useCallback(async () => {
     if (!user) return;
@@ -60,21 +61,26 @@ export default function CounterPaymentsPage() {
       setError('Tiền khách đưa phải là số nguyên và không ít hơn tổng cần thanh toán.');
       return;
     }
+    const reference = transferReferences[payment._id]?.trim();
+    if (selected === 'BANK_TRANSFER' && payment.confirmationMode === 'CASHIER' && (!reference || reference.length > 100)) {
+      setError('Nhập mã giao dịch sau khi đối chiếu đủ tiền vào tài khoản cửa hàng.');
+      return;
+    }
     setBusyId(payment._id);
     setError('');
     setNotice('');
     try {
-      if (selected === 'BANK_TRANSFER') {
+      if (selected === 'BANK_TRANSFER' && payment.confirmationMode !== 'CASHIER') {
         if (!payment.order || payment.paymentMethod !== 'BANK_TRANSFER') throw new Error('Đơn này chưa được tạo với phương thức chuyển khoản.');
         const info = await shopApi<GatewayInfo>(`/api/payments/order/${payment.order._id}/gateway`, { method: 'POST', token: user.token });
         setGatewayInfo((current) => ({ ...current, [payment._id]: info }));
         setNotice(`Đã tạo mã chuyển khoản cho đơn #${payment.order.orderCode}. Vui lòng chờ cổng thanh toán xác nhận rồi làm mới danh sách.`);
       } else {
         const result = await shopApi<{ payment: PaymentRecord }>(`/api/payments/${payment._id}/counter-confirm`, {
-          method: 'POST', token: user.token, body: { paymentMethod: 'CASH', receivedAmount }
+          method: 'POST', token: user.token, body: { paymentMethod: selected, ...(selected === 'CASH' ? { receivedAmount } : { transactionCode: reference }) }
         });
         setPayments((current) => current.map((item) => item._id === payment._id ? { ...item, ...result.payment, order: item.order } : item));
-        setNotice(`Đã ghi nhận tiền mặt cho đơn #${payment.order?.orderCode}.`);
+        setNotice(`Đã ghi nhận ${methodLabels[selected].toLowerCase()} cho đơn #${payment.order?.orderCode}.`);
       }
     } catch (err) {
       setError((err as Error).message);
@@ -93,7 +99,7 @@ export default function CounterPaymentsPage() {
       <div className="mx-auto max-w-5xl">
       {user?.role !== 'STAFF' && <button onClick={() => navigate('/cashier')} className="text-sm font-semibold text-primary">← Về trang thu ngân</button>}
       <h1 className="mt-4 text-3xl font-bold text-slate-950">Thanh toán tại quầy</h1>
-      <p className="mt-2 text-slate-600">Tiền mặt do thu ngân xác nhận. Chuyển khoản chỉ hoàn tất khi cổng thanh toán gửi xác nhận có chữ ký; MoMo/VNPay tại quầy chưa được kết nối.</p>
+      <p className="mt-2 text-slate-600">Thu ngân xác nhận tiền mặt hoặc đối chiếu đủ tiền chuyển khoản vào tài khoản cửa hàng rồi nhập mã giao dịch.</p>
       {error && <p role="alert" className="mt-5 rounded-lg bg-red-50 p-4 text-red-700">{error}</p>}
       {notice && <p role="status" className="mt-5 rounded-lg bg-emerald-50 p-4 text-emerald-800">{notice}</p>}
       <button onClick={() => void refresh()} disabled={loading} className="mt-5 rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-primary disabled:opacity-50">Làm mới danh sách</button>
@@ -104,11 +110,14 @@ export default function CounterPaymentsPage() {
           <div className="flex flex-wrap justify-between gap-3"><div><h3 className="font-bold">#{payment.order?.orderCode}</h3><p className="mt-1 text-sm text-slate-600">{payment.order?.orderType === 'DINE_IN' ? `Tại bàn ${payment.order.tableNumber || '—'}` : 'Khách đến lấy'} · {payment.order?.recipientName || payment.order?.customer?.fullName || 'Khách tại quầy'}</p></div><strong className="text-xl text-primary">{formatVnd(payment.amount)}</strong></div>
           <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
             <label className="text-sm font-semibold">Hình thức thanh toán<div className="mt-1 rounded-lg border border-blue-100 p-2.5">{methodLabels[payment.paymentMethod as CounterMethod] || payment.paymentMethod}</div></label>
-            <button onClick={() => void confirm(payment)} disabled={!!busyId} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{busyId === payment._id ? 'Đang xử lý...' : payment.paymentMethod === 'BANK_TRANSFER' ? 'Hiện mã QR chuyển khoản' : 'Đã nhận đủ tiền mặt'}</button>
+            <button onClick={() => void confirm(payment)} disabled={!!busyId} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{busyId === payment._id ? 'Đang xử lý...' : payment.paymentMethod === 'BANK_TRANSFER' ? payment.confirmationMode === 'CASHIER' ? 'Đã đối chiếu đủ tiền chuyển khoản' : 'Hiện mã QR chuyển khoản' : 'Đã nhận đủ tiền mặt'}</button>
           </div>
           {payment.paymentMethod !== 'BANK_TRANSFER' && <label className="mt-3 block text-sm font-semibold">Tiền khách đưa
             <NumberInput type="number" min={payment.amount} step="1" inputMode="numeric" value={cashReceived[payment._id] ?? String(payment.amount)} onChange={(event) => setCashReceived(current => ({ ...current, [payment._id]: event.target.value }))} className="mt-1 block w-full max-w-xs rounded-lg border border-blue-100 p-2.5" />
             <span className="mt-1 block font-normal text-slate-600">Tiền thối lại: {formatVnd(Math.max(0, (Number(cashReceived[payment._id] ?? payment.amount) || 0) - payment.amount))}</span>
+          </label>}
+          {payment.paymentMethod === 'BANK_TRANSFER' && payment.confirmationMode === 'CASHIER' && <label className="mt-3 block text-sm font-semibold">Mã giao dịch chuyển khoản đã đối chiếu
+            <input maxLength={100} value={transferReferences[payment._id] || ''} onChange={event => setTransferReferences(current => ({ ...current, [payment._id]: event.target.value }))} className="mt-1 block w-full max-w-md rounded-lg border border-blue-100 p-2.5" />
           </label>}
           {gatewayInfo[payment._id] && payment.paymentMethod === 'BANK_TRANSFER' && <div className="mt-4 flex flex-wrap items-center gap-4 rounded-lg bg-blue-50 p-4 text-sm"><img src={gatewayInfo[payment._id].qrUrl} alt={`Mã QR thanh toán đơn ${payment.order?.orderCode}`} className="h-40 w-40 bg-white object-contain" /><div><p><strong>Ngân hàng:</strong> {gatewayInfo[payment._id].bankName}</p><p><strong>Tài khoản:</strong> {gatewayInfo[payment._id].accountNo} · {gatewayInfo[payment._id].accountName}</p><p><strong>Nội dung:</strong> {payment.order?.orderCode}</p><p><strong>Mã đối soát:</strong> {payment.transactionCode}</p><p className="mt-2 text-blue-800">Thanh toán vẫn chờ xác nhận từ cổng.</p></div></div>}
         </article>)}</div>

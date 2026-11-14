@@ -21,7 +21,6 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
   const [lines, setLines] = useState<{ ingredient_id: any; quantity_required: number }[]>([]);
   const [filter, setFilter] = useState<'all' | 'with' | 'without'>('all');
   const [search, setSearch] = useState('');
-  const [valuation, setValuation] = useState<{ ingredientId: string; totalCost: number | '' } | null>(null);
 
   const bomOf = (productId: any) =>
     (db.product_ingredients || []).filter(
@@ -40,19 +39,6 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
     return Math.max(0, Number(row.currentStock ?? row.current_stock ?? 0) - tracked)
       + lots.reduce((sum: number, lot: any) => sum + (lot.unitCost == null ? lot.remainingQuantity : 0), 0);
   };
-  const saveIngredientCost = async () => {
-    if (!valuation || !token || saving) return;
-    if (valuation.totalCost === '' || !Number.isSafeInteger(valuation.totalCost) || valuation.totalCost < 0) {
-      setMessage('Nhập tổng tiền của lượng tồn chưa có giá bằng số nguyên không âm.'); return;
-    }
-    setSaving(true); setMessage('');
-    try {
-      await shopApi(`/api/ingredients/${valuation.ingredientId}/unpriced-stock-cost`, { token, method: 'PUT', body: { totalCost: valuation.totalCost } });
-      await refresh(); setValuation(null);
-      setMessage('Đã lưu giá nguyên liệu. Giá vốn công thức đã được cập nhật.');
-    } catch (error) { setMessage((error as Error).message); }
-    finally { setSaving(false); }
-  };
 
   const products = (db.products || []).filter(p => {
     const pId = p.id ?? p._id;
@@ -62,7 +48,6 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
 
   const openEditor = (productId: any) => {
     setMessage('');
-    setValuation(null);
     setEditingProductId(productId);
     const existing = bomOf(productId);
     setLines(
@@ -110,8 +95,6 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
     ? draftCosts.reduce((sum, row) => sum + (row.cost ?? 0), 0) : null;
   const draftEstimated = draftCosts.some(row => row.estimated);
   const draftPrice = editingProduct?.base_price ?? editingProduct?.basePrice ?? 0;
-  const draftProfit = draftCost === null ? null : draftPrice - draftCost;
-  const draftMargin = draftProfit !== null && draftPrice > 0 ? Math.round(draftProfit / draftPrice * 100) : null;
 
   return (
     <AdminLayout
@@ -161,7 +144,6 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
           const bom = bomOf(pId);
           const { cost, estimated } = productCostDetails(db, pId);
           const basePrice = p.base_price ?? p.basePrice ?? 0;
-          const margin = cost !== null && basePrice > 0 ? Math.round(((basePrice - cost) / basePrice) * 100) : null;
           const catName = (db.categories || []).find(
             c => c.id === p.category_id || c._id === p.category_id || String(c.id) === String(p.category_id)
           )?.name;
@@ -187,10 +169,9 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
                   </div>
                   <Badge className={(p.is_available ?? p.isAvailable ?? true) ? 'shrink-0 bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/10' : 'shrink-0 bg-stone-100 text-stone-500'}>{(p.is_available ?? p.isAvailable ?? true) ? 'Đang bán' : 'Tạm ngưng'}</Badge>
               </div>
-              <div className="mx-5 grid grid-cols-1 divide-y divide-stone-200/70 overflow-hidden rounded-xl border border-stone-200/70 bg-[#faf9f6] sm:mx-6 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+              <div className="mx-5 grid grid-cols-1 divide-y divide-stone-200/70 overflow-hidden rounded-xl border border-stone-200/70 bg-[#faf9f6] sm:mx-6 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
                 <div className="px-4 py-4"><p className="text-xs text-stone-500">Giá bán</p><p className="mt-2 text-xl font-bold tabular-nums tracking-tight text-stone-900">{fmtMoney(basePrice)}</p></div>
                 <div className="px-4 py-4"><p className="text-xs text-stone-500">{estimated ? 'Giá vốn dự kiến' : 'Giá vốn nguyên liệu'}</p><p className="mt-2 text-xl font-bold tabular-nums tracking-tight text-[#800020]">{cost === null ? '—' : fmtMoney(cost)}</p></div>
-                <div className="px-4 py-4"><p className="text-xs text-stone-500">{estimated ? 'Lợi nhuận gộp dự kiến' : 'Lợi nhuận gộp'}</p><div className="mt-2 flex flex-wrap items-center gap-2"><p className={`text-xl font-bold tabular-nums tracking-tight ${cost !== null && cost > basePrice ? 'text-rose-700' : 'text-emerald-700'}`}>{cost === null ? '—' : fmtMoney(basePrice - cost)}</p>{margin !== null && <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${margin < 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{`${margin}%`}</span>}</div></div>
               </div>
               <div className="px-5 py-5 sm:px-6">
                 <div className="mb-3 flex items-center justify-between gap-2"><h4 className="text-xs font-bold uppercase tracking-wider text-stone-600">Thành phần <span className="ml-1 font-normal text-stone-400">({bom.length})</span></h4><span className="text-[11px] text-stone-400">Cho 1 ly / phần</span></div>
@@ -260,7 +241,7 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
                   ))}
                 </select>
                 <p className="mt-1.5 text-[10px] text-stone-400">{draftCosts[i].cost === null ? unpricedQuantity(l.ingredient_id) > 0 ? `Chưa có giá cho ${fmtNumber(unpricedQuantity(l.ingredient_id))} ${ingredient(l.ingredient_id)?.unit} tồn kho` : 'Chưa có giá nhập nguyên liệu' : draftCosts[i].estimated ? 'Đơn giá dự kiến' : 'Đơn giá theo lô nhập'}</p>
-                {unpricedQuantity(l.ingredient_id) > 0 && <button type="button" disabled={saving} onClick={() => { setValuation({ ingredientId: String(l.ingredient_id), totalCost: '' }); setMessage(''); }} className="mt-1 text-[11px] font-semibold text-[#800020] underline underline-offset-2">Bổ sung giá tồn tại đây</button>}
+                {unpricedQuantity(l.ingredient_id) > 0 && <p className="mt-1 text-[11px] text-stone-500">Cập nhật giá tồn tại mục Nguyên liệu.</p>}
                 {draftCosts[i].cost === null && unpricedQuantity(l.ingredient_id) <= 0 && <a href="/admin/purchases" target="_blank" rel="noreferrer" className="mt-1 inline-block text-[11px] font-semibold text-[#800020] underline underline-offset-2">Nhập hàng và giá mua ↗</a>}
                 </div>
                 <div className="col-span-6 row-start-2 sm:col-span-3 sm:row-start-auto">
@@ -292,14 +273,6 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
                 >
                   <span className="material-symbols-outlined text-[18px]">delete</span>
                 </button>
-                {valuation?.ingredientId === String(l.ingredient_id) && <div className="col-span-12 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-                  <p className="font-semibold text-stone-800">Bổ sung giá tồn: {ingredient(l.ingredient_id)?.name}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-stone-600">Lượng tồn chưa có giá: <b>{fmtNumber(unpricedQuantity(l.ingredient_id))} {ingredient(l.ingredient_id)?.unit}</b>. Nhập tổng tiền mua của đúng lượng này, hệ thống tự chia ra đơn giá.</p>
-                  <label className="mt-3 block text-[11px] font-medium text-stone-700" htmlFor={`stock-cost-${i}`}>Tổng tiền của lượng tồn trên (đ)</label>
-                  <div className="mt-1 flex flex-col gap-2 sm:flex-row"><NumberInput id={`stock-cost-${i}`} aria-label={`Tổng giá trị tồn ${ingredient(l.ingredient_id)?.name}`} type="number" min="0" step="1" disabled={saving} value={valuation.totalCost} onChange={e => setValuation({ ...valuation, totalCost: e.target.value === '' ? '' : Number(e.target.value) })} placeholder="Nhập tổng tiền mua" className={inputCls} /><button type="button" disabled={saving || valuation.totalCost === ''} onClick={() => void saveIngredientCost()} className="shrink-0 rounded-xl bg-[#800020] px-4 py-2 font-semibold text-white disabled:opacity-50">{saving ? 'Đang lưu...' : 'Lưu giá & tính cost'}</button><button type="button" disabled={saving} onClick={() => setValuation(null)} className="shrink-0 px-2 py-2 text-stone-500">Đóng</button></div>
-                  {valuation.totalCost !== '' && Number.isFinite(valuation.totalCost) && valuation.totalCost >= 0 && unpricedQuantity(l.ingredient_id) > 0 && <p className="mt-2 text-[11px] tabular-nums text-stone-600">Đơn giá tự tính: {fmtMoney(valuation.totalCost)} ÷ {fmtNumber(unpricedQuantity(l.ingredient_id))} = {fmtMoney(valuation.totalCost / unpricedQuantity(l.ingredient_id))}/{ingredient(l.ingredient_id)?.unit}</p>}
-                  <p className="mt-2 text-[10px] text-stone-500">Lưu giá sẽ cập nhật giá trị nguyên liệu trong kho, giữ nguyên số lượng tồn. Công thức được lưu riêng bằng nút bên dưới.</p>
-                </div>}
               </div>
             ))}
             <button
@@ -317,14 +290,13 @@ export const AdminRecipesPage: React.FC<AdminRecipesPageProps> = ({ onNavigate, 
             </button>
             <div aria-live="polite" aria-atomic="true" className="rounded-xl border border-stone-200 bg-[#faf9f6] p-4">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><h4 className="font-semibold text-stone-800">Ước tính cho 1 ly / phần</h4><span className="text-[10px] text-stone-400">Cập nhật theo lượng vừa nhập</span></div>
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div><p className="text-[11px] text-stone-500">Giá bán</p><p className="mt-1 text-lg font-bold tabular-nums text-stone-900">{fmtMoney(draftPrice)}</p></div>
                 <div><p className="text-[11px] text-stone-500">Tổng giá vốn{draftEstimated ? ' dự kiến' : ''}</p><p className="mt-1 text-lg font-bold tabular-nums text-[#800020]">{draftCost === null ? 'Chưa tính đủ' : fmtMoney(draftCost)}</p></div>
-                <div><p className="text-[11px] text-stone-500">Lợi nhuận gộp dự kiến</p><p className={`mt-1 text-lg font-bold tabular-nums ${draftProfit !== null && draftProfit < 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{draftProfit === null ? '—' : fmtMoney(draftProfit)}{draftMargin !== null && <span className="ml-2 text-xs font-medium">{`(${draftMargin}%)`}</span>}</p></div>
               </div>
               {duplicateIngredients ? <p className="mt-3 text-xs text-amber-800">Nguyên liệu bị trùng. Gộp lượng dùng vào một dòng để tính đúng giá vốn.</p>
                 : draftCost === null ? <p className="mt-3 text-xs text-stone-500">Chọn nguyên liệu, nhập lượng dùng hợp lệ và bổ sung giá nguyên liệu để tính đủ chi phí.</p>
-                : draftProfit !== null && draftProfit < 0 ? <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">Giá vốn vượt giá bán {fmtMoney(-draftProfit)}. Kiểm tra lượng dùng cho 1 ly và đơn giá nhập.</p> : null}
+                : draftCost !== null && draftCost > draftPrice ? <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">Giá vốn vượt giá bán {fmtMoney(draftCost - draftPrice)}. Kiểm tra lượng dùng cho 1 ly và đơn giá nhập.</p> : null}
               <p className="mt-3 border-t border-stone-200/70 pt-3 text-[10px] leading-relaxed text-stone-400">Chi phí nguyên liệu theo lô còn lại{draftEstimated ? ', có sử dụng đơn giá dự kiến' : ''}. Chưa gồm nhân công và chi phí vận hành.</p>
             </div>
             {message && <p role="status" className="text-sm text-stone-700">{message}</p>}

@@ -1,6 +1,6 @@
 import CashierWorkHeader from '../../components/CashierWorkHeader';
 import { NumberInput } from '../../components/NumberInput';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { formatVnd, shopApi } from '../../lib/shopApi';
@@ -52,6 +52,7 @@ interface HandoverDetail {
   resubmittedAt?: string | null;
   openingCash: number | null;
   cashRevenue: number;
+  cashRefunds?: number;
   codReceipts: number;
   paymentCount: number;
   unattributedCash: number;
@@ -85,6 +86,9 @@ const formatShiftHours = (shiftName: string, shiftInfo?: ShiftInfo) =>
   shiftInfo?.startTime && shiftInfo?.endTime
     ? `${shiftInfo.startTime} – ${shiftInfo.endTime}`
     : shiftTimes[shiftName] || '';
+// Same wording as the Admin attendance screen; COMPLETED reads as the handover step here.
+const shiftStatusLabels: Record<string, string> = { SCHEDULED: 'Chưa chấm công', PRESENT: 'Đang trong ca', ABSENT: 'Vắng mặt', COMPLETED: 'Chờ bàn giao' };
+const SYNC_INTERVAL_MS = 30000;
 const validMoney = (value: string) => /^\d+$/.test(value) && Number.isSafeInteger(Number(value));
 
 export default function PosHandoverPage() {
@@ -99,6 +103,7 @@ export default function PosHandoverPage() {
   const [draft, setDraft] = useState(initialRange);
   const [range, setRange] = useState(initialRange);
   const [reloadKey, setReloadKey] = useState(0);
+  const loadedRef = useRef(false);
   const [shifts, setShifts] = useState<ShiftRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<HandoverDetail | null>(null);
@@ -115,6 +120,15 @@ export default function PosHandoverPage() {
   const [pendingCod, setPendingCod] = useState<CodRemittance[]>([]);
   const [codCash, setCodCash] = useState<Record<string, string>>({});
   const [codNote, setCodNote] = useState<Record<string, string>>({});
+
+  // Admin changes attendance elsewhere: re-read shifts periodically and when the tab regains focus.
+  useEffect(() => {
+    const sync = () => { if (document.visibilityState === 'visible') setReloadKey(key => key + 1); };
+    const timer = window.setInterval(sync, SYNC_INTERVAL_MS);
+    document.addEventListener('visibilitychange', sync);
+    window.addEventListener('focus', sync);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', sync); window.removeEventListener('focus', sync); };
+  }, []);
 
   useEffect(() => {
     if (!token || !canConfirm) return;
@@ -140,12 +154,13 @@ export default function PosHandoverPage() {
   useEffect(() => {
     if (!token) return;
     let active = true;
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     shopApi<ShiftRecord[]>(`/api/shift-handovers?from=${range.from}&to=${range.to}`, { token })
       .then((raw) => {
         if (!active) return;
         const rows = Array.isArray(raw) ? raw : [];
         setShifts(rows);
+        loadedRef.current = true;
         const queryScheduleId = searchParams.get('scheduleId');
         if (queryScheduleId && rows.some((row) => row._id === queryScheduleId)) {
           setSelectedId(queryScheduleId);
@@ -235,7 +250,7 @@ export default function PosHandoverPage() {
     }
   };
 
-  const expectedPreview = detail?.expectedCash ?? (detail?.openingCash === null && validMoney(openingCash) ? Number(openingCash) + detail.cashRevenue + detail.codReceipts : null);
+  const expectedPreview = detail?.expectedCash ?? (detail?.openingCash === null && validMoney(openingCash) ? Number(openingCash) + detail.cashRevenue + detail.codReceipts - (detail.cashRefunds || 0) : null);
   const differencePreview = expectedPreview !== null && validMoney(actualCash) ? Number(actualCash) - expectedPreview : null;
   const isDiff = differencePreview !== null && differencePreview !== 0;
 
@@ -395,9 +410,13 @@ export default function PosHandoverPage() {
                       ? 'bg-emerald-50 text-emerald-700'
                       : shift.status === 'COMPLETED'
                       ? 'bg-amber-50 text-amber-800'
+                      : shift.status === 'PRESENT'
+                      ? 'bg-blue-50 text-blue-700'
+                      : shift.status === 'ABSENT'
+                      ? 'bg-red-50 text-red-700'
                       : 'bg-slate-100 text-slate-600'
                   }`}>
-                    {shift.handoverAt ? 'Đã bàn giao' : shift.status === 'COMPLETED' ? 'Chờ bàn giao' : 'Đang làm việc'}
+                    {shift.handoverAt ? 'Đã bàn giao' : shiftStatusLabels[shift.status] || shift.status}
                   </span>
                 </button>
               ))}
@@ -506,7 +525,7 @@ export default function PosHandoverPage() {
                             <strong className="text-xs font-bold text-emerald-700 block mt-0.5">{formatVnd(detail.codReceipts || 0)}</strong>
                           </div>
                           <div className="rounded-lg bg-white p-2.5 border border-red-200 shadow-2xs">
-                            <span className="text-[10px] font-bold text-primary block uppercase">= Phải có trong két</span>
+                            <span className="text-[10px] font-bold text-primary block uppercase">− Hoàn tiền mặt: {formatVnd(detail.cashRefunds || 0)} · = Phải có trong két</span>
                             <strong className="text-xs font-black text-primary block mt-0.5">
                               {expectedPreview !== null ? formatVnd(expectedPreview) : '—'}
                             </strong>
@@ -902,6 +921,7 @@ export default function PosHandoverPage() {
                             <div className="flex justify-between"><span>Tiền đầu ca</span><strong>{formatVnd(detail.openingCash || 0)}</strong></div>
                             <div className="flex justify-between"><span>Thu tiền mặt ({methods.CASH.count})</span><strong>{formatVnd(cashSales)}</strong></div>
                             <div className="flex justify-between"><span>Nhận COD từ shipper</span><strong>{formatVnd(detail.codReceipts || 0)}</strong></div>
+                            <div className="flex justify-between"><span>Hoàn tiền mặt</span><strong>−{formatVnd(detail.cashRefunds || 0)}</strong></div>
                             <div className="flex justify-between"><span>Theo hệ thống</span><strong>{formatVnd(detail.expectedCash || 0)}</strong></div>
                             <div className="flex justify-between"><span>Thực tế trong két</span><strong>{formatVnd(detail.actualCash || 0)}</strong></div>
                             <div className="mt-1 flex justify-between border-t border-dashed border-black pt-1">

@@ -106,7 +106,7 @@ test('ordered prices calculate recipe cost and render its amount before receivin
     if (name === 'Recipes') {
       assert.match(html, /2\.000\.000đ/);
       assert.match(html, /Giá vốn dự kiến theo định mức/);
-      assert.match(html, /-4344%/);
+      assert.doesNotMatch(html, /-4344%/);
     }
   }
   db.purchase_orders[0].status = 'CANCELLED';
@@ -138,4 +138,22 @@ test('attendance and handovers render cleanly in admin layout without crashing',
     assert.match(html, name === 'Attendance' ? /Chấm công nhân sự/ : /Biên bản bàn giao ca/);
     assert.doesNotMatch(html, /\b(?:NaN|undefined)\b/);
   }
+});
+
+test('product and recipe costs match when rows contain both MongoDB and numeric UI IDs', () => {
+  const db = empty();
+  db.products = [{ id: 1, _id: 'mongo-product', base_price: 45000 }];
+  db.ingredients = [{ id: 2, _id: 'mongo-beans', current_stock: 1000, stock_lots: [{ _id: 'lot', receivedAt: '2026-11-01', remainingQuantity: 1000, unitCost: 100 }] }];
+  db.product_ingredients = [{ product_id: 1, ingredient_id: 2, quantity_required: 50 }];
+  assert.deepEqual(interfaceUtils.productCostDetails(db, 1), { cost: 5000, estimated: false });
+  assert.deepEqual(utils.productCostDetails(db, 'mongo-product'), { cost: 5000, estimated: false });
+  assert.equal(utils.recipeLineCost(db, 'mongo-beans', 50).cost, 5000);
+  // Raw embedded purchase items and normalized separate purchase rows both resolve.
+  delete db.ingredients[0].stock_lots;
+  db.purchase_orders = [{ id: 3, _id: 'mongo-po', status: 'RECEIVED', created_at: '2026-11-01', items: [{ ingredient: { _id: 'mongo-beans' }, unitPrice: 100 }] }];
+  assert.equal(interfaceUtils.productCost(db, 1), 5000);
+  delete db.purchase_orders[0].items;
+  db.purchase_order_items = [{ po_id: 3, ingredient_id: 2, unit_price: 100 }];
+  assert.equal(interfaceUtils.productCost(db, 1), 5000);
+  assert.equal(utils.lastPurchasePrice(db, 'mongo-beans'), 100);
 });
