@@ -24,6 +24,7 @@ const statusNames: Record<ScheduleStatus, string> = {
   SCHEDULED: 'Đã phân công', PRESENT: 'Đang làm', ABSENT: 'Vắng mặt', COMPLETED: 'Đã hoàn thành'
 };
 const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const vietnamToday = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
 const mondayOf = (date: Date) => {
   const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
@@ -64,6 +65,7 @@ export default function AdminSchedulesPage() {
     return { key: dateKey(date), label: weekdays[index], display: `${date.getDate()}/${date.getMonth() + 1}` };
   }), [weekStart]);
 
+  // PCA1: tải lịch theo tuần và thông tin khung giờ để hiển thị cho Admin/nhân viên.
   useEffect(() => {
     if (!token) return;
     let active = true;
@@ -101,18 +103,21 @@ export default function AdminSchedulesPage() {
     ? schedules.filter((schedule) => schedule.user?._id === employeeFilter)
     : schedules, [schedules, employeeFilter]);
   const activeEmployees = employees.filter((employee) => employee.status === 'ACTIVE');
-  const removableSchedules = visible.filter(schedule => schedule.status === 'SCHEDULED' && !schedule.checkInTime && !schedule.checkOutTime);
+  const today = vietnamToday();
+  const removableSchedules = visible.filter(schedule => schedule.workDate.slice(0, 10) >= today && schedule.status === 'SCHEDULED' && !schedule.checkInTime && !schedule.checkOutTime);
   const options = form?.originalUserId && !activeEmployees.some((employee) => employee._id === form.originalUserId)
     ? [...activeEmployees, ...employees.filter((employee) => employee._id === form.originalUserId)]
     : activeEmployees;
 
   const openCreate = (workDate: string, shiftName: ShiftName) => {
+    if (workDate < vietnamToday()) return;
     const selected = activeEmployees.find((employee) => employee._id === employeeFilter);
     setForm({ userId: selected?._id || activeEmployees[0]?._id || '', workDate, shiftName, note: '' });
     setError('');
     setNotice('');
   };
   const openEdit = (schedule: Schedule) => {
+    if (schedule.workDate.slice(0, 10) < vietnamToday()) return;
     if (!schedule.user) { setError('Nhân viên của phân ca không còn tồn tại.'); return; }
     setForm({
       id: schedule._id, originalUserId: schedule.user._id, userId: schedule.user._id,
@@ -121,9 +126,11 @@ export default function AdminSchedulesPage() {
     setError('');
     setNotice('');
   };
+  // PCA2: Admin phân hoặc sửa người làm trong một ca/ngày cụ thể.
   const save = async (event: FormEvent) => {
     event.preventDefault();
     if (!token || !form || busy) return;
+    if (form.workDate < vietnamToday()) { setError('Không thể phân ca cho ngày trong quá khứ.'); return; }
     setBusy(true);
     setError('');
     setNotice('');
@@ -141,6 +148,7 @@ export default function AdminSchedulesPage() {
     } catch (err) { setError((err as Error).message); }
     finally { setBusy(false); }
   };
+  // PCA3: bỏ phân công chưa chấm công; lịch đã phát sinh công không xóa ở đây.
   const remove = async (schedule: Schedule) => {
     if (!token || busy || !window.confirm(`Bỏ phân ca của ${schedule.user?.fullName || 'nhân viên đã xóa'}?`)) return;
     setBusy(true);
@@ -153,6 +161,7 @@ export default function AdminSchedulesPage() {
     } catch (err) { setError((err as Error).message); }
     finally { setBusy(false); }
   };
+  // BGC4: người nhận báo số tiền đếm lệch cho thu ngân giao và Admin.
   const reportCashDiscrepancy = async (schedule: Schedule) => {
     if (!token || busy) return;
     const counted = countedCash[schedule._id] ?? '';
@@ -169,6 +178,7 @@ export default function AdminSchedulesPage() {
     } catch (err) { setError((err as Error).message); }
     finally { setBusy(false); }
   };
+  // BGC3 (Ngọc - UC25-27): thu ngân kế tiếp tự đếm và nhận két; khớp mới vào ca.
   const acceptCashTransfer = async (schedule: Schedule) => {
     if (!token || busy) return;
     const counted = countedCash[schedule._id] ?? '';
@@ -254,7 +264,7 @@ export default function AdminSchedulesPage() {
             {options.map((employee) => <option key={employee._id} value={employee._id}>{employee.fullName} · {employee.phone}{employee.status !== 'ACTIVE' ? ' (ngừng hoạt động)' : ''}</option>)}
           </select>
         </label>
-        <label className="text-xs font-semibold text-stone-700">Ngày làm việc<input type="date" required min={days[0].key} max={days[6].key} value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} className={`mt-1 ${inputCls}`} /></label>
+        <label className="text-xs font-semibold text-stone-700">Ngày làm việc<input type="date" required min={days[0].key > today ? days[0].key : today} max={days[6].key} value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} className={`mt-1 ${inputCls}`} /></label>
         <label className="text-xs font-semibold text-stone-700">Ca làm
           <select value={form.shiftName} onChange={(event) => setForm({ ...form, shiftName: event.target.value as ShiftName })} className={`mt-1 ${inputCls}`}>
             {shifts.filter(shift => !shift.historical).map((shift) => <option key={shift.code} value={shift.code}>{shift.name} · {shift.startTime}–{shift.endTime}</option>)}
@@ -264,7 +274,7 @@ export default function AdminSchedulesPage() {
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <button type="button" onClick={() => setForm(null)} className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold">Hủy</button>
-        <button disabled={busy || !form.userId} className="rounded-xl bg-[#800020] px-5 py-2 text-sm font-bold text-white disabled:opacity-50">{busy ? 'Đang lưu...' : 'Lưu phân ca'}</button>
+        <button disabled={busy || !form.userId || form.workDate < today} className="rounded-xl bg-[#800020] px-5 py-2 text-sm font-bold text-white disabled:opacity-50">{busy ? 'Đang lưu...' : 'Lưu phân ca'}</button>
       </div>
     </form>}
 
@@ -285,12 +295,12 @@ export default function AdminSchedulesPage() {
                 {isAdmin && <span className="block text-[11px] text-[#800020]">{statusNames[schedule.status]}</span>}
                 {schedule.shiftInfo?.startTime && <span className="block text-[11px] text-stone-500">{schedule.shiftInfo.startTime}–{schedule.shiftInfo.endTime}</span>}
                 {schedule.note && <p className="mt-1 break-words text-[11px] text-stone-600">{schedule.note}</p>}
-                {isAdmin && schedule.user && schedule.status === 'SCHEDULED' && <div className="mt-2 flex gap-2 text-[11px] font-semibold">
+                {isAdmin && day.key >= today && schedule.user && schedule.status === 'SCHEDULED' && <div className="mt-2 flex gap-2 text-[11px] font-semibold">
                   <button type="button" onClick={() => openEdit(schedule)} className="text-[#800020]">Sửa</button>
                   <button type="button" disabled={busy} onClick={() => void remove(schedule)} className="text-red-600 disabled:opacity-50">Bỏ ca</button>
                 </div>}
               </div>)}</div>
-              {isAdmin && !shift.historical && <button type="button" onClick={() => openCreate(day.key, shift.code)} disabled={activeEmployees.length === 0} className="mt-2 text-xs font-semibold text-[#800020] disabled:text-stone-400">+ Phân ca</button>}
+              {isAdmin && !shift.historical && day.key >= today && <button type="button" onClick={() => openCreate(day.key, shift.code)} disabled={activeEmployees.length === 0} className="mt-2 text-xs font-semibold text-[#800020] disabled:text-stone-400">+ Phân ca</button>}
               {!isAdmin && items.length === 0 && <span className="text-xs text-stone-400">Không có ca</span>}
             </td>;
           })}

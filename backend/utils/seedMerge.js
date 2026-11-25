@@ -184,9 +184,10 @@ async function buildPlan(db, snapshot, { session, repairEncoding, password }) {
 }
 
 async function mergeSnapshot(db, snapshot, { dryRun = false, repairEncoding = true,
-  password = process.env.SEED_USER_PASSWORD || 'AuraCafe123!' } = {}) {
+  password = process.env.SEED_USER_PASSWORD || '123456' } = {}) {
   if (process.env.NODE_ENV === 'production') throw new Error('Seed is restricted to development databases.');
-  if (passwordError(password)) throw new Error(`SEED_USER_PASSWORD: ${passwordError(password)}`);
+  // Only the shared local demo password bypasses the normal account password policy.
+  if (password !== '123456' && passwordError(password)) throw new Error(`SEED_USER_PASSWORD: ${passwordError(password)}`);
   if (!dryRun && !await checkReplicaSet()) throw new Error('Additive seed requires a MongoDB replica set; no records were changed.');
   const known = new Set((await db.listCollections().toArray()).map(item => item.name));
   // Collections/indexes are created only when absent; live indexes are retained.

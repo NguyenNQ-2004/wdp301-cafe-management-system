@@ -55,6 +55,7 @@ export default function AdminUsersPage() {
     return () => { active = false; };
   }, [token]);
 
+  // NV1: Admin tìm và lọc danh sách nhân viên theo tên, chức vụ, trạng thái.
   const visible = useMemo(() => employees.filter((employee) => {
     const query = search.trim().toLocaleLowerCase('vi');
     return (!query || `${employee.fullName} ${employee.phone} ${employee.email || ''}`.toLocaleLowerCase('vi').includes(query))
@@ -69,6 +70,7 @@ export default function AdminUsersPage() {
     setError(''); setFieldErrors({}); setFormOpen(true);
   };
 
+  // NV2: tạo hoặc sửa hồ sơ, tài khoản và chức vụ nhân viên.
   const save = async (event: FormEvent) => {
     event.preventDefault();
     if (!token || saving) return;
@@ -93,6 +95,7 @@ export default function AdminUsersPage() {
     finally { setSaving(false); }
   };
 
+  // NV3: khóa/kích hoạt tài khoản để kiểm soát quyền làm việc.
   const changeStatus = async (employee: Employee) => {
     if (!token || busyId) return;
     setBusyId(employee._id); setError(''); setNotice('');

@@ -17,7 +17,7 @@ const { atomicRouter } = require('../utils/atomicRoute');
 const router = atomicRouter(express.Router(), ['POST /order/:orderId/gateway']);
 const canManageCounter = (user) => user.role === 'ADMIN' || (user.role === 'STAFF' && ['CASHIER', 'MANAGER'].includes(user.position));
 router.get('/config', (_req, res) => res.json({ demoEnabled: demoPaymentsEnabled(), gatewayEnabled: gateway.enabled() }));
-// SePay sends one bank-credit event per transfer; only this endpoint may mark a QR payment paid.
+// PQR6 PQR7 PQR8 (Ngọc - UC12): SePay báo tiền vào; xác thực nguồn, mã, tài khoản và số tiền trước khi xác nhận đơn.
 router.post('/sepay-webhook', async (req, res) => {
   if (!gateway.verify(req)) return res.status(401).json({ success: false });
   const body = req.body || {};
@@ -118,6 +118,7 @@ router.post('/order/:orderId/refund-and-cancel', withOrderMutation(async (req, r
   return res.json({ order, payment: updated });
 }, req => req.params.orderId));
 
+// COD5 (Ngọc - UC12): chuyển đơn đang chờ QR sang COD; xác nhận đơn nhưng chưa thu tiền.
 router.post('/order/:orderId/cod', async (req, res) => {
   let unlock;
   try {
@@ -146,6 +147,7 @@ router.post('/order/:orderId/cod', async (req, res) => {
   finally { unlock?.(); }
 });
 
+// PQR5 (Ngọc - UC12): cấp dữ liệu VietQR cho đúng đơn và khoản thanh toán PENDING.
 router.post('/order/:orderId/gateway', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.orderId)) return res.status(400).json({ message: 'Mã đơn không hợp lệ.' });
@@ -236,6 +238,7 @@ router.post('/:id/demo-confirm', async (req, res) => {
 });
 
 // UC13: nhân viên thu ngân xác nhận đã nhận tiền tại quầy.
+// TQ4 (Ngọc - UC13): lưu giao dịch thành công, tiền nhận và tiền thối sau khi thu ngân xác nhận.
 router.post('/:id/counter-confirm', withOrderMutation(async (req, res) => {
   let unlock;
   try {

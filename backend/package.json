@@ -13,6 +13,7 @@
     "mock:gateway": "node scripts/mockPaymentGateway.js",
     "db:local-replica": "node scripts/setupLocalReplicaSet.js",
     "seed": "node seed.js --merge",
+    "seed:staff-schedules": "node seed.js --merge --staff-schedules",
     "seed:check": "node seed.js --merge --dry-run",
     "seed:reports-demo": "node seedReportDemo.js",
     "seed:export": "node seed.js --export",

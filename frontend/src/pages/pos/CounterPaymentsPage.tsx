@@ -38,6 +38,7 @@ export default function CounterPaymentsPage() {
   const [transferReferences, setTransferReferences] = useState<Record<string, string>>({});
   const previousStatuses = useRef<Record<string, string>>({});
 
+  // TQ1: lấy các khoản thanh toán tại quầy đang chờ và đã hoàn tất.
   const refresh = useCallback(async (silent = false) => {
     if (!user) return;
     if (!silent) setLoading(true);
@@ -67,6 +68,7 @@ export default function CounterPaymentsPage() {
     return () => window.clearInterval(timer);
   }, [awaitingGateway, refresh]);
 
+  // TQ2 TQ3 (Ngọc - UC13): chọn tiền mặt/chuyển khoản rồi kiểm đủ tiền hoặc đối chiếu QR trước khi xác nhận.
   const confirm = async (payment: CounterPayment) => {
     if (!user || busyId) return;
     const selected = payment.paymentMethod === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'CASH';

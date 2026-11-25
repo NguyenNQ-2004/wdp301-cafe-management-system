@@ -31,22 +31,26 @@ export default function PaymentPage({ onRequestAuth }: { onRequestAuth: () => vo
   }, [user?.token, orderId, revision]);
   useEffect(() => {
     if (!user || !orderId || details?.demoEnabled || details?.order.paymentMethod !== 'BANK_TRANSFER' || details.payment.status !== 'PENDING' || details.order.status !== 'PENDING') return;
+    // PQR5 (Ngọc - UC12): lấy VietQR riêng của đơn, gồm số tiền và nội dung chuyển khoản để đối chiếu.
     let active = true; setGatewayError('');
     shopApi<NonNullable<Details['gateway']>>(`/api/payments/order/${encodeURIComponent(orderId)}/gateway`, { method: 'POST', token: user.token }).then(gateway => { if (active) setDetails(current => current ? { ...current, gateway } : current); }).catch(failure => { if (active) setGatewayError(failure.message); });
     return () => { active = false; };
   }, [user?.token, orderId, details?.order.paymentMethod, details?.payment.status, revision]);
   useEffect(() => {
     if (!user || !orderId || !details || details.payment.status !== 'PENDING' || details.order.status === 'CANCELLED') return;
+    // PQR6 PQR7 PQR8: chỉ đọc lại trạng thái từ server; trình duyệt không tự xác nhận đã nhận tiền.
     let active = true;
     const timer = window.setInterval(() => { shopApi<Details>(`/api/payments/order/${encodeURIComponent(orderId)}`, { token: user.token }).then(value => { if (active) setDetails(value); }).catch(() => {}); }, 5000);
     return () => { active = false; window.clearInterval(timer); };
   }, [user?.token, orderId, details?.payment.status, details?.order.status]);
   useEffect(() => {
     if (!details || !orderId) return;
+    // PQR8 / COD5 (Ngọc - UC14): khi QR thành công hoặc COD đã xác nhận, chuyển sang phiếu đơn/hóa đơn.
     if (details.payment.status === 'SUCCESS' || (details.order.paymentMethod === 'COD' && details.order.status !== 'PENDING' && details.order.status !== 'CANCELLED')) {
       useCartStore.getState().setPointsToUse(0); useCartStore.getState().requestRefresh(); navigate('/bill?orderId=' + encodeURIComponent(orderId), { replace: true });
     }
   }, [details?.payment.status, details?.order.paymentMethod, details?.order.status, orderId, navigate]);
+  // COD5 (Ngọc - UC12): xác nhận trả khi nhận hàng; khoản tiền vẫn chờ shipper thu lúc giao.
   const chooseCod = async () => {
     if (!user || !orderId || requestBusy.current) return;
     requestBusy.current = true; setBusy(true); setError('');

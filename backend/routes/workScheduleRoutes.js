@@ -47,6 +47,10 @@ const handleError = (error, res) => {
 };
 const populateUser = (query) => query.populate('user', 'fullName phone position status').sort({ workDate: 1, shiftName: 1 });
 const vietnamDay = (date) => new Date(date.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const scheduleDay = (date) => date.toISOString().slice(0, 10);
+const assertFutureOrToday = (date) => {
+  if (scheduleDay(date) < vietnamDay(new Date())) throw badRequest('Không thể phân ca cho ngày trong quá khứ.');
+};
 const getShiftTime = resolveShift;
 const cashHandoverQuery = (schedule, now) => ({
   _id: { $ne: schedule._id },
@@ -72,6 +76,7 @@ router.get('/cod-remittances', async (req, res) => {
   } catch (error) { handleError(error, res); }
 });
 
+// COD10 (Ngọc - UC27): thu ngân trong ca kiểm đếm và nhận tiền COD shipper nộp vào két.
 router.post('/:id/confirm-cod', async (req, res) => {
   try {
     if (req.user.role !== 'STAFF' || !['CASHIER', 'MANAGER'].includes(req.user.position)) return res.status(403).json({ message: 'Chỉ thu ngân hoặc quản lý đang trong ca được nhận tiền COD.' });
@@ -141,12 +146,15 @@ router.get('/', async (req, res) => {
   } catch (error) { handleError(error, res); }
 });
 
+// UC25 (Ngọc): Admin phân nhân viên vào ca/ngày cụ thể trước khi chấm công.
 router.post('/', adminOnly, async (req, res) => {
   try {
     const data = parseAssignment(req.body, true);
+    assertFutureOrToday(data.workDate);
     const employee = await User.findOne({ _id: data.user, role: 'STAFF', status: 'ACTIVE' });
     if (!employee) return res.status(400).json({ message: 'Chỉ phân ca cho nhân viên đang hoạt động.' });
     const schedule = await withWeekLock(mondayOf(data.workDate), async () => {
+      assertFutureOrToday(data.workDate);
       const shift = await WorkShift.findOne({ weekStart: mondayOf(data.workDate), shiftName: data.shiftName });
       if (!shift) throw badRequest('Ca làm không tồn tại trong tuần của ngày làm việc.');
       return WorkSchedule.create({ ...data, shift: shift._id, shiftStartTime: shift.startTime, shiftEndTime: shift.endTime });
@@ -162,13 +170,16 @@ router.put('/:id', adminOnly, async (req, res) => {
     const changes = parseAssignment(req.body, false);
     const schedule = await WorkSchedule.findById(req.params.id);
     if (!schedule) return res.status(404).json({ message: 'Không tìm thấy lịch làm việc.' });
+    if (scheduleDay(schedule.workDate) < vietnamDay(new Date())) return res.status(409).json({ message: 'Không thể sửa phân ca của ngày đã qua.' });
     if (schedule.checkInTime || schedule.checkOutTime || schedule.status !== 'SCHEDULED') return res.status(409).json({ message: 'Ca đã chấm công không thể đổi phân công.' });
     if (changes.user) {
       const employee = await User.findOne({ _id: changes.user, role: 'STAFF', status: 'ACTIVE' });
       if (!employee) return res.status(400).json({ message: 'Chỉ phân ca cho nhân viên đang hoạt động.' });
     }
     const targetDate = changes.workDate || schedule.workDate;
+    assertFutureOrToday(targetDate);
     await withWeekLock(mondayOf(targetDate), async () => {
+      assertFutureOrToday(targetDate);
       const shift = await WorkShift.findOne({ weekStart: mondayOf(targetDate), shiftName: changes.shiftName || schedule.shiftName });
       if (!shift) throw badRequest('Ca làm không tồn tại trong tuần của ngày làm việc.');
       Object.assign(schedule, changes, { shift: shift._id, shiftStartTime: shift.startTime, shiftEndTime: shift.endTime });
@@ -184,6 +195,7 @@ router.delete('/:id', adminOnly, async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) throw badRequest('Mã lịch làm việc không hợp lệ.');
     const schedule = await WorkSchedule.findById(req.params.id);
     if (!schedule) return res.status(404).json({ message: 'Không tìm thấy lịch làm việc.' });
+    if (scheduleDay(schedule.workDate) < vietnamDay(new Date())) return res.status(409).json({ message: 'Không thể bỏ phân ca của ngày đã qua; hãy ghi nhận vắng mặt nếu nhân viên không đến.' });
     if (schedule.checkInTime || schedule.checkOutTime || schedule.status !== 'SCHEDULED') return res.status(409).json({ message: 'Ca đã chấm công không thể xóa.' });
     await schedule.deleteOne();
     res.json({ message: 'Đã bỏ phân ca.' });
@@ -239,6 +251,7 @@ router.get('/:id/cash-receivers', async (req, res) => {
   } catch (error) { handleError(error, res); }
 });
 
+// UC27 (Ngọc): thu ngân đã chốt két chỉ định ca của người nhận; người nhận phải tự xác nhận trên tài khoản mình.
 router.post('/:id/assign-cash-receiver', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) throw badRequest('Mã ca bàn giao không hợp lệ.');
@@ -284,6 +297,7 @@ router.get('/:id/cash-transfer', async (req, res) => {
   } catch (error) { handleError(error, res); }
 });
 
+// UC27 (Ngọc): người nhận báo số đếm lệch cho người giao và Admin; ca chưa được mở.
 router.post('/:id/cash-discrepancy', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) throw badRequest('Mã ca làm không hợp lệ.');
@@ -311,6 +325,7 @@ router.post('/:id/cash-discrepancy', async (req, res) => {
   } catch (error) { handleError(error, res); }
 });
 
+// UC26-27 (Ngọc): chỉ khi số đếm khớp biên bản mới ghi nhận người nhận vào ca và mang số tiền sang két mới.
 router.post('/:id/accept-cash-transfer', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) throw badRequest('Mã ca làm không hợp lệ.');
@@ -345,6 +360,7 @@ router.post('/:id/accept-cash-transfer', async (req, res) => {
   } catch (error) { handleError(error, res); }
 });
 
+// UC26 (Ngọc): ghi nhận vào/ra ca và đối chiếu giờ thực tế với lịch; ca nhận két dùng bước xác nhận riêng.
 router.put('/:id/shift-action', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) throw badRequest('Mã lịch làm việc không hợp lệ.');
@@ -371,6 +387,7 @@ router.put('/:id/shift-action', async (req, res) => {
       if (await Order.exists({ shipper: req.user._id, orderType: 'ONLINE', status: { $nin: ['COMPLETED', 'CANCELLED'] } })) return res.status(409).json({ message: 'Cần giao xong hoặc trả các đơn được phân công về quán trước khi chốt ca.' });
       if (action === 'CHECK_OUT' && await Payment.exists({ receivedBy: req.user._id, paymentMethod: 'CASH', status: 'SUCCESS', remittanceId: { $exists: false } })) return res.status(409).json({ message: 'Còn tiền COD chưa nộp. Hãy mở Đối soát COD và dùng Nộp tiền & chốt ca.' });
     }
+    // COD10 (liên thông Shipper): lập khoản nộp COD để thu ngân kiểm đếm và nhận vào két.
     if (action === 'REMIT_COD') {
       if (req.user.role !== 'STAFF' || req.user.position !== 'SHIPPER') return res.status(403).json({ message: 'Chỉ shipper được nộp tiền COD của ca giao hàng.' });
       if (schedule.status !== 'PRESENT' || !schedule.checkInTime || schedule.checkOutTime) return res.status(409).json({ message: 'Ca phải đang mở để nộp COD.' });

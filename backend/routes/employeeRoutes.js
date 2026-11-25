@@ -89,6 +89,7 @@ router.get('/', async (_req, res) => {
   } catch (error) { handleError(error, res); }
 });
 
+// UC23 (Ngọc): Admin tạo tài khoản nhân viên và gán chức vụ để giới hạn quyền thao tác.
 router.post('/', async (req, res) => {
   try {
     const { password, ...fields } = parseEmployee(req.body, true);
@@ -97,6 +98,7 @@ router.post('/', async (req, res) => {
   } catch (error) { handleError(error, res); }
 });
 
+// UC23 (Ngọc): Admin cập nhật hồ sơ, chức vụ hoặc trạng thái tài khoản nhân viên.
 router.put('/:id', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) throw badRequest('Mã nhân viên không hợp lệ.');

@@ -122,6 +122,7 @@ export default function AdminAttendancePage() {
     return () => { active = false; };
   }, [token, isAdmin, range, employeeId, reloadKey]);
 
+  // CC1: tổng hợp ca được phân, đang làm, hoàn thành và vắng mặt.
   const summary = useMemo(() => ({
     assigned: records.length,
     present: records.filter((item) => item.status === 'PRESENT').length,
@@ -138,6 +139,7 @@ export default function AdminAttendancePage() {
     setError('');
     setRange({ ...draft });
   };
+  // CC2 CC3: Admin ghi vào/ra/vắng rồi đối chiếu giờ thực tế; người nhận két phải tự xác nhận riêng.
   const changeAttendance = async (record: RecordItem, action: 'CHECK_IN' | 'CHECK_OUT' | 'ABSENT') => {
     if (!token || busyId) return;
     const recordsCash = action === 'CHECK_IN' && ['CASHIER', 'MANAGER'].includes(record.user?.position || '');

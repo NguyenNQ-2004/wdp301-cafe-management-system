@@ -53,9 +53,16 @@ test('UC25 assigns weekly shifts and keeps staff schedules private', async (t) =
   const staffToken = await tokenFor(staffA);
   const otherToken = await tokenFor(staffB);
   const customerToken = await tokenFor(customer);
-  await require('../models/WorkShift').create(['MORNING', 'EVENING'].map((shiftName, i) => ({ weekStart: new Date('2026-10-12'), shiftName, startTime: i ? '17:00' : '07:00', endTime: i ? '22:00' : '12:00' })));
-  const week = '?weekStart=2026-10-12';
-  const payload = { userId: String(staffA._id), workDate: '2026-10-12', shiftName: 'MORNING', note: 'Quầy sáng' };
+  const today = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const todayDate = new Date(`${today}T00:00:00.000Z`);
+  const pastDate = new Date(todayDate.getTime() - 86400000).toISOString().slice(0, 10);
+  const nextMonday = new Date(todayDate);
+  nextMonday.setUTCDate(nextMonday.getUTCDate() + (8 - nextMonday.getUTCDay()) % 7 || 7);
+  const onWeekDay = offset => new Date(nextMonday.getTime() + offset * 86400000).toISOString().slice(0, 10);
+  const weekStart = onWeekDay(0);
+  await require('../models/WorkShift').create(['MORNING', 'EVENING'].map((shiftName, i) => ({ weekStart: nextMonday, shiftName, startTime: i ? '17:00' : '07:00', endTime: i ? '22:00' : '12:00' })));
+  const week = `?weekStart=${weekStart}`;
+  const payload = { userId: String(staffA._id), workDate: weekStart, shiftName: 'MORNING', note: 'Quầy sáng' };
 
   assert.equal((await request('GET', `/api/work-schedules${week}`)).status, 401);
   assert.equal((await request('GET', `/api/work-schedules${week}`, null, customerToken)).status, 403);
@@ -64,14 +71,15 @@ test('UC25 assigns weekly shifts and keeps staff schedules private', async (t) =
   assert.equal((await request('POST', '/api/work-schedules', { ...payload, userId: String(inactive._id) }, adminToken)).status, 400);
   assert.equal((await request('POST', '/api/work-schedules', { ...payload, workDate: '2026-02-30' }, adminToken)).status, 400);
   assert.equal((await request('POST', '/api/work-schedules', { ...payload, status: 'COMPLETED' }, adminToken)).status, 400);
+  assert.equal((await request('POST', '/api/work-schedules', { ...payload, workDate: pastDate }, adminToken)).status, 400);
   const created = await request('POST', '/api/work-schedules', payload, adminToken);
   assert.equal(created.status, 201);
   assert.equal(created.data.user.fullName, 'Staff A');
   assert.equal((await request('POST', '/api/work-schedules', payload, adminToken)).status, 409);
 
-  const second = await request('POST', '/api/work-schedules', { userId: String(staffB._id), workDate: '2026-10-13', shiftName: 'EVENING' }, adminToken);
+  const second = await request('POST', '/api/work-schedules', { userId: String(staffB._id), workDate: onWeekDay(1), shiftName: 'EVENING' }, adminToken);
   assert.equal(second.status, 201);
-  assert.equal((await request('GET', '/api/work-schedules?weekStart=2026-10-13', null, adminToken)).status, 400);
+  assert.equal((await request('GET', `/api/work-schedules?weekStart=${onWeekDay(1)}`, null, adminToken)).status, 400);
   assert.equal((await request('GET', `/api/work-schedules${week}`, null, adminToken)).data.length, 2);
   assert.deepEqual((await request('GET', `/api/work-schedules${week}&userId=${staffB._id}`, null, adminToken)).data.map((item) => item._id), [second.data._id]);
   const ownSchedules = (await request('GET', `/api/work-schedules${week}&userId=${staffB._id}`, null, staffToken)).data;
@@ -82,10 +90,11 @@ test('UC25 assigns weekly shifts and keeps staff schedules private', async (t) =
   assert.deepEqual((await request('GET', `/api/work-schedules${week}`, null, otherToken)).data.map((item) => item._id), [second.data._id]);
   assert.equal((await request('PUT', `/api/work-schedules/${created.data._id}`, { note: 'Đổi quầy' }, staffToken)).status, 403);
   assert.equal((await request('PUT', `/api/work-schedules/${created.data._id}`, { status: 'ABSENT' }, adminToken)).status, 400);
-  const updated = await request('PUT', `/api/work-schedules/${created.data._id}`, { note: 'Đổi quầy', workDate: '2026-10-14' }, adminToken);
+  assert.equal((await request('PUT', `/api/work-schedules/${created.data._id}`, { workDate: pastDate }, adminToken)).status, 400);
+  const updated = await request('PUT', `/api/work-schedules/${created.data._id}`, { note: 'Đổi quầy', workDate: onWeekDay(2) }, adminToken);
   assert.equal(updated.status, 200);
   assert.equal(updated.data.note, 'Đổi quầy');
-  assert.equal((await request('GET', '/api/work-schedules?weekStart=2026-10-19', null, staffToken)).data.length, 0);
+  assert.equal((await request('GET', `/api/work-schedules?weekStart=${onWeekDay(7)}`, null, staffToken)).data.length, 0);
   assert.equal((await request('PUT', `/api/work-schedules/${second.data._id}/shift-action`, { action: 'CHECK_IN' }, staffToken)).status, 403);
   await WorkSchedule.updateOne({ _id: created.data._id }, { $set: { status: 'PRESENT', checkInTime: new Date() } });
   const checkedInSchedules = (await request('GET', `/api/work-schedules${week}`, null, staffToken)).data;
@@ -95,5 +104,9 @@ test('UC25 assigns weekly shifts and keeps staff schedules private', async (t) =
   assert.equal((await request('PUT', `/api/work-schedules/${created.data._id}`, { note: 'Sửa' }, adminToken)).status, 409);
   assert.equal((await request('DELETE', `/api/work-schedules/${second.data._id}`, null, staffToken)).status, 403);
   assert.equal((await request('DELETE', `/api/work-schedules/${second.data._id}`, null, adminToken)).status, 200);
+  const historical = await WorkSchedule.create({ user: staffB._id, workDate: new Date(`${pastDate}T00:00:00.000Z`), shiftName: 'MORNING', status: 'SCHEDULED' });
+  assert.equal((await request('PUT', `/api/work-schedules/${historical._id}`, { note: 'late edit' }, adminToken)).status, 409);
+  assert.equal((await request('DELETE', `/api/work-schedules/${historical._id}`, null, adminToken)).status, 409);
+  await historical.deleteOne();
   assert.equal(await WorkSchedule.countDocuments(), 1);
 });

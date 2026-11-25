@@ -146,6 +146,7 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     const isStaffOrAdmin = ['ADMIN', 'STAFF'].includes(req.user.role);
+    // PQR2 PQR3 PQR4 / COD2 COD3 COD4 (Ngọc - UC11): checkout web chỉ dành cho khách đăng nhập và đơn giao tận nơi.
     const checkoutFlow = req.body.checkoutFlow === true;
     let identity = {};
     let unfinished;
@@ -170,6 +171,7 @@ router.post('/', async (req, res) => {
     try { items = await normalizeCartItems(rawItems); }
     catch (error) { throw orderError(error.message); }
     if (!items.length) throw orderError('Vui lòng chọn ít nhất một món.');
+    // GIO4: backend kiểm lại món và tồn kho, không tin tổng tiền chỉ do trình duyệt gửi lên.
     if (checkoutFlow) await checkCheckoutStock(items);
     if (!['DINE_IN', 'TAKEAWAY', 'ONLINE'].includes(orderType)) {
       throw orderError('Loại đơn hàng không hợp lệ (DINE_IN, TAKEAWAY, ONLINE).');
@@ -315,6 +317,7 @@ router.post('/', async (req, res) => {
       ...(finalPaymentMethod === 'DEMO_ONLINE' && demoProvider ? { demoProvider } : {})
     };
 
+    // PQR4 / COD4: lưu đơn và món trước khi khách chọn QR hay COD ở trang thanh toán.
     const order = await Order.create(orderData);
 
     // Đồng bộ vào bảng order_items (Table 6)
@@ -332,6 +335,7 @@ router.post('/', async (req, res) => {
     }
 
     // Tự động tạo payment ban đầu
+    // PQR4 / COD4: tạo khoản thanh toán PENDING; không đánh dấu đã trả tại bước tạo đơn.
     await Payment.create({
       order: order._id,
       paymentMethod: finalPaymentMethod === 'DEMO_ONLINE' ? 'DEMO_ONLINE' : ['CASH', 'VNPAY', 'MOMO', 'BANK_TRANSFER'].includes(finalPaymentMethod) ? finalPaymentMethod : 'CASH',
@@ -525,6 +529,7 @@ router.put('/:id/status', withOrderMutation(async (req, res) => {
       }
     }
 
+    // PQR10 / COD7 (Ngọc - UC11): shipper phải nhận đơn và đang trong ca trước khi chuyển sang đang giao.
     if (status === 'DELIVERING' && order.status !== 'DELIVERING' && order.delivery?.status !== 'ACCEPTED') return res.status(409).json({ message: 'Shipper phải nhận đơn trước khi lấy hàng.' });
 
     if (order.orderType === 'ONLINE' && ['DELIVERING', 'COMPLETED'].includes(status)) {
@@ -536,6 +541,7 @@ router.put('/:id/status', withOrderMutation(async (req, res) => {
     const previousStatus = order.status;
     const previousCancelReason = order.cancelReason;
     if (isStaff && position === 'CASHIER' && status === 'CANCELLED' && (order.orderType === 'ONLINE' || !['PENDING', 'CONFIRMED', 'CANCELLED'].includes(order.status))) return res.status(409).json({ message: 'Thu ngân chỉ được hủy đơn tại quầy đang chờ hoặc đã xác nhận.' });
+    // COD8 COD9 (Ngọc - UC12): giao xong chỉ khi shipper thu đúng tổng tiền; lúc đó mới ghi nhận thanh toán COD.
     if (status === 'COMPLETED' && order.status !== 'COMPLETED' && order.orderType === 'ONLINE' && order.paymentMethod === 'COD' && req.body.collectedAmount !== order.finalAmount) return res.status(409).json({ message: 'Số tiền COD thực thu phải bằng số tiền của đơn hàng.' });
     if (['PREPARING','READY','COMPLETED'].includes(status) && !(order.orderType === 'ONLINE' && order.paymentMethod === 'COD') && !await Payment.exists({ order: order._id, status: 'SUCCESS', amount: order.finalAmount })) {
       return res.status(409).json({ message: 'Đơn hàng phải thanh toán trước khi pha chế hoặc bàn giao.' });
@@ -583,6 +589,7 @@ router.put('/:id/status', withOrderMutation(async (req, res) => {
 }));
 
 // 5. BARISTA KDS: TOGGLE ITEM PREPARED (Tích từng món đã pha xong)
+// PQR9 / COD6 (liên thông Barista): chỉ món đã pha xong mới đưa đơn sang trạng thái sẵn sàng giao.
 router.put('/:id/items/:itemIndex/prepared', authorizePosition('BARISTA', 'MANAGER'), withOrderMutation(async (req, res) => {
   let unlock;
   try {

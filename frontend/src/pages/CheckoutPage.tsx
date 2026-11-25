@@ -61,6 +61,7 @@ export default function CheckoutPage({ onRequestAuth }: { onRequestAuth: () => v
   const total = subtotal - discount + fee;
   const customer = user?.role === 'CUSTOMER';
   const ready = !areasLoading && !!customer && !!selectedArea && !areaError && cart.ready && cart.ownerId === user?._id && !cart.syncError && !shop.loading && !shop.error && !loyaltyLoading && !loyaltyError;
+  // PQR2 PQR3 PQR4 / COD2 COD3 COD4 (Ngọc - UC11): đăng nhập, kiểm tra giao hàng và tạo đơn.
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!user) { onRequestAuth(); return; }

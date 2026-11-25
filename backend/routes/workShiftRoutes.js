@@ -103,6 +103,7 @@ router.post('/copy', adminOnly, async (req, res) => {
     res.status(201).json({ weekStart, shifts: shifts.map(shiftJson) });
   } catch (error) { weeklyError(error, res); }
 });
+// UC24 (Ngọc): Admin tạo khung giờ ca cho từng tuần; lịch phân ca sẽ tham chiếu khung này.
 router.post('/', adminOnly, async (req, res) => {
   try {
     const data = parseShift(req.body); assertEditable(data.weekStart);

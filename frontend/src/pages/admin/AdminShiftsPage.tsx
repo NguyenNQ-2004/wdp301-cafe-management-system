@@ -21,6 +21,7 @@ export default function AdminShiftsPage() {
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
   const readOnly=weekStart<monday();
+  // KCA1: tải khung giờ ca của tuần đang chọn; tuần cũ chỉ xem.
   useEffect(()=>{
     if(!token) return;
     let active=true; setLoading(true); setForm(null); setError(''); setNotice('');
@@ -30,6 +31,7 @@ export default function AdminShiftsPage() {
       .finally(()=>{if(active)setLoading(false);});
     return ()=>{active=false;};
   },[token,weekStart,revision]);
+  // KCA2: tạo hoặc sửa giờ bắt đầu/kết thúc của ca trong tuần.
   const save=async(event:FormEvent)=>{
     event.preventDefault(); if(!token||!form||busy||readOnly)return;
     setBusy(true);setError('');
@@ -46,6 +48,7 @@ export default function AdminShiftsPage() {
     try{await shopApi(`/api/work-shifts/${shift._id}`,{token,method:'DELETE'});setRevision(x=>x+1);}
     catch(err){setError((err as Error).message);}finally{setBusy(false);}
   };
+  // KCA3: sao chép cấu hình ca tuần gần nhất khi tuần này chưa có ca.
   const copy=async()=>{
     if(!token||busy||readOnly||shifts.length)return;
     setBusy(true);setError('');

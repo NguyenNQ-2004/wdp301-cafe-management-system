@@ -214,6 +214,7 @@ router.get('/:id', async (req, res) => {
   } catch (error) { handleError(error, res); }
 });
 
+// UC27 (Ngọc): chốt két theo tiền đầu ca + tiền mặt bán hàng + COD đã nhận - hoàn tiền mặt; QR tách riêng.
 router.post('/:id/confirm', async (req, res) => {
   try {
     if (!isCashier(req.user)) return res.status(403).json({ message: 'Chỉ nhân viên thu ngân hoặc quản lý được bàn giao ca của mình.' });
@@ -274,6 +275,7 @@ router.post('/:id/confirm', async (req, res) => {
 });
 
 // Admin review: CONFIRM or REJECT
+// BGC5 (Ngọc - UC27): Admin xem và duyệt/từ chối biên bản chốt ca, kể cả ghi chú chênh lệch.
 router.post('/:id/review', async (req, res) => {
   try {
     if (req.user.role !== 'ADMIN') {

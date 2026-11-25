@@ -28,8 +28,10 @@ interface BillPageProps {
 }
 
 export const BillPage: React.FC<BillPageProps> = ({ orderId, onSelectOrder, onNavigate, onShowToast }) => {
+  // UC14 (Ngọc): hiển thị phiếu đơn/hoá đơn theo trạng thái thanh toán; COD chỉ là phiếu đơn trước khi giao.
   const { db, rawId } = useDb();
   const user = useAuthStore(state => state.user);
+  // HD1: chọn đơn cần xem và nạp chi tiết thanh toán tương ứng.
   const orders = [...db.orders].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   const order = orderId === null ? orders[0] : db.orders.find(o => o.id === orderId);
   const [paymentDetail, setPaymentDetail] = useState<PaymentRecord | null>(null);
@@ -60,6 +62,7 @@ export const BillPage: React.FC<BillPageProps> = ({ orderId, onSelectOrder, onNa
     refund_amount: paymentDetail.refundAmount, refund_method: paymentDetail.refundMethod,
     refunded_at: paymentDetail.refundedAt
   } : paymentOf(db, order.id);
+  // HD2: COD chưa giao là phiếu đơn chưa thu tiền, không hiển thị như hóa đơn đã trả.
   const codAwaitingCash = order.status !== 'CANCELLED' && order.payment_method === 'COD' && payment?.status === 'PENDING';
   const receiptTitle = order.status === 'CANCELLED' ? 'Đơn hàng đã hủy'
     : payment?.status === 'REFUNDED' ? 'Đơn hàng đã hoàn tiền'
@@ -124,7 +127,7 @@ export const BillPage: React.FC<BillPageProps> = ({ orderId, onSelectOrder, onNa
           </div>
         </div>
 
-        {/* Printable Receipt */}
+        {/* HD3: vùng phiếu/hóa đơn để khách hoặc thu ngân in từ trình duyệt. */}
         <div id="bill-print" className="bg-white rounded-3xl border border-stone-300 shadow-lg p-6 sm:p-10 max-w-xl mx-auto font-sans relative overflow-hidden">
           <div className="text-center space-y-1.5 pb-6 border-b-2 border-dashed border-stone-200">
             <div className="w-12 h-12 mx-auto rounded-2xl bg-primary text-white flex items-center justify-center font-black shadow-xs mb-2">

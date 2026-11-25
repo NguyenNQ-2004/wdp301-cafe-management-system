@@ -7,19 +7,24 @@ import useLoyalty from '../hooks/useLoyalty';
 import useShopRules from '../hooks/useShopRules';
 import '../interface/storefront.css';
 export default function CartPage() {
+  // PQR1 / COD1 (Ngọc - UC10, UC64): chọn món, số lượng và điểm đổi; chỉ món được tích mới đi tiếp tới thanh toán.
   const cart = useCartStore();
   const user = useAuthStore(state => state.user);
   const loyalty = useLoyalty(user?.token);
   const shop = useShopRules();
+  // GIO1: chỉ các món khách tích chọn mới đi vào tổng tiền và bước đặt hàng.
   const selected = cart.items.filter(item => item.checked);
   const subtotal = selected.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
   const step = loyalty.summary?.rules?.points_step || 10;
+  // UC64: giới hạn điểm đổi theo số điểm khách có và tiền món, trước khi tính phí giao hàng.
   const value = loyalty.summary?.rules?.points_step_value ?? 2000;
   const maxPoints = loyalty.summary?.canRedeem && value > 0 ? Math.min(Math.floor(loyalty.summary.totalPoints / step), Math.floor(subtotal / value)) * step : 0;
+  // GIO2: đổi điểm trong giới hạn số điểm và giá trị món.
   const points = Math.min(Math.floor((cart.pointsToUse || 0) / step) * step, maxPoints);
   const discount = points / step * value;
   const fee = subtotal < shop.rules.freeship_threshold ? shop.rules.delivery_fee : 0;
   const allSelected = cart.items.length > 0 && cart.items.every(item => item.checked);
+  // GIO3: giỏ khách đăng nhập phải đồng bộ đúng chủ sở hữu trước khi sang checkout.
   const ready = !user || (cart.ready && cart.ownerId === user._id && !cart.syncError);
   return <div className="bg-[#f8fafc] px-3 py-7"><div className="mx-auto max-w-[1140px]"><nav className="mb-2 text-xs text-stone-500"><Link to="/">Trang chủ</Link> › Giỏ hàng của bạn</nav><h1 className="mb-6 text-3xl font-bold">Giỏ hàng của bạn <small className="ml-2 text-sm text-primary">{cart.items.length} món</small></h1>
     {(cart.syncError || shop.error) && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{cart.syncError || shop.error}</p>}

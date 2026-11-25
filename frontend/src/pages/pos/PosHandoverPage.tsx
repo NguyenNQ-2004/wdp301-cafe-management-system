@@ -152,6 +152,7 @@ export default function PosHandoverPage() {
     return () => { active = false; };
   }, [token, canConfirm, detail?.schedule._id, detail?.handedOver, detail?.schedule.checkOutTime, detail?.schedule.user?._id, user?._id, reloadKey]);
 
+  // BGC2: sau khi chốt và ra ca, thu ngân chọn ca của người sẽ nhận két.
   const assignCashReceiver = async () => {
     if (!token || !detail || !selectedCashReceiver || busy) return;
     setBusy(true); setError(''); setNotice('');
@@ -234,6 +235,7 @@ export default function PosHandoverPage() {
     setRange({ ...draft });
   };
 
+  // BGC1 (Ngọc - UC27): chốt tiền mặt thực đếm; doanh thu QR được đối chiếu riêng và không cộng vào tiền trong két.
   const confirm = async (event: FormEvent) => {
     event.preventDefault();
     if (!token || !detail?.ready || !selectedId || busy || !canConfirm) return;

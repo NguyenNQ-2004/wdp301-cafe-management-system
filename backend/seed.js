@@ -11,9 +11,9 @@ const seedData = {
   "formatVersion": {
     "$numberInt": "1"
   },
-  "exportedAt": "2026-11-14T20:05:33.611Z",
+  "exportedAt": "2026-11-25T15:51:59.470Z",
   "sourceDatabase": "aura_cafe_erp",
-  "notes": "Real password hashes and password recovery sessions are excluded. Seeded accounts use SEED_USER_PASSWORD.",
+  "notes": "Shared local demo fixture with staff, orders, inventory, purchase and handover states. Password hashes and reset tokens are excluded; seeded accounts use SEED_USER_PASSWORD.",
   "collections": [
     {
       "name": "carts",
@@ -352,6 +352,40 @@ const seedData = {
       "documents": [
         {
           "_id": {
+            "$oid": "68e0acd6ea648716cf2c17fc"
+          },
+          "customer": {
+            "$oid": "6aeb673031b031ff6bfab946"
+          },
+          "order": {
+            "$oid": "6aeb673031b031ff6bfab98d"
+          },
+          "issueType": "COMPLAINT",
+          "topic": "Thời gian phục vụ",
+          "content": "Khách phản ánh món ra chậm; quản lý đang xác minh.",
+          "status": "IN_PROGRESS",
+          "adminResponse": "Quán đã tiếp nhận và đang kiểm tra ca phục vụ.",
+          "respondedBy": {
+            "$oid": "6aeb673031b031ff6bfab943"
+          },
+          "respondedAt": {
+            "$date": {
+              "$numberLong": "1795233600000"
+            }
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795230000000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795233600000"
+            }
+          }
+        },
+        {
+          "_id": {
             "$oid": "6aeb673031b031ff6bfab9b9"
           },
           "customer": {
@@ -544,6 +578,40 @@ const seedData = {
           },
           "__v": {
             "$numberInt": "0"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "b8a696f9f59e6e5e081a521f"
+          },
+          "customer": {
+            "$oid": "6aeb673031b031ff6bfab946"
+          },
+          "order": {
+            "$oid": "6aeb673031b031ff6bfab98d"
+          },
+          "issueType": "COMPLAINT",
+          "topic": "Phản ánh trùng lặp",
+          "content": "Khách gửi lại cùng một phản ánh đã được xử lý.",
+          "status": "REJECTED",
+          "adminResponse": "Phản ánh này trùng với yêu cầu trước; vui lòng theo dõi phản hồi cũ.",
+          "respondedBy": {
+            "$oid": "6aeb673031b031ff6bfab943"
+          },
+          "respondedAt": {
+            "$date": {
+              "$numberLong": "1795320000000"
+            }
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795316400000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795320000000"
+            }
           }
         }
       ]
@@ -868,12 +936,166 @@ const seedData = {
           "name": "reporter_1"
         }
       ],
-      "documents": []
+      "documents": [
+        {
+          "_id": {
+            "$oid": "d2ae5d64df40791dba067260"
+          },
+          "order": {
+            "$oid": "6aeb673031b031ff6bfab98e"
+          },
+          "reporter": {
+            "$oid": "6aeb673031b031ff6bfab948"
+          },
+          "issueType": "DELAY",
+          "description": "Khách yêu cầu giao trễ 15 phút; đã liên hệ xác nhận.",
+          "outcome": "REPORT",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794643200000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794643200000"
+            }
+          }
+        }
+      ]
     },
     {
       "name": "ingredients",
       "indexes": [],
       "documents": [
+        {
+          "_id": {
+            "$oid": "058acaf05eed774b975fe1bc"
+          },
+          "name": "Bánh croissant thành phẩm",
+          "supplier": {
+            "$oid": "6aeb673031b031ff6bfab960"
+          },
+          "unit": "cái",
+          "isActive": true,
+          "currentStock": {
+            "$numberInt": "98"
+          },
+          "minStockLevel": {
+            "$numberInt": "10"
+          },
+          "lotsVersion": {
+            "$numberInt": "0"
+          },
+          "stockLots": [
+            {
+              "_id": {
+                "$oid": "81b835ff3d40d18822b382e9"
+              },
+              "sourceType": "OPENING",
+              "sourceId": "SEED-OPENING-croissant",
+              "receivedAt": {
+                "$date": {
+                  "$numberLong": "1794686733611"
+                }
+              },
+              "quantity": {
+                "$numberInt": "100"
+              },
+              "remainingQuantity": {
+                "$numberInt": "98"
+              },
+              "unitCost": {
+                "$numberInt": "18000"
+              }
+            }
+          ]
+        },
+        {
+          "_id": {
+            "$oid": "3661198b623f59b138dc83e6"
+          },
+          "name": "Hạnh nhân lát",
+          "supplier": {
+            "$oid": "6aeb673031b031ff6bfab960"
+          },
+          "unit": "g",
+          "isActive": true,
+          "currentStock": {
+            "$numberInt": "2000"
+          },
+          "minStockLevel": {
+            "$numberInt": "200"
+          },
+          "lotsVersion": {
+            "$numberInt": "0"
+          },
+          "stockLots": [
+            {
+              "_id": {
+                "$oid": "89c8567dbbc149ca438c1f71"
+              },
+              "sourceType": "OPENING",
+              "sourceId": "SEED-OPENING-almond",
+              "receivedAt": {
+                "$date": {
+                  "$numberLong": "1794686733611"
+                }
+              },
+              "quantity": {
+                "$numberInt": "2000"
+              },
+              "remainingQuantity": {
+                "$numberInt": "2000"
+              },
+              "unitCost": {
+                "$numberInt": "250"
+              }
+            }
+          ]
+        },
+        {
+          "_id": {
+            "$oid": "4990da8f82da567423a05687"
+          },
+          "supplier": {
+            "$oid": "6aeb673031b031ff6bfab960"
+          },
+          "name": "Đường nâu",
+          "unit": "gram",
+          "isActive": true,
+          "currentStock": {
+            "$numberInt": "250"
+          },
+          "minStockLevel": {
+            "$numberInt": "1000"
+          },
+          "lotsVersion": {
+            "$numberInt": "0"
+          },
+          "stockLots": [
+            {
+              "_id": {
+                "$oid": "71ceacdc459eb3561aa3579a"
+              },
+              "sourceType": "OPENING",
+              "sourceId": "DEMO-OPENING-brown-sugar",
+              "receivedAt": {
+                "$date": {
+                  "$numberLong": "1795395600000"
+                }
+              },
+              "quantity": {
+                "$numberInt": "250"
+              },
+              "remainingQuantity": {
+                "$numberInt": "250"
+              },
+              "unitCost": {
+                "$numberInt": "65"
+              }
+            }
+          ]
+        },
         {
           "_id": {
             "$oid": "6aeb673031b031ff6bfab963"
@@ -1275,6 +1497,135 @@ const seedData = {
               }
             }
           ]
+        },
+        {
+          "_id": {
+            "$oid": "6cbbe4ef97fbd0710a9f6373"
+          },
+          "name": "Bột sôcôla Bỉ",
+          "supplier": {
+            "$oid": "6aeb673031b031ff6bfab960"
+          },
+          "unit": "g",
+          "isActive": true,
+          "currentStock": {
+            "$numberInt": "5000"
+          },
+          "minStockLevel": {
+            "$numberInt": "500"
+          },
+          "lotsVersion": {
+            "$numberInt": "0"
+          },
+          "stockLots": [
+            {
+              "_id": {
+                "$oid": "a267d34c93d75bc6506411ed"
+              },
+              "sourceType": "OPENING",
+              "sourceId": "SEED-OPENING-chocolate",
+              "receivedAt": {
+                "$date": {
+                  "$numberLong": "1794686733611"
+                }
+              },
+              "quantity": {
+                "$numberInt": "5000"
+              },
+              "remainingQuantity": {
+                "$numberInt": "5000"
+              },
+              "unitCost": {
+                "$numberInt": "180"
+              }
+            }
+          ]
+        },
+        {
+          "_id": {
+            "$oid": "f6b67060d00c497af05d4e85"
+          },
+          "supplier": {
+            "$oid": "6aeb673031b031ff6bfab960"
+          },
+          "name": "Hạt cà phê Arabica",
+          "unit": "gram",
+          "isActive": true,
+          "currentStock": {
+            "$numberInt": "120"
+          },
+          "minStockLevel": {
+            "$numberInt": "500"
+          },
+          "lotsVersion": {
+            "$numberInt": "0"
+          },
+          "stockLots": [
+            {
+              "_id": {
+                "$oid": "9259a2e7791cb713ff222112"
+              },
+              "sourceType": "OPENING",
+              "sourceId": "DEMO-OPENING-arabica",
+              "receivedAt": {
+                "$date": {
+                  "$numberLong": "1795395600000"
+                }
+              },
+              "quantity": {
+                "$numberInt": "120"
+              },
+              "remainingQuantity": {
+                "$numberInt": "120"
+              },
+              "unitCost": {
+                "$numberInt": "480"
+              }
+            }
+          ]
+        },
+        {
+          "_id": {
+            "$oid": "fadf568441a051bcd8a1ee84"
+          },
+          "name": "Bột matcha Uji",
+          "supplier": {
+            "$oid": "6aeb673031b031ff6bfab960"
+          },
+          "unit": "g",
+          "isActive": true,
+          "currentStock": {
+            "$numberInt": "3000"
+          },
+          "minStockLevel": {
+            "$numberInt": "300"
+          },
+          "lotsVersion": {
+            "$numberInt": "0"
+          },
+          "stockLots": [
+            {
+              "_id": {
+                "$oid": "74fa7e025bab40a895a90cd4"
+              },
+              "sourceType": "OPENING",
+              "sourceId": "SEED-OPENING-matcha",
+              "receivedAt": {
+                "$date": {
+                  "$numberLong": "1794686733611"
+                }
+              },
+              "quantity": {
+                "$numberInt": "3000"
+              },
+              "remainingQuantity": {
+                "$numberInt": "3000"
+              },
+              "unitCost": {
+                "$numberInt": "500"
+              }
+            }
+          ]
         }
       ]
     },
@@ -1282,6 +1633,213 @@ const seedData = {
       "name": "inventorytransactions",
       "indexes": [],
       "documents": [
+        {
+          "_id": {
+            "$oid": "24519c0a9b0ce85446bc1f3f"
+          },
+          "ingredient": {
+            "$oid": "058acaf05eed774b975fe1bc"
+          },
+          "transactionType": "OUT_ORDER",
+          "quantity": {
+            "$numberInt": "1"
+          },
+          "stockBefore": {
+            "$numberInt": "99"
+          },
+          "stockAfter": {
+            "$numberInt": "98"
+          },
+          "stockDelta": {
+            "$numberInt": "-1"
+          },
+          "unitBefore": "cái",
+          "unitAfter": "cái",
+          "valueBefore": {
+            "$numberInt": "1782000"
+          },
+          "valueAfter": {
+            "$numberInt": "1764000"
+          },
+          "costTotal": {
+            "$numberInt": "18000"
+          },
+          "lotAllocations": [
+            {
+              "_id": {
+                "$oid": "6277e4d9efa205bb33b0b4ea"
+              },
+              "lotId": {
+                "$oid": "81b835ff3d40d18822b382e9"
+              },
+              "quantity": {
+                "$numberInt": "1"
+              },
+              "unitCost": {
+                "$numberInt": "18000"
+              }
+            }
+          ],
+          "referenceType": "ORDER",
+          "referenceId": {
+            "$oid": "17dd10ba0c54b2d76f32116f"
+          },
+          "createdBy": {
+            "$oid": "6aeb673031b031ff6bfab943"
+          },
+          "note": "Xuất kho cho đơn AURA-DEMO-DELIVERING",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795575600000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795575600000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "43dc328b52e14228cb17251b"
+          },
+          "ingredient": {
+            "$oid": "4990da8f82da567423a05687"
+          },
+          "transactionType": "ADJUSTMENT",
+          "quantity": {
+            "$numberInt": "250"
+          },
+          "stockBefore": {
+            "$numberInt": "0"
+          },
+          "stockAfter": {
+            "$numberInt": "250"
+          },
+          "stockDelta": {
+            "$numberInt": "250"
+          },
+          "unitBefore": "gram",
+          "unitAfter": "gram",
+          "referenceType": "ADJUSTMENT",
+          "note": "Tồn đầu kỳ demo; cần bổ sung hàng",
+          "createdBy": {
+            "$oid": "6aeb673031b031ff6bfab943"
+          },
+          "valueBefore": {
+            "$numberInt": "0"
+          },
+          "valueAfter": {
+            "$numberInt": "16250"
+          },
+          "costTotal": {
+            "$numberInt": "16250"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795395600000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795395600000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "46114ceb52c4d22d1d60b0cf"
+          },
+          "ingredient": {
+            "$oid": "058acaf05eed774b975fe1bc"
+          },
+          "transactionType": "ADJUSTMENT",
+          "quantity": {
+            "$numberInt": "100"
+          },
+          "stockBefore": {
+            "$numberInt": "0"
+          },
+          "stockAfter": {
+            "$numberInt": "100"
+          },
+          "stockDelta": {
+            "$numberInt": "100"
+          },
+          "unitBefore": "cái",
+          "unitAfter": "cái",
+          "referenceType": "ADJUSTMENT",
+          "note": "SEED: tồn đầu kỳ cho nguyên liệu bổ sung",
+          "createdBy": {
+            "$oid": "6aeb673031b031ff6bfab943"
+          },
+          "valueBefore": {
+            "$numberInt": "0"
+          },
+          "valueAfter": {
+            "$numberInt": "1800000"
+          },
+          "costTotal": {
+            "$numberInt": "1800000"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "4b269c51d985e4633fb0a32e"
+          },
+          "ingredient": {
+            "$oid": "3661198b623f59b138dc83e6"
+          },
+          "transactionType": "ADJUSTMENT",
+          "quantity": {
+            "$numberInt": "2000"
+          },
+          "stockBefore": {
+            "$numberInt": "0"
+          },
+          "stockAfter": {
+            "$numberInt": "2000"
+          },
+          "stockDelta": {
+            "$numberInt": "2000"
+          },
+          "unitBefore": "g",
+          "unitAfter": "g",
+          "referenceType": "ADJUSTMENT",
+          "note": "SEED: tồn đầu kỳ cho nguyên liệu bổ sung",
+          "createdBy": {
+            "$oid": "6aeb673031b031ff6bfab943"
+          },
+          "valueBefore": {
+            "$numberInt": "0"
+          },
+          "valueAfter": {
+            "$numberInt": "500000"
+          },
+          "costTotal": {
+            "$numberInt": "500000"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
         {
           "_id": {
             "$oid": "6aeb673031b031ff6bfab9c3"
@@ -3012,6 +3570,213 @@ const seedData = {
               "$numberLong": "1794682777674"
             }
           }
+        },
+        {
+          "_id": {
+            "$oid": "7ebc5843876bca55df12b45e"
+          },
+          "ingredient": {
+            "$oid": "058acaf05eed774b975fe1bc"
+          },
+          "transactionType": "OUT_ORDER",
+          "quantity": {
+            "$numberInt": "1"
+          },
+          "stockBefore": {
+            "$numberInt": "100"
+          },
+          "stockAfter": {
+            "$numberInt": "99"
+          },
+          "stockDelta": {
+            "$numberInt": "-1"
+          },
+          "unitBefore": "cái",
+          "unitAfter": "cái",
+          "valueBefore": {
+            "$numberInt": "1800000"
+          },
+          "valueAfter": {
+            "$numberInt": "1782000"
+          },
+          "costTotal": {
+            "$numberInt": "18000"
+          },
+          "lotAllocations": [
+            {
+              "_id": {
+                "$oid": "f81de1996308f63692acdf3b"
+              },
+              "lotId": {
+                "$oid": "81b835ff3d40d18822b382e9"
+              },
+              "quantity": {
+                "$numberInt": "1"
+              },
+              "unitCost": {
+                "$numberInt": "18000"
+              }
+            }
+          ],
+          "referenceType": "ORDER",
+          "referenceId": {
+            "$oid": "df1640b1d2e2c9b927aaac60"
+          },
+          "createdBy": {
+            "$oid": "6aeb673031b031ff6bfab943"
+          },
+          "note": "Xuất kho cho đơn AURA-DEMO-PREPARING",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795572000000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795572000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "9fc1996b45947f7d5e562576"
+          },
+          "ingredient": {
+            "$oid": "fadf568441a051bcd8a1ee84"
+          },
+          "transactionType": "ADJUSTMENT",
+          "quantity": {
+            "$numberInt": "3000"
+          },
+          "stockBefore": {
+            "$numberInt": "0"
+          },
+          "stockAfter": {
+            "$numberInt": "3000"
+          },
+          "stockDelta": {
+            "$numberInt": "3000"
+          },
+          "unitBefore": "g",
+          "unitAfter": "g",
+          "referenceType": "ADJUSTMENT",
+          "note": "SEED: tồn đầu kỳ cho nguyên liệu bổ sung",
+          "createdBy": {
+            "$oid": "6aeb673031b031ff6bfab943"
+          },
+          "valueBefore": {
+            "$numberInt": "0"
+          },
+          "valueAfter": {
+            "$numberInt": "1500000"
+          },
+          "costTotal": {
+            "$numberInt": "1500000"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "bb9bbdcde941f463d2188893"
+          },
+          "ingredient": {
+            "$oid": "6cbbe4ef97fbd0710a9f6373"
+          },
+          "transactionType": "ADJUSTMENT",
+          "quantity": {
+            "$numberInt": "5000"
+          },
+          "stockBefore": {
+            "$numberInt": "0"
+          },
+          "stockAfter": {
+            "$numberInt": "5000"
+          },
+          "stockDelta": {
+            "$numberInt": "5000"
+          },
+          "unitBefore": "g",
+          "unitAfter": "g",
+          "referenceType": "ADJUSTMENT",
+          "note": "SEED: tồn đầu kỳ cho nguyên liệu bổ sung",
+          "createdBy": {
+            "$oid": "6aeb673031b031ff6bfab943"
+          },
+          "valueBefore": {
+            "$numberInt": "0"
+          },
+          "valueAfter": {
+            "$numberInt": "900000"
+          },
+          "costTotal": {
+            "$numberInt": "900000"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "d8a9e03b0f898f69f740a7d6"
+          },
+          "ingredient": {
+            "$oid": "f6b67060d00c497af05d4e85"
+          },
+          "transactionType": "ADJUSTMENT",
+          "quantity": {
+            "$numberInt": "120"
+          },
+          "stockBefore": {
+            "$numberInt": "0"
+          },
+          "stockAfter": {
+            "$numberInt": "120"
+          },
+          "stockDelta": {
+            "$numberInt": "120"
+          },
+          "unitBefore": "gram",
+          "unitAfter": "gram",
+          "referenceType": "ADJUSTMENT",
+          "note": "Tồn đầu kỳ demo; cần bổ sung hàng",
+          "createdBy": {
+            "$oid": "6aeb673031b031ff6bfab943"
+          },
+          "valueBefore": {
+            "$numberInt": "0"
+          },
+          "valueAfter": {
+            "$numberInt": "57600"
+          },
+          "costTotal": {
+            "$numberInt": "57600"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795395600000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795395600000"
+            }
+          }
         }
       ]
     },
@@ -3948,6 +4713,41 @@ const seedData = {
       "name": "orderitems",
       "indexes": [],
       "documents": [
+        {
+          "_id": {
+            "$oid": "472d0d2cc9ec2f637dcae8b8"
+          },
+          "order": {
+            "$oid": "3bcac1824571cc3df6b1ce56"
+          },
+          "product": {
+            "$oid": "6aeb673031b031ff6bfab954"
+          },
+          "productNameAtTime": "Cà Phê Muối Aura Đặc Biệt",
+          "unitPrice": {
+            "$numberInt": "45000"
+          },
+          "customization": {
+            "size": "M"
+          },
+          "quantity": {
+            "$numberInt": "1"
+          },
+          "subtotal": {
+            "$numberInt": "45000"
+          },
+          "isPrepared": false,
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795568400000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795568400000"
+            }
+          }
+        },
         {
           "_id": {
             "$oid": "6aeb673031b031ff6bfab997"
@@ -5186,6 +5986,76 @@ const seedData = {
           "__v": {
             "$numberInt": "0"
           }
+        },
+        {
+          "_id": {
+            "$oid": "a697258024679650433b5239"
+          },
+          "order": {
+            "$oid": "17dd10ba0c54b2d76f32116f"
+          },
+          "product": {
+            "$oid": "6aeb673031b031ff6bfab959"
+          },
+          "productNameAtTime": "Bánh Croissant Bơ Pháp",
+          "unitPrice": {
+            "$numberInt": "35000"
+          },
+          "customization": {
+            "size": "M"
+          },
+          "quantity": {
+            "$numberInt": "1"
+          },
+          "subtotal": {
+            "$numberInt": "35000"
+          },
+          "isPrepared": true,
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795575600000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795575600000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "de9bfd5c75cac6d30372b8c0"
+          },
+          "order": {
+            "$oid": "df1640b1d2e2c9b927aaac60"
+          },
+          "product": {
+            "$oid": "6aeb673031b031ff6bfab959"
+          },
+          "productNameAtTime": "Bánh Croissant Bơ Pháp",
+          "unitPrice": {
+            "$numberInt": "35000"
+          },
+          "customization": {
+            "size": "M"
+          },
+          "quantity": {
+            "$numberInt": "1"
+          },
+          "subtotal": {
+            "$numberInt": "35000"
+          },
+          "isPrepared": false,
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795572000000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795572000000"
+            }
+          }
         }
       ]
     },
@@ -5220,6 +6090,188 @@ const seedData = {
         }
       ],
       "documents": [
+        {
+          "_id": {
+            "$oid": "17dd10ba0c54b2d76f32116f"
+          },
+          "orderCode": "AURA-DEMO-DELIVERING",
+          "customer": {
+            "$oid": "6aeb673031b031ff6bfab946"
+          },
+          "recipientName": "Le Minh Anh",
+          "recipientPhone": "0900000004",
+          "deliveryAddress": "12 Nguyễn Trãi, Thanh Xuân, Hà Nội",
+          "district": "Thanh Xuân",
+          "ward": "Thượng Đình",
+          "addressDetail": "Số 12 Nguyễn Trãi",
+          "orderType": "ONLINE",
+          "status": "DELIVERING",
+          "items": [
+            {
+              "product": {
+                "$oid": "6aeb673031b031ff6bfab959"
+              },
+              "productNameAtTime": "Bánh Croissant Bơ Pháp",
+              "unitPrice": {
+                "$numberInt": "35000"
+              },
+              "customization": {
+                "size": "M"
+              },
+              "quantity": {
+                "$numberInt": "1"
+              },
+              "subtotal": {
+                "$numberInt": "35000"
+              },
+              "isPrepared": true,
+              "costTotal": {
+                "$numberInt": "18000"
+              },
+              "costPerItem": {
+                "$numberInt": "18000"
+              },
+              "costAllocations": [
+                {
+                  "ingredient": {
+                    "$oid": "058acaf05eed774b975fe1bc"
+                  },
+                  "ingredientName": "Bánh croissant thành phẩm",
+                  "unit": "cái",
+                  "lotId": {
+                    "$oid": "81b835ff3d40d18822b382e9"
+                  },
+                  "quantity": {
+                    "$numberInt": "1"
+                  },
+                  "unitCost": {
+                    "$numberInt": "18000"
+                  }
+                }
+              ]
+            }
+          ],
+          "totalAmount": {
+            "$numberInt": "35000"
+          },
+          "discountAmount": {
+            "$numberInt": "0"
+          },
+          "deliveryFee": {
+            "$numberInt": "18000"
+          },
+          "finalAmount": {
+            "$numberInt": "53000"
+          },
+          "paymentMethod": "COD",
+          "shipper": {
+            "$oid": "6aeb673031b031ff6bfab948"
+          },
+          "delivery": {
+            "status": "DELIVERING",
+            "assignedAt": {
+              "$date": {
+                "$numberLong": "1795575600000"
+              }
+            },
+            "acceptedAt": {
+              "$date": {
+                "$numberLong": "1795576200000"
+              }
+            },
+            "pickedUpAt": {
+              "$date": {
+                "$numberLong": "1795577400000"
+              }
+            },
+            "history": []
+          },
+          "inventoryDeductedAt": {
+            "$date": {
+              "$numberLong": "1795575600000"
+            }
+          },
+          "costTotal": {
+            "$numberInt": "18000"
+          },
+          "costCapturedAt": {
+            "$date": {
+              "$numberLong": "1795575600000"
+            }
+          },
+          "costStatus": "COMPLETE",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795575600000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795575600000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "3bcac1824571cc3df6b1ce56"
+          },
+          "orderCode": "AURA-DEMO-QR-PENDING",
+          "customer": {
+            "$oid": "6aeb673031b031ff6bfab946"
+          },
+          "recipientName": "Le Minh Anh",
+          "recipientPhone": "0900000004",
+          "deliveryAddress": "12 Nguyễn Trãi, Thanh Xuân, Hà Nội",
+          "district": "Thanh Xuân",
+          "ward": "Thượng Đình",
+          "addressDetail": "Số 12 Nguyễn Trãi",
+          "orderType": "ONLINE",
+          "status": "PENDING",
+          "items": [
+            {
+              "product": {
+                "$oid": "6aeb673031b031ff6bfab954"
+              },
+              "productNameAtTime": "Cà Phê Muối Aura Đặc Biệt",
+              "unitPrice": {
+                "$numberInt": "45000"
+              },
+              "customization": {
+                "size": "M"
+              },
+              "quantity": {
+                "$numberInt": "1"
+              },
+              "subtotal": {
+                "$numberInt": "45000"
+              },
+              "isPrepared": false
+            }
+          ],
+          "totalAmount": {
+            "$numberInt": "45000"
+          },
+          "discountAmount": {
+            "$numberInt": "0"
+          },
+          "deliveryFee": {
+            "$numberInt": "18000"
+          },
+          "finalAmount": {
+            "$numberInt": "63000"
+          },
+          "paymentMethod": "BANK_TRANSFER",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795568400000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795568400000"
+            }
+          }
+        },
         {
           "_id": {
             "$oid": "6aeb673031b031ff6bfab98d"
@@ -7959,6 +9011,103 @@ const seedData = {
           "shipper": {
             "$oid": "6af4b8350b44b941144fb48f"
           }
+        },
+        {
+          "_id": {
+            "$oid": "df1640b1d2e2c9b927aaac60"
+          },
+          "orderCode": "AURA-DEMO-PREPARING",
+          "customer": {
+            "$oid": "6aeb673031b031ff6bfab946"
+          },
+          "cashier": {
+            "$oid": "6aeb673031b031ff6bfab945"
+          },
+          "tableNumber": "T02",
+          "orderType": "DINE_IN",
+          "status": "PREPARING",
+          "items": [
+            {
+              "product": {
+                "$oid": "6aeb673031b031ff6bfab959"
+              },
+              "productNameAtTime": "Bánh Croissant Bơ Pháp",
+              "unitPrice": {
+                "$numberInt": "35000"
+              },
+              "customization": {
+                "size": "M"
+              },
+              "quantity": {
+                "$numberInt": "1"
+              },
+              "subtotal": {
+                "$numberInt": "35000"
+              },
+              "isPrepared": false,
+              "costTotal": {
+                "$numberInt": "18000"
+              },
+              "costPerItem": {
+                "$numberInt": "18000"
+              },
+              "costAllocations": [
+                {
+                  "ingredient": {
+                    "$oid": "058acaf05eed774b975fe1bc"
+                  },
+                  "ingredientName": "Bánh croissant thành phẩm",
+                  "unit": "cái",
+                  "lotId": {
+                    "$oid": "81b835ff3d40d18822b382e9"
+                  },
+                  "quantity": {
+                    "$numberInt": "1"
+                  },
+                  "unitCost": {
+                    "$numberInt": "18000"
+                  }
+                }
+              ]
+            }
+          ],
+          "totalAmount": {
+            "$numberInt": "35000"
+          },
+          "discountAmount": {
+            "$numberInt": "0"
+          },
+          "deliveryFee": {
+            "$numberInt": "0"
+          },
+          "finalAmount": {
+            "$numberInt": "35000"
+          },
+          "paymentMethod": "CASH",
+          "inventoryDeductedAt": {
+            "$date": {
+              "$numberLong": "1795572000000"
+            }
+          },
+          "costTotal": {
+            "$numberInt": "18000"
+          },
+          "costCapturedAt": {
+            "$date": {
+              "$numberLong": "1795572000000"
+            }
+          },
+          "costStatus": "COMPLETE",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795572000000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795572000000"
+            }
+          }
         }
       ]
     },
@@ -8007,6 +9156,90 @@ const seedData = {
         }
       ],
       "documents": [
+        {
+          "_id": {
+            "$oid": "0cda51a93a2e755cab87d5d6"
+          },
+          "order": {
+            "$oid": "df1640b1d2e2c9b927aaac60"
+          },
+          "paymentMethod": "CASH",
+          "amount": {
+            "$numberInt": "35000"
+          },
+          "status": "SUCCESS",
+          "confirmationMode": "CASHIER",
+          "paidAt": {
+            "$date": {
+              "$numberLong": "1795572000000"
+            }
+          },
+          "receivedAmount": {
+            "$numberInt": "50000"
+          },
+          "changeAmount": {
+            "$numberInt": "15000"
+          },
+          "receivedBy": {
+            "$oid": "6aeb673031b031ff6bfab945"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795572000000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795572000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "2536b570b82b0e2d4944608a"
+          },
+          "order": {
+            "$oid": "3bcac1824571cc3df6b1ce56"
+          },
+          "paymentMethod": "BANK_TRANSFER",
+          "amount": {
+            "$numberInt": "63000"
+          },
+          "status": "PENDING",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795568400000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795568400000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "47b5f25246582e0f1f185d7c"
+          },
+          "order": {
+            "$oid": "17dd10ba0c54b2d76f32116f"
+          },
+          "paymentMethod": "CASH",
+          "amount": {
+            "$numberInt": "53000"
+          },
+          "status": "PENDING",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795575600000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795575600000"
+            }
+          }
+        },
         {
           "_id": {
             "$oid": "6aeb673031b031ff6bfab9a7"
@@ -8871,6 +10104,54 @@ const seedData = {
       "documents": [
         {
           "_id": {
+            "$oid": "16cae12d76f54bc21e5f4c9e"
+          },
+          "product": {
+            "$oid": "6aeb673031b031ff6bfab95e"
+          },
+          "ingredient": {
+            "$oid": "3661198b623f59b138dc83e6"
+          },
+          "quantityRequired": {
+            "$numberInt": "5"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "2aa75f0b49e18886d491fccc"
+          },
+          "product": {
+            "$oid": "6aeb673031b031ff6bfab95e"
+          },
+          "ingredient": {
+            "$oid": "6aeb673031b031ff6bfab964"
+          },
+          "quantityRequired": {
+            "$numberInt": "120"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
             "$oid": "6aeb673031b031ff6bfab96e"
           },
           "product": {
@@ -9217,6 +10498,102 @@ const seedData = {
           "updatedAt": {
             "$date": {
               "$numberLong": "1794682007047"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "8e373af91accf83b4d4be16a"
+          },
+          "product": {
+            "$oid": "6aeb673031b031ff6bfab959"
+          },
+          "ingredient": {
+            "$oid": "058acaf05eed774b975fe1bc"
+          },
+          "quantityRequired": {
+            "$numberInt": "1"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "94a4894c9177c3f7d8e6d1aa"
+          },
+          "product": {
+            "$oid": "6aeb673031b031ff6bfab95a"
+          },
+          "ingredient": {
+            "$oid": "fadf568441a051bcd8a1ee84"
+          },
+          "quantityRequired": {
+            "$numberInt": "8"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "e2333a7d3343d52b5227fccf"
+          },
+          "product": {
+            "$oid": "6aeb673031b031ff6bfab95e"
+          },
+          "ingredient": {
+            "$oid": "6cbbe4ef97fbd0710a9f6373"
+          },
+          "quantityRequired": {
+            "$numberInt": "25"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "fb8ae182627a05e6b7806d2d"
+          },
+          "product": {
+            "$oid": "6aeb673031b031ff6bfab95a"
+          },
+          "ingredient": {
+            "$oid": "6aeb673031b031ff6bfab964"
+          },
+          "quantityRequired": {
+            "$numberInt": "150"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
             }
           }
         }
@@ -10019,6 +11396,36 @@ const seedData = {
       "documents": [
         {
           "_id": {
+            "$oid": "0b3baa34ca065bc32c9b4dcc"
+          },
+          "purchaseOrder": {
+            "$oid": "9f712f3793cd68b4abd25fec"
+          },
+          "ingredient": {
+            "$oid": "4990da8f82da567423a05687"
+          },
+          "quantity": {
+            "$numberInt": "1000"
+          },
+          "unitPrice": {
+            "$numberInt": "65"
+          },
+          "totalCost": {
+            "$numberInt": "65000"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795316400000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795316400000"
+            }
+          }
+        },
+        {
+          "_id": {
             "$oid": "6aeb673031b031ff6bfab9bd"
           },
           "purchaseOrder": {
@@ -10206,6 +11613,36 @@ const seedData = {
           "updatedAt": {
             "$date": {
               "$numberLong": "1794681943290"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "f24c9586c7d8d0d6ebdf6d7e"
+          },
+          "purchaseOrder": {
+            "$oid": "def42b01c142efddb5f0379f"
+          },
+          "ingredient": {
+            "$oid": "f6b67060d00c497af05d4e85"
+          },
+          "quantity": {
+            "$numberInt": "2000"
+          },
+          "unitPrice": {
+            "$numberInt": "480"
+          },
+          "totalCost": {
+            "$numberInt": "960000"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795489200000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795489200000"
             }
           }
         }
@@ -10444,13 +11881,466 @@ const seedData = {
           "__v": {
             "$numberInt": "0"
           }
+        },
+        {
+          "_id": {
+            "$oid": "9f712f3793cd68b4abd25fec"
+          },
+          "supplier": {
+            "$oid": "6aeb673031b031ff6bfab960"
+          },
+          "creator": {
+            "$oid": "6aeb673031b031ff6bfab943"
+          },
+          "status": "CANCELLED",
+          "totalCost": {
+            "$numberInt": "65000"
+          },
+          "items": [
+            {
+              "ingredient": {
+                "$oid": "4990da8f82da567423a05687"
+              },
+              "quantity": {
+                "$numberInt": "1000"
+              },
+              "unitPrice": {
+                "$numberInt": "65"
+              },
+              "totalCost": {
+                "$numberInt": "65000"
+              }
+            }
+          ],
+          "note": "Phiếu đã hủy demo",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795316400000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795316400000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "def42b01c142efddb5f0379f"
+          },
+          "supplier": {
+            "$oid": "6aeb673031b031ff6bfab960"
+          },
+          "creator": {
+            "$oid": "6aeb673031b031ff6bfab943"
+          },
+          "status": "DRAFT",
+          "totalCost": {
+            "$numberInt": "960000"
+          },
+          "items": [
+            {
+              "ingredient": {
+                "$oid": "f6b67060d00c497af05d4e85"
+              },
+              "quantity": {
+                "$numberInt": "2000"
+              },
+              "unitPrice": {
+                "$numberInt": "480"
+              },
+              "totalCost": {
+                "$numberInt": "960000"
+              }
+            }
+          ],
+          "note": "Phiếu nháp demo",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795489200000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795489200000"
+            }
+          }
         }
       ]
     },
     {
       "name": "restockrequests",
       "indexes": [],
-      "documents": []
+      "documents": [
+        {
+          "_id": {
+            "$oid": "012e5ea7f237ccea1241efe4"
+          },
+          "requester": {
+            "$oid": "ddb1643cf10b2c39c11d7488"
+          },
+          "reviewer": {
+            "$oid": "6aeb673031b031ff6bfab943"
+          },
+          "reviewedAt": {
+            "$date": {
+              "$numberLong": "1795406400000"
+            }
+          },
+          "reviewNote": "Điều chỉnh số lượng rồi gửi lại",
+          "status": "REJECTED",
+          "reason": "Đề xuất số lượng lớn",
+          "note": "Dữ liệu demo",
+          "items": [
+            {
+              "_id": {
+                "$oid": "6fc3e44a1f374a5fb35671c7"
+              },
+              "ingredient": {
+                "$oid": "f6b67060d00c497af05d4e85"
+              },
+              "quantity": {
+                "$numberInt": "5000"
+              },
+              "itemNote": ""
+            }
+          ],
+          "history": [
+            {
+              "_id": {
+                "$oid": "b991bcee22af091f56bdebfa"
+              },
+              "action": "create",
+              "actor": {
+                "$oid": "ddb1643cf10b2c39c11d7488"
+              },
+              "at": {
+                "$date": {
+                  "$numberLong": "1795399200000"
+                }
+              },
+              "note": ""
+            },
+            {
+              "_id": {
+                "$oid": "59b27ed76eafdf7a0598a9ba"
+              },
+              "action": "submit",
+              "actor": {
+                "$oid": "ddb1643cf10b2c39c11d7488"
+              },
+              "at": {
+                "$date": {
+                  "$numberLong": "1795402800000"
+                }
+              },
+              "note": ""
+            },
+            {
+              "_id": {
+                "$oid": "259c04b2758530efe76e9b95"
+              },
+              "action": "reject",
+              "actor": {
+                "$oid": "6aeb673031b031ff6bfab943"
+              },
+              "at": {
+                "$date": {
+                  "$numberLong": "1795406400000"
+                }
+              },
+              "note": "Điều chỉnh số lượng rồi gửi lại"
+            }
+          ],
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795399200000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795406400000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6331d99a4ddb70bfbb2db217"
+          },
+          "requester": {
+            "$oid": "ddb1643cf10b2c39c11d7488"
+          },
+          "status": "DRAFT",
+          "reason": "Đường nâu dưới mức tồn tối thiểu",
+          "note": "Dữ liệu demo",
+          "items": [
+            {
+              "_id": {
+                "$oid": "934fbf8b34fcff7714eb091f"
+              },
+              "ingredient": {
+                "$oid": "4990da8f82da567423a05687"
+              },
+              "quantity": {
+                "$numberInt": "3000"
+              },
+              "itemNote": ""
+            }
+          ],
+          "history": [
+            {
+              "_id": {
+                "$oid": "b96a1e6076ffc5215f33c66f"
+              },
+              "action": "create",
+              "actor": {
+                "$oid": "ddb1643cf10b2c39c11d7488"
+              },
+              "at": {
+                "$date": {
+                  "$numberLong": "1795140000000"
+                }
+              },
+              "note": ""
+            }
+          ],
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795140000000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795140000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "7491f4979dbf84c38f863553"
+          },
+          "requester": {
+            "$oid": "6aeb673031b031ff6bfab945"
+          },
+          "status": "CANCELLED",
+          "reason": "Đề xuất trùng",
+          "note": "Dữ liệu demo",
+          "items": [
+            {
+              "_id": {
+                "$oid": "c9ca5df2318fd97a2fded3b9"
+              },
+              "ingredient": {
+                "$oid": "4990da8f82da567423a05687"
+              },
+              "quantity": {
+                "$numberInt": "500"
+              },
+              "itemNote": ""
+            }
+          ],
+          "history": [
+            {
+              "_id": {
+                "$oid": "688abe6c10f6e42181c0f201"
+              },
+              "action": "create",
+              "actor": {
+                "$oid": "6aeb673031b031ff6bfab945"
+              },
+              "at": {
+                "$date": {
+                  "$numberLong": "1795485600000"
+                }
+              },
+              "note": ""
+            },
+            {
+              "_id": {
+                "$oid": "5fba8749b7026a51b69d9f6e"
+              },
+              "action": "cancel",
+              "actor": {
+                "$oid": "6aeb673031b031ff6bfab945"
+              },
+              "at": {
+                "$date": {
+                  "$numberLong": "1795489200000"
+                }
+              },
+              "note": ""
+            }
+          ],
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795485600000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795489200000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "87c55f14f2cfa4c927b12b2b"
+          },
+          "requester": {
+            "$oid": "6aeb673031b031ff6bfab945"
+          },
+          "reviewer": {
+            "$oid": "6aeb673031b031ff6bfab943"
+          },
+          "reviewedAt": {
+            "$date": {
+              "$numberLong": "1795320000000"
+            }
+          },
+          "reviewNote": "Đồng ý nhập bổ sung",
+          "status": "APPROVED",
+          "reason": "Bổ sung đường nâu",
+          "note": "Dữ liệu demo",
+          "items": [
+            {
+              "_id": {
+                "$oid": "d6f3ca523bb3d246823d344c"
+              },
+              "ingredient": {
+                "$oid": "4990da8f82da567423a05687"
+              },
+              "quantity": {
+                "$numberInt": "1000"
+              },
+              "itemNote": ""
+            }
+          ],
+          "history": [
+            {
+              "_id": {
+                "$oid": "c60144f37cd36ec4effe2a0e"
+              },
+              "action": "create",
+              "actor": {
+                "$oid": "6aeb673031b031ff6bfab945"
+              },
+              "at": {
+                "$date": {
+                  "$numberLong": "1795312800000"
+                }
+              },
+              "note": ""
+            },
+            {
+              "_id": {
+                "$oid": "2b3dd77a1520affdf7d19b8e"
+              },
+              "action": "submit",
+              "actor": {
+                "$oid": "6aeb673031b031ff6bfab945"
+              },
+              "at": {
+                "$date": {
+                  "$numberLong": "1795316400000"
+                }
+              },
+              "note": ""
+            },
+            {
+              "_id": {
+                "$oid": "1169b883a7c35c0ace746b42"
+              },
+              "action": "approve",
+              "actor": {
+                "$oid": "6aeb673031b031ff6bfab943"
+              },
+              "at": {
+                "$date": {
+                  "$numberLong": "1795320000000"
+                }
+              },
+              "note": ""
+            }
+          ],
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795312800000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795320000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "a1dd0663417a3d25c5570887"
+          },
+          "requester": {
+            "$oid": "6aeb673031b031ff6bfab945"
+          },
+          "status": "PENDING_APPROVAL",
+          "reason": "Cần hạt Arabica cho các ca cuối tuần",
+          "note": "Dữ liệu demo",
+          "items": [
+            {
+              "_id": {
+                "$oid": "b411cf553d548a2b30eae5e1"
+              },
+              "ingredient": {
+                "$oid": "f6b67060d00c497af05d4e85"
+              },
+              "quantity": {
+                "$numberInt": "2000"
+              },
+              "itemNote": ""
+            }
+          ],
+          "history": [
+            {
+              "_id": {
+                "$oid": "8a7f2ae89f11cb07c22b2c97"
+              },
+              "action": "create",
+              "actor": {
+                "$oid": "6aeb673031b031ff6bfab945"
+              },
+              "at": {
+                "$date": {
+                  "$numberLong": "1795226400000"
+                }
+              },
+              "note": ""
+            },
+            {
+              "_id": {
+                "$oid": "03cf3c7e2c0a986062ecfe8d"
+              },
+              "action": "submit",
+              "actor": {
+                "$oid": "6aeb673031b031ff6bfab945"
+              },
+              "at": {
+                "$date": {
+                  "$numberLong": "1795230000000"
+                }
+              },
+              "note": ""
+            }
+          ],
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795226400000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795230000000"
+            }
+          }
+        }
+      ]
     },
     {
       "name": "rewarditems",
@@ -10595,6 +12485,200 @@ const seedData = {
         }
       ],
       "documents": [
+        {
+          "_id": {
+            "$oid": "0ee80c0cb92b6b27a2fe4af9"
+          },
+          "schedule": {
+            "$oid": "459337a74ba3995ed5eb7584"
+          },
+          "cashier": {
+            "$oid": "f73d7e8efb7c79dac9640ab6"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794873600000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794902280000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794929700000"
+            }
+          },
+          "openingCash": {
+            "$numberInt": "100000"
+          },
+          "cashSales": {
+            "$numberInt": "0"
+          },
+          "codReceipts": {
+            "$numberInt": "0"
+          },
+          "cashRefunds": {
+            "$numberInt": "0"
+          },
+          "expectedCash": {
+            "$numberInt": "100000"
+          },
+          "actualCash": {
+            "$numberInt": "90000"
+          },
+          "difference": {
+            "$numberInt": "-10000"
+          },
+          "note": "Két thiếu 10.000đ, cần kiểm tra lại.",
+          "status": "REJECTED",
+          "reviewedBy": {
+            "$oid": "6aeb673031b031ff6bfab943"
+          },
+          "reviewedAt": {
+            "$date": {
+              "$numberLong": "1794933900000"
+            }
+          },
+          "reviewerNote": "Kiểm đếm và gửi lại biên bản.",
+          "revision": {
+            "$numberInt": "0"
+          },
+          "history": [
+            {
+              "_id": {
+                "$oid": "165a5392c021c72a358ff738"
+              },
+              "action": "REJECT",
+              "actor": {
+                "$oid": "6aeb673031b031ff6bfab943"
+              },
+              "at": {
+                "$date": {
+                  "$numberLong": "1794933900000"
+                }
+              },
+              "fromStatus": "SUBMITTED",
+              "toStatus": "REJECTED",
+              "note": "Kiểm đếm và gửi lại biên bản.",
+              "actualCash": {
+                "$numberInt": "90000"
+              },
+              "expectedCash": {
+                "$numberInt": "100000"
+              }
+            }
+          ],
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794930300000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794933900000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "2380ae60e278de43103ffcec"
+          },
+          "schedule": {
+            "$oid": "278a219a4b255aaf5362fd18"
+          },
+          "cashier": {
+            "$oid": "ddb1643cf10b2c39c11d7488"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794873600000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794873720000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794902280000"
+            }
+          },
+          "openingCash": {
+            "$numberInt": "100000"
+          },
+          "cashSales": {
+            "$numberInt": "0"
+          },
+          "codReceipts": {
+            "$numberInt": "0"
+          },
+          "cashRefunds": {
+            "$numberInt": "0"
+          },
+          "expectedCash": {
+            "$numberInt": "100000"
+          },
+          "actualCash": {
+            "$numberInt": "100000"
+          },
+          "difference": {
+            "$numberInt": "0"
+          },
+          "note": "",
+          "status": "CONFIRMED",
+          "reviewedBy": {
+            "$oid": "6aeb673031b031ff6bfab943"
+          },
+          "reviewedAt": {
+            "$date": {
+              "$numberLong": "1794906480000"
+            }
+          },
+          "reviewerNote": "Số liệu đã khớp.",
+          "revision": {
+            "$numberInt": "0"
+          },
+          "history": [
+            {
+              "_id": {
+                "$oid": "c2d7fdbb7e4d36a6985eee91"
+              },
+              "action": "CONFIRM",
+              "actor": {
+                "$oid": "6aeb673031b031ff6bfab943"
+              },
+              "at": {
+                "$date": {
+                  "$numberLong": "1794906480000"
+                }
+              },
+              "fromStatus": "SUBMITTED",
+              "toStatus": "CONFIRMED",
+              "note": "Số liệu đã khớp.",
+              "actualCash": {
+                "$numberInt": "100000"
+              },
+              "expectedCash": {
+                "$numberInt": "100000"
+              }
+            }
+          ],
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794902880000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794906480000"
+            }
+          }
+        },
         {
           "_id": {
             "$oid": "6af897bf1e5896fafbd24c17"
@@ -11034,6 +13118,25 @@ const seedData = {
       "documents": [
         {
           "_id": {
+            "$oid": "45dda2f5a083bf40286691a1"
+          },
+          "name": "Nhà cung cấp cũ (demo)",
+          "phone": "02838220000",
+          "address": "Quận 1, TP. Hồ Chí Minh",
+          "status": "INACTIVE",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794272400000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795136400000"
+            }
+          }
+        },
+        {
+          "_id": {
             "$oid": "6aeb673031b031ff6bfab960"
           },
           "name": "Fresh Bean Supplier",
@@ -11155,6 +13258,39 @@ const seedData = {
         }
       ],
       "documents": [
+        {
+          "_id": {
+            "$oid": "52dd16476071582cd2208939"
+          },
+          "fullName": "Nguyễn Hữu Phúc",
+          "phone": "0987000106",
+          "email": "aura.shipper.phuc.demo@gmail.com",
+          "emailKey": "aura.shipper.phuc.demo@gmail.com",
+          "role": "STAFF",
+          "position": "SHIPPER",
+          "status": "ACTIVE",
+          "baseSalary": {
+            "$numberInt": "7000000"
+          },
+          "hireDate": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          },
+          "totalPoints": {
+            "$numberInt": "0"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          }
+        },
         {
           "_id": {
             "$oid": "6aeb673031b031ff6bfab943"
@@ -11622,6 +13758,171 @@ const seedData = {
           "__v": {
             "$numberInt": "0"
           }
+        },
+        {
+          "_id": {
+            "$oid": "7c6941cf77e73924f3089a9c"
+          },
+          "fullName": "Trần Đức Long",
+          "phone": "0987000105",
+          "email": "aura.shipper.long.demo@gmail.com",
+          "emailKey": "aura.shipper.long.demo@gmail.com",
+          "role": "STAFF",
+          "position": "SHIPPER",
+          "status": "ACTIVE",
+          "baseSalary": {
+            "$numberInt": "7000000"
+          },
+          "hireDate": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          },
+          "totalPoints": {
+            "$numberInt": "0"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "a6592f80e4d4b7e262a58728"
+          },
+          "fullName": "Đỗ Khánh Linh",
+          "phone": "0987000104",
+          "email": "aura.barista.linh.demo@gmail.com",
+          "emailKey": "aura.barista.linh.demo@gmail.com",
+          "role": "STAFF",
+          "position": "BARISTA",
+          "status": "ACTIVE",
+          "baseSalary": {
+            "$numberInt": "7600000"
+          },
+          "hireDate": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          },
+          "totalPoints": {
+            "$numberInt": "0"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "c1905c8e99e73b57b5f96fdc"
+          },
+          "fullName": "Võ Hồng Sơn",
+          "phone": "0987000103",
+          "email": "aura.barista.son.demo@gmail.com",
+          "emailKey": "aura.barista.son.demo@gmail.com",
+          "role": "STAFF",
+          "position": "BARISTA",
+          "status": "ACTIVE",
+          "baseSalary": {
+            "$numberInt": "7600000"
+          },
+          "hireDate": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          },
+          "totalPoints": {
+            "$numberInt": "0"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "ddb1643cf10b2c39c11d7488"
+          },
+          "fullName": "Lê Thu Hà",
+          "phone": "0987000101",
+          "email": "aura.cashier.ha.demo@gmail.com",
+          "emailKey": "aura.cashier.ha.demo@gmail.com",
+          "role": "STAFF",
+          "position": "CASHIER",
+          "status": "ACTIVE",
+          "baseSalary": {
+            "$numberInt": "7200000"
+          },
+          "hireDate": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          },
+          "totalPoints": {
+            "$numberInt": "0"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "f73d7e8efb7c79dac9640ab6"
+          },
+          "fullName": "Phạm Minh Châu",
+          "phone": "0987000102",
+          "email": "aura.cashier.chau.demo@gmail.com",
+          "emailKey": "aura.cashier.chau.demo@gmail.com",
+          "role": "STAFF",
+          "position": "CASHIER",
+          "status": "ACTIVE",
+          "baseSalary": {
+            "$numberInt": "7200000"
+          },
+          "hireDate": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          },
+          "totalPoints": {
+            "$numberInt": "0"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1790812800000"
+            }
+          }
         }
       ]
     },
@@ -11794,6 +14095,1536 @@ const seedData = {
         }
       ],
       "documents": [
+        {
+          "_id": {
+            "$oid": "02458619af6caa31cbb2080d"
+          },
+          "user": {
+            "$oid": "6af4b8350b44b941144fb48f"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794960000000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794988920000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795015680000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795015800000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "0340cbfa7e34a3b9d3dc4d14"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab945"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795824000000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "058ff600dc6cc4d363cb653b"
+          },
+          "user": {
+            "$oid": "6af4b8350b44b941144fb48f"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795824000000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "06a7e2affac2136b6cf87f61"
+          },
+          "user": {
+            "$oid": "7c6941cf77e73924f3089a9c"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795392000000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795392120000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795420680000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795420800000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "0a992d821edc7f7b43fe7ec1"
+          },
+          "user": {
+            "$oid": "ddb1643cf10b2c39c11d7488"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795046400000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795046460000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795075200000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795075200000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "0c6f669ed73716a3b2ffc195"
+          },
+          "user": {
+            "$oid": "c1905c8e99e73b57b5f96fdc"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795737600000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "18123e3aa2c8a127669d1ee4"
+          },
+          "user": {
+            "$oid": "52dd16476071582cd2208939"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795046400000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795075080000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795102500000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795102200000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "1954d2291307c444a34db92b"
+          },
+          "user": {
+            "$oid": "a6592f80e4d4b7e262a58728"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795478400000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795507080000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795534500000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795534200000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "1eef2d5928bf2f2ab43d8a3a"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab948"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794960000000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794959760000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794988980000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794988800000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "1f8ae2977a233392b86a0c53"
+          },
+          "user": {
+            "$oid": "c1905c8e99e73b57b5f96fdc"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795046400000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795075320000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795102080000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795102200000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "2097ae1efd85bc160d8848ea"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab944"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795651200000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "20a5c151cdcbf172c61cd2da"
+          },
+          "user": {
+            "$oid": "6af4b8350b44b941144fb48f"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794787200000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794816060000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794843000000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794843000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "21046d7fd3698d68982f5e24"
+          },
+          "user": {
+            "$oid": "6af8ad9afcfef0a0c28d486f"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795305600000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795334460000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795361400000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795361400000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "22c842e8dc0b0ec96aaa699e"
+          },
+          "user": {
+            "$oid": "f73d7e8efb7c79dac9640ab6"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795219200000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795247880000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795275300000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795275000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "278a219a4b255aaf5362fd18"
+          },
+          "user": {
+            "$oid": "ddb1643cf10b2c39c11d7488"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794873600000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794873720000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794902280000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794902400000"
+            }
+          },
+          "startingCash": {
+            "$numberInt": "100000"
+          },
+          "endingCashSystem": {
+            "$numberInt": "100000"
+          },
+          "endingCashActual": {
+            "$numberInt": "100000"
+          },
+          "handoverAt": {
+            "$date": {
+              "$numberLong": "1794902880000"
+            }
+          },
+          "handoverNote": ""
+        },
+        {
+          "_id": {
+            "$oid": "27fa5b05da5c6cc7dd820ead"
+          },
+          "user": {
+            "$oid": "a6592f80e4d4b7e262a58728"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795132800000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795132920000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795161480000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795161600000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "2e75321bbff27371c4fcfcb0"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab944"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795132800000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795161480000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795188900000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795188600000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "2f9a3bad23edf2b579351baf"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab944"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795824000000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "303b78526c010da4c88c1ccf"
+          },
+          "user": {
+            "$oid": "a6592f80e4d4b7e262a58728"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795651200000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "33feca7d5a6fa8ccf70e49c9"
+          },
+          "user": {
+            "$oid": "6af8ad9afcfef0a0c28d486f"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795651200000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "38c5858c972482baae5cc729"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab945"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795478400000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795478160000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795507380000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795507200000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "3b4b8c0056f4980413622b7d"
+          },
+          "user": {
+            "$oid": "7c6941cf77e73924f3089a9c"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795737600000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "3ea2d445b49f6d3d258d8bd9"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab945"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794787200000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794786960000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794816180000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794816000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "3f089c59be2cb15f07540c28"
+          },
+          "user": {
+            "$oid": "7c6941cf77e73924f3089a9c"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795219200000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795219260000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795248000000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795248000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "40edbbe3dd64914da2162f20"
+          },
+          "user": {
+            "$oid": "6af4b8350b44b941144fb48f"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795132800000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795161660000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795188600000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795188600000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "4387112f42257fb001dae247"
+          },
+          "user": {
+            "$oid": "c1905c8e99e73b57b5f96fdc"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795564800000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "459337a74ba3995ed5eb7584"
+          },
+          "user": {
+            "$oid": "f73d7e8efb7c79dac9640ab6"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794873600000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794902280000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794929700000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794929400000"
+            }
+          },
+          "startingCash": {
+            "$numberInt": "100000"
+          },
+          "endingCashSystem": {
+            "$numberInt": "100000"
+          },
+          "endingCashActual": {
+            "$numberInt": "90000"
+          },
+          "handoverAt": {
+            "$date": {
+              "$numberLong": "1794930300000"
+            }
+          },
+          "handoverNote": "Két thiếu 10.000đ, cần kiểm tra lại."
+        },
+        {
+          "_id": {
+            "$oid": "484760acd5171de4f5c0ad06"
+          },
+          "user": {
+            "$oid": "a6592f80e4d4b7e262a58728"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795219200000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795248060000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795275000000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795275000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "485fb885f40952f04931867e"
+          },
+          "user": {
+            "$oid": "6af8ad9afcfef0a0c28d486f"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795132800000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795161720000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795188480000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795188600000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "49ee175deb03f3c141798c1b"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab944"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795046400000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795046160000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795075380000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795075200000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "4a3c7fac7ac0ce72605c48c1"
+          },
+          "user": {
+            "$oid": "52dd16476071582cd2208939"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795737600000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "4f65ae000939af1c291a3da9"
+          },
+          "user": {
+            "$oid": "f73d7e8efb7c79dac9640ab6"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795392000000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795420560000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795447980000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795447800000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "553f3494e83dce084176cc31"
+          },
+          "user": {
+            "$oid": "a6592f80e4d4b7e262a58728"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795392000000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795391760000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795420980000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795420800000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "579c80b139c6f118c2271597"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab948"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795651200000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "58d2ee76e2eb1ff837f4c7f7"
+          },
+          "user": {
+            "$oid": "6af8ad9afcfef0a0c28d486f"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795478400000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795507320000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795534080000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795534200000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "5a57e467d1b9c5e55d7bbe13"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab944"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795305600000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795305660000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795334400000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795334400000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "5f00d5dfec76eed9cffe0319"
+          },
+          "user": {
+            "$oid": "a6592f80e4d4b7e262a58728"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795737600000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6310bea43d75825ff99f01dc"
+          },
+          "user": {
+            "$oid": "52dd16476071582cd2208939"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795564800000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "655ae6bdef3c3b6fa6f4fc9a"
+          },
+          "user": {
+            "$oid": "ddb1643cf10b2c39c11d7488"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795910400000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "65ae0317044ac674bb588e0f"
+          },
+          "user": {
+            "$oid": "f73d7e8efb7c79dac9640ab6"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795046400000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795074960000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795102380000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795102200000"
+            }
+          }
+        },
         {
           "_id": {
             "$oid": "6af4bfd56c62c988a55af322"
@@ -12342,6 +16173,1650 @@ const seedData = {
               }
             }
           }
+        },
+        {
+          "_id": {
+            "$oid": "6dc0931fbc546764ecc8f656"
+          },
+          "user": {
+            "$oid": "c1905c8e99e73b57b5f96fdc"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794787200000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794815880000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794843300000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794843000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6e51fcd05718f4778badf36c"
+          },
+          "user": {
+            "$oid": "7c6941cf77e73924f3089a9c"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794873600000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794873660000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794902400000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794902400000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "711b0dfb53dab817835be206"
+          },
+          "user": {
+            "$oid": "f73d7e8efb7c79dac9640ab6"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795910400000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "71bd4931925388bf25d30c4a"
+          },
+          "user": {
+            "$oid": "52dd16476071582cd2208939"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795219200000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795247760000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795275180000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795275000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "728afff0e860472d6e5a9bd3"
+          },
+          "user": {
+            "$oid": "6af8ad9afcfef0a0c28d486f"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795824000000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "749ad6c9d6f86bff9595e208"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab948"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795132800000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795132680000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795161900000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795161600000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "7ebc23255acc9a865487395d"
+          },
+          "user": {
+            "$oid": "f73d7e8efb7c79dac9640ab6"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795737600000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "801aa253c83ac5ce7583c510"
+          },
+          "user": {
+            "$oid": "ddb1643cf10b2c39c11d7488"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795392000000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795392060000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795420800000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795420800000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "8111166b9018925f17fac49d"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab945"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795132800000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795132560000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795161780000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795161600000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "8331bdf19162cdaf541032ed"
+          },
+          "user": {
+            "$oid": "7c6941cf77e73924f3089a9c"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795910400000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "833fa5e9a2d051c8bac0b2be"
+          },
+          "user": {
+            "$oid": "6af8ad9afcfef0a0c28d486f"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794787200000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794816120000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794842880000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794843000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "8bc41d060e040f0d80cb49a8"
+          },
+          "user": {
+            "$oid": "c1905c8e99e73b57b5f96fdc"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795478400000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795478520000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795507080000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795507200000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "91208d4a80d932f9dd39cc42"
+          },
+          "user": {
+            "$oid": "a6592f80e4d4b7e262a58728"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794873600000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794873480000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794902700000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794902400000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "93085bef4f3b01ba92e36a06"
+          },
+          "user": {
+            "$oid": "ddb1643cf10b2c39c11d7488"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795219200000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795219320000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795247880000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795248000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "939c888a586824bed4cc577a"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab948"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795305600000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795305360000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795334580000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795334400000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "97267bcff19cfe9dd632f1fc"
+          },
+          "user": {
+            "$oid": "ddb1643cf10b2c39c11d7488"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795737600000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "97d85538fa768692bc1a7708"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab944"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795392000000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795420920000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795447680000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795447800000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "9db3faed6c4a32ab8e56434c"
+          },
+          "user": {
+            "$oid": "c1905c8e99e73b57b5f96fdc"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794960000000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794960060000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794988800000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794988800000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "ae1e2eabfd4ab7192f7f28fe"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab945"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795305600000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795305480000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795334700000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795334400000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "b8272d5b3dba989f9cdc24aa"
+          },
+          "user": {
+            "$oid": "52dd16476071582cd2208939"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795910400000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "bd95e7b09adadaf3c55fc8ef"
+          },
+          "user": {
+            "$oid": "a6592f80e4d4b7e262a58728"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795910400000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "c519abb3f495edf976cea8ec"
+          },
+          "user": {
+            "$oid": "c1905c8e99e73b57b5f96fdc"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795219200000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795219080000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795248300000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795248000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "c5746700657432303293d356"
+          },
+          "user": {
+            "$oid": "a6592f80e4d4b7e262a58728"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794960000000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794988560000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795015980000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795015800000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "c591f3c6a135c268e7b93720"
+          },
+          "user": {
+            "$oid": "52dd16476071582cd2208939"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795392000000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795420680000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795448100000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795447800000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "c8f3afb39fcd1d3e7967c97d"
+          },
+          "user": {
+            "$oid": "f73d7e8efb7c79dac9640ab6"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795564800000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "c949a59aec8bd72d16104224"
+          },
+          "user": {
+            "$oid": "c1905c8e99e73b57b5f96fdc"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795824000000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "cad5e9c3fbe9c72d114e1a53"
+          },
+          "user": {
+            "$oid": "c1905c8e99e73b57b5f96fdc"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795305600000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795334160000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795361580000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795361400000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "cdac07786e2f262dd0e36402"
+          },
+          "user": {
+            "$oid": "7c6941cf77e73924f3089a9c"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795564800000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "ce29ad8bc2d9016bdc76ad0a"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab948"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794787200000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794787080000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794816300000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794816000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "cee6e3f7ffc1b004c8cc0046"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab945"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794960000000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794959880000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794989100000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794988800000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "cfc778018de157a754a54c73"
+          },
+          "user": {
+            "$oid": "6af8ad9afcfef0a0c28d486f"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794960000000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794988860000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795015800000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795015800000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "d23fce458745746d8ade2c4c"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab948"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795824000000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "d2e0a7901572bcf0b5c93400"
+          },
+          "user": {
+            "$oid": "7c6941cf77e73924f3089a9c"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795046400000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795046520000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795075080000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795075200000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "d559fbe01d9c665834f40257"
+          },
+          "user": {
+            "$oid": "6af4b8350b44b941144fb48f"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795651200000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "d8ef7cbd196882fef5e807e4"
+          },
+          "user": {
+            "$oid": "6af4b8350b44b941144fb48f"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795305600000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795334520000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795361280000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795361400000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "da96230e0308c68ede64d53d"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab948"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795478400000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795478280000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795507500000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795507200000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "ddb76d88f565f7e69a0ebc01"
+          },
+          "user": {
+            "$oid": "52dd16476071582cd2208939"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794873600000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794902160000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794929580000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794929400000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "e02bc8344cb2c1d6f0fc8c68"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab944"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795910400000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "e0a8b448f41aa37c76f43eba"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab944"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795564800000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "e47fbed37ea3b8112b81af37"
+          },
+          "user": {
+            "$oid": "ddb1643cf10b2c39c11d7488"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795564800000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "e80d2f17d18e5c49fb4de7cf"
+          },
+          "user": {
+            "$oid": "6af4b8350b44b941144fb48f"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795478400000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795507260000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795534200000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795534200000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "ed9bf29563c949380faa49d5"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab944"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794873600000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "shift": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "shiftStartTime": "15:00",
+          "shiftEndTime": "22:30",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794902460000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794929400000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794929400000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "feccf04c4f7c834d6471e2d6"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab944"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794787200000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "COMPLETED",
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794787320000"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794815880000"
+            }
+          },
+          "note": "Lịch và chấm công mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794816000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "fffcc79031e8bb5a6980678f"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab945"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795651200000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "shift": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "shiftStartTime": "07:00",
+          "shiftEndTime": "15:00",
+          "status": "SCHEDULED",
+          "note": "Lịch phân ca mẫu",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
         }
       ]
     },
@@ -12362,6 +17837,29 @@ const seedData = {
         }
       ],
       "documents": [
+        {
+          "_id": {
+            "$oid": "6289798d94cab45fdbee748e"
+          },
+          "weekStart": {
+            "$date": {
+              "$numberLong": "1794787200000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "startTime": "15:00",
+          "endTime": "22:30",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
         {
           "_id": {
             "$oid": "6af8851f4e21b1dc3c7decf6"
@@ -12439,6 +17937,75 @@ const seedData = {
           "__v": {
             "$numberInt": "0"
           }
+        },
+        {
+          "_id": {
+            "$oid": "86bc4942711693768d2ffadf"
+          },
+          "weekStart": {
+            "$date": {
+              "$numberLong": "1795392000000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "startTime": "07:00",
+          "endTime": "15:00",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "c12404a1fdd456d5151ee060"
+          },
+          "weekStart": {
+            "$date": {
+              "$numberLong": "1795392000000"
+            }
+          },
+          "shiftName": "Ca tối",
+          "startTime": "15:00",
+          "endTime": "22:30",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "ee3db81af94f064e1d4967b1"
+          },
+          "weekStart": {
+            "$date": {
+              "$numberLong": "1794787200000"
+            }
+          },
+          "shiftName": "Ca sáng",
+          "startTime": "07:00",
+          "endTime": "15:00",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794686733611"
+            }
+          }
         }
       ]
     }
@@ -12483,8 +18050,9 @@ async function importData() {
   if (process.env.NODE_ENV === 'production' || process.env.ALLOW_DESTRUCTIVE_SEED !== 'true') {
     throw new Error('Local seed requires ALLOW_DESTRUCTIVE_SEED=true and replaces the embedded seed collections.');
   }
-  const password = process.env.SEED_USER_PASSWORD || 'AuraCafe123!';
-  const invalidPassword = passwordError(password);
+  const password = process.env.SEED_USER_PASSWORD || '123456';
+  // The shared local demo account uses a simple password; normal account policy is unchanged.
+  const invalidPassword = password === '123456' ? null : passwordError(password);
   if (invalidPassword) throw new Error(`SEED_USER_PASSWORD: ${invalidPassword}`);
   const snapshot = getSnapshot();
   if (snapshot.formatVersion !== 1 || !Array.isArray(snapshot.collections) || !snapshot.collections.some(item => item.name === 'users')) throw new Error('Invalid seed snapshot.');
@@ -12515,7 +18083,7 @@ async function importData() {
   }
   // OTPs and reset tokens are short-lived secrets and cannot be seeded.
   await db.collection('passwordrecoveries').deleteMany({});
-  console.log('Seed restored. Existing live database passwords were not exported; seeded accounts use SEED_USER_PASSWORD (default: AuraCafe123!).');
+  console.log('Seed restored. Existing live database passwords were not exported; seeded accounts use SEED_USER_PASSWORD (default: 123456).');
 }
 
 async function mergeData() {
@@ -12525,7 +18093,9 @@ async function mergeData() {
   const parsed = new URL(uri);
   if (!['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)) throw new Error('Additive seed is restricted to a local development database.');
   await mongoose.connect(uri, { serverSelectionTimeoutMS: 8000, autoCreate: false, autoIndex: false });
-  const result = await mergeSnapshot(mongoose.connection.db, supplementSnapshot(getSnapshot()), {
+  const result = await mergeSnapshot(mongoose.connection.db, supplementSnapshot(getSnapshot(), {
+    staffSchedulesOnly: process.argv.includes('--staff-schedules')
+  }), {
     dryRun: process.argv.includes('--dry-run')
   });
   console.log(JSON.stringify({ database: mongoose.connection.name, ...result }, null, 2));

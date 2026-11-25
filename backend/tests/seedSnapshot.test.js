@@ -53,3 +53,41 @@ test('seed restores the exported records, BSON references and indexes in an isol
     await connection.close();
   }
 });
+
+test('shared demo seed keeps stock, purchase requests and order payments coherent', () => {
+  const snapshot = require('../seed').getSnapshot();
+  const documents = name => snapshot.collections.find(item => item.name === name).documents;
+  const byId = name => new Map(documents(name).map(item => [String(item._id), item]));
+  const ingredients = byId('ingredients');
+  const users = byId('users');
+  const orders = byId('orders');
+  const schedules = byId('workschedules');
+
+  const lowStock = documents('ingredients').filter(item => item.currentStock <= item.minStockLevel);
+  assert.ok(lowStock.length >= 2);
+  assert.deepEqual(new Set(documents('restockrequests').map(item => item.status)),
+    new Set(['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'CANCELLED']));
+  for (const request of documents('restockrequests')) {
+    assert.equal(users.get(String(request.requester))?.position, 'CASHIER');
+    assert.ok(request.items.length);
+    for (const item of request.items) assert.ok(ingredients.has(String(item.ingredient)) && item.quantity > 0);
+  }
+  assert.ok(documents('purchaseorders').some(item => item.status === 'DRAFT'));
+  for (const order of documents('purchaseorders')) {
+    assert.equal(order.totalCost, order.items.reduce((total, item) => total + item.quantity * item.unitPrice, 0));
+  }
+  for (const order of documents('orders')) {
+    assert.equal(order.finalAmount, order.totalAmount - (order.discountAmount || 0) + (order.deliveryFee || 0));
+  }
+  for (const payment of documents('payments')) {
+    assert.equal(payment.amount, orders.get(String(payment.order))?.finalAmount);
+  }
+  for (const handover of documents('shifthandovers')) {
+    assert.ok(schedules.has(String(handover.schedule)));
+    assert.equal(handover.difference, handover.actualCash - handover.expectedCash);
+  }
+  for (const issue of documents('deliveryissues')) {
+    assert.ok(orders.has(String(issue.order)));
+    assert.equal(users.get(String(issue.reporter))?.position, 'SHIPPER');
+  }
+});
