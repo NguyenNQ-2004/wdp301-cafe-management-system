@@ -1,4 +1,4 @@
-import { newPurchaseLine, purchaseItemsPayload, type PurchaseLine } from '../../lib/purchaseCost';
+import { purchaseItemsPayload, type PurchaseLine } from '../../lib/purchaseCost';
 import { PurchaseLineEditor } from './PurchaseLineEditor';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -60,28 +60,26 @@ export default function AdminPurchasesPage() {
   const ingredients = data?.ingredients ?? [];
   const summary = data?.summary ?? { DRAFT: 0, ORDERED: 0, RECEIVED: 0, CANCELLED: 0 };
   const visible = filter === 'ALL' ? orders : orders.filter((order) => order.status === filter);
-  const supplierIngredients = ingredients.filter((ingredient) => ingredient.supplier?._id === supplierId);
+  const selectableIngredients = [...ingredients].sort((a, b) =>
+    Number(b.supplier?._id === supplierId) - Number(a.supplier?._id === supplierId) || a.name.localeCompare(b.name)
+  );
   const draftTotal = items.reduce((sum, item) => sum + Number(item.totalCost || 0), 0);
 
-  // K-PN: itemForIngredient — Tạo dòng nhập mặc định cho nguyên liệu.
-  const itemForIngredient = (ingredient: Ingredient): FormItem => newPurchaseLine(ingredient);
+  const emptyItem = (): FormItem => ({ ingredient: '', quantity: '', inputUnit: '', totalCost: '' });
   // K-PN: Khởi tạo lại nhà cung cấp và các dòng nguyên liệu mỗi lần mở biểu mẫu.
   // Khi lưu, giao diện gửi phiếu ở trạng thái DRAFT (Nháp / Đề xuất).
   // K-PN: openCreate — Mở biểu mẫu tạo phiếu nháp.
   const openCreate = () => {
     const firstSupplier = suppliers[0];
-    const firstIngredient = ingredients.find((ingredient) => ingredient.supplier?._id === firstSupplier?._id);
     setSupplierId(firstSupplier?._id || '');
-    setItems(firstIngredient ? [itemForIngredient(firstIngredient)] : []);
+    setItems([emptyItem()]);
     setMessage('');
     setNote('');
     setCreateOpen(true);
   };
-  // K-PN: changeSupplier — Đổi nhà cung cấp và làm mới dòng nguyên liệu tương ứng.
+  // K-PN: Đổi nhà cung cấp nhưng giữ các dòng đã nhập vì nguyên liệu có thể mua từ nhiều nguồn.
   const changeSupplier = (nextSupplierId: string) => {
-    const firstIngredient = ingredients.find((ingredient) => ingredient.supplier?._id === nextSupplierId);
     setSupplierId(nextSupplierId);
-    setItems(firstIngredient ? [itemForIngredient(firstIngredient)] : []);
   };
   // K-PN: updateItem — Cập nhật dòng nguyên liệu theo vị trí trong biểu mẫu.
   const updateItem = (index: number, patch: Partial<FormItem>) => setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
@@ -133,9 +131,10 @@ export default function AdminPurchasesPage() {
       {message && <p role="alert" className="text-rose-700">{message}</p>}
       <div className="grid gap-4 sm:grid-cols-2"><Field label="Nhà cung cấp"><select required className={inputCls} value={supplierId} onChange={(event) => changeSupplier(event.target.value)}>{suppliers.map((supplier) => <option key={supplier._id} value={supplier._id}>{supplier.name}</option>)}</select></Field>
       <Field label="Trạng thái"><input className={inputCls} value={META.DRAFT[0]} readOnly /></Field></div>
-      <p>Nhập lượng mua và tổng tiền cho từng nguyên liệu. Hệ thống tự đổi đơn vị và tính đơn giá.</p>
-      {items.map((item, index) => <PurchaseLineEditor key={index} line={item} index={index} ingredients={supplierIngredients} onChange={(patch) => updateItem(index, patch)} onRemove={items.length > 1 ? () => setItems((current) => current.filter((_, i) => i !== index)) : undefined} disabled={saving} />)}
-      <GhostButton disabled={!supplierIngredients.length} onClick={() => setItems((current) => [...current, itemForIngredient(supplierIngredients[0])])}>+ Thêm nguyên liệu</GhostButton>
+      <p>Nhập lượng mua và tổng tiền cho từng nguyên liệu. Hệ thống tự đổi đơn vị và tính đơn giá. Nhà cung cấp mặc định của nguyên liệu chỉ là gợi ý, không giới hạn nơi mua.</p>
+      {ingredients.length === 0 ? <div className="rounded-xl bg-amber-50 p-3 text-amber-800">Chưa có nguyên liệu. <button type="button" className="font-semibold underline" onClick={() => navigate('/admin/ingredients')}>Tạo nguyên liệu trước</button> khi lập phiếu nhập.</div> : null}
+      {items.map((item, index) => <PurchaseLineEditor key={index} line={item} index={index} ingredients={selectableIngredients} onChange={(patch) => updateItem(index, patch)} onRemove={items.length > 1 ? () => setItems((current) => current.filter((_, i) => i !== index)) : undefined} disabled={saving} />)}
+      <GhostButton disabled={!ingredients.length} onClick={() => setItems((current) => [...current, emptyItem()])}>+ Thêm nguyên liệu</GhostButton>
       <Field label="Ghi chú"><textarea maxLength={500} className={inputCls} value={note} onChange={(event) => setNote(event.target.value)} /></Field>
       <div className="text-right font-bold">Tổng tiền: {money(draftTotal)}</div><FormActions loading={saving} onCancel={() => setCreateOpen(false)} submitLabel={saving ? 'Đang lưu...' : 'Lưu phiếu nhập'} />
     </form></Modal> : null}

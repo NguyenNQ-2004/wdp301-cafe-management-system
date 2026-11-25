@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { shopApi } from '../../lib/shopApi';
+import { NumberInput } from '../../components/NumberInput';
+import { formatVnd, shopApi } from '../../lib/shopApi';
 import useAuthStore from '../../store/authStore';
 import StaffWorkNav from '../../components/StaffWorkNav';
 import { AdminLayout, inputCls } from './AdminUi';
@@ -10,6 +11,7 @@ type ScheduleStatus = 'SCHEDULED' | 'PRESENT' | 'ABSENT' | 'COMPLETED';
 interface Employee { _id: string; fullName: string; phone: string; position: string; status: string }
 interface Schedule { _id: string; user: Employee | null; workDate: string; shiftName: ShiftName; status: ScheduleStatus; note?: string; checkInTime?: string; checkOutTime?: string; shiftInfo?: { startTime: string; endTime: string } }
 interface Shift { code: ShiftName; name: string; startTime: string; endTime: string; historical?: boolean }
+interface CashTransferInfo { required: boolean; ready: boolean; assignedToMe: boolean; expectedCash: number | null; source: { cashier: string } | null; discrepancy: { countedCash: number; note: string; resolvedAt?: string } | null }
 interface FormState { id?: string; originalUserId?: string; userId: string; workDate: string; shiftName: ShiftName; note: string }
 
 const defaultShifts: Shift[] = [
@@ -52,6 +54,9 @@ export default function AdminSchedulesPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [form, setForm] = useState<FormState | null>(null);
+  const [cashTransfers, setCashTransfers] = useState<Record<string, CashTransferInfo>>({});
+  const [countedCash, setCountedCash] = useState<Record<string, string>>({});
+  const [cashNotes, setCashNotes] = useState<Record<string, string>>({});
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => {
     const date = fromKey(weekStart);
@@ -69,8 +74,14 @@ export default function AdminSchedulesPage() {
       isAdmin ? shopApi<Employee[]>('/api/employees', { token }) : Promise.resolve([])
     ];
     Promise.all(requests)
-      .then(([weekSchedules, shiftResponse, staff]) => {
+      .then(async ([weekSchedules, shiftResponse, staff]) => {
         if (!active) return;
+        const pendingCashiers = !isAdmin && ['CASHIER', 'MANAGER'].includes(user?.position || '')
+          ? weekSchedules.filter(schedule => schedule.status === 'SCHEDULED' && !schedule.checkInTime && schedule.workDate.slice(0, 10) === dateKey(new Date()))
+          : [];
+        const transferRows = await Promise.all(pendingCashiers.map(async schedule => [schedule._id, await shopApi<CashTransferInfo>(`/api/work-schedules/${schedule._id}/cash-transfer`, { token })] as const));
+        if (!active) return;
+        setCashTransfers(Object.fromEntries(transferRows));
         setSchedules(weekSchedules);
         const activeCodes = new Set(shiftResponse.shifts.map(shift => shift.code));
         const historical = new Map<string, Shift>();
@@ -84,7 +95,7 @@ export default function AdminSchedulesPage() {
       .catch((err: Error) => { if (active) setError(err.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [token, isAdmin, weekStart, reloadKey]);
+  }, [token, isAdmin, weekStart, reloadKey, user?.position]);
 
   const visible = useMemo(() => employeeFilter
     ? schedules.filter((schedule) => schedule.user?._id === employeeFilter)
@@ -142,6 +153,34 @@ export default function AdminSchedulesPage() {
     } catch (err) { setError((err as Error).message); }
     finally { setBusy(false); }
   };
+  const reportCashDiscrepancy = async (schedule: Schedule) => {
+    if (!token || busy) return;
+    const counted = countedCash[schedule._id] ?? '';
+    const note = cashNotes[schedule._id]?.trim() || '';
+    if (!/^\d+$/.test(counted) || !Number.isSafeInteger(Number(counted)) || !note) {
+      setError('Nhập số tiền thực đếm và lý do chênh lệch.');
+      return;
+    }
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const result = await shopApi<{ message: string }>(`/api/work-schedules/${schedule._id}/cash-discrepancy`, { method: 'POST', token, body: { countedCash: Number(counted), note } });
+      setNotice(result.message);
+      setReloadKey(key => key + 1);
+    } catch (err) { setError((err as Error).message); }
+    finally { setBusy(false); }
+  };
+  const acceptCashTransfer = async (schedule: Schedule) => {
+    if (!token || busy) return;
+    const counted = countedCash[schedule._id] ?? '';
+    if (!/^\d+$/.test(counted) || !Number.isSafeInteger(Number(counted))) { setError('Hãy nhập số tiền thực đếm.'); return; }
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const result = await shopApi<{ message: string }>(`/api/work-schedules/${schedule._id}/accept-cash-transfer`, { method: 'POST', token, body: { countedCash: Number(counted) } });
+      setNotice(result.message);
+      setReloadKey(key => key + 1);
+    } catch (err) { setError((err as Error).message); }
+    finally { setBusy(false); }
+  };
   const removeUnstartedSchedules = async () => {
     if (!isAdmin || !token || loading || busy || !removableSchedules.length) return;
     const targets = [...removableSchedules];
@@ -181,11 +220,30 @@ export default function AdminSchedulesPage() {
         <button type="button" onClick={() => setWeekStart(moveWeek(weekStart, -1))} className="rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold">← Tuần trước</button>
         <button type="button" onClick={() => setWeekStart(dateKey(mondayOf(new Date())))} className="rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold">Tuần này</button>
         <button type="button" onClick={() => setWeekStart(moveWeek(weekStart, 1))} className="rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold">Tuần sau →</button>
+        {!isAdmin && <button type="button" onClick={() => setReloadKey(key => key + 1)} className="rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold">Làm mới</button>}
       </div>
     </div>
 
     {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>}
     {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{notice}</p>}
+
+    {!isAdmin && schedules.filter(schedule => cashTransfers[schedule._id]?.required).map(schedule => {
+      const transfer = cashTransfers[schedule._id];
+      return <section key={schedule._id} className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+        <h2 className="font-bold">Đối chiếu két trước khi vào ca</h2>
+        <p className="mt-1">{transfer.source?.cashier} đã chốt {formatVnd(transfer.expectedCash || 0)}. {!transfer.ready ? 'Chờ Admin ghi nhận người trước ra ca.' : !transfer.assignedToMe ? 'Chờ thu ngân trước chọn bạn làm người nhận két.' : 'Hãy tự đếm tiền, xác nhận nhận két để vào ca. Admin sẽ thấy kết quả đối chiếu.'}</p>
+        {transfer.discrepancy && !transfer.discrepancy.resolvedAt && <p className="mt-2 font-semibold">Đã báo Admin: thực đếm {formatVnd(transfer.discrepancy.countedCash)} · {transfer.discrepancy.note}</p>}
+        {transfer.ready && transfer.assignedToMe && <div className="mt-3 flex flex-wrap items-end gap-2">
+          <label className="text-xs font-semibold">Tiền thực đếm (đ)<NumberInput type="number" min="0" step="1" value={countedCash[schedule._id] ?? ''} onChange={event => setCountedCash(current => ({ ...current, [schedule._id]: event.target.value }))} className="mt-1 block w-40 rounded-lg border border-amber-200 bg-white p-2" /></label>
+          {countedCash[schedule._id] !== undefined && /^\d+$/.test(countedCash[schedule._id]) && Number(countedCash[schedule._id]) === transfer.expectedCash
+            ? <button type="button" disabled={busy} onClick={() => void acceptCashTransfer(schedule)} className="rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">Xác nhận nhận két và vào ca</button>
+            : countedCash[schedule._id] !== undefined && /^\d+$/.test(countedCash[schedule._id]) && <>
+              <label className="text-xs font-semibold">Ghi chú chênh lệch<input value={cashNotes[schedule._id] ?? ''} maxLength={500} onChange={event => setCashNotes(current => ({ ...current, [schedule._id]: event.target.value }))} className="mt-1 block w-72 rounded-lg border border-amber-200 bg-white p-2" /></label>
+              <button type="button" disabled={busy} onClick={() => void reportCashDiscrepancy(schedule)} className="rounded-lg bg-amber-800 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">Báo chênh lệch cho {transfer.source?.cashier || 'thu ngân giao két'} và Admin</button>
+            </>}
+        </div>}
+      </section>;
+    })}
 
     {isAdmin && form && <form onSubmit={save} className="rounded-2xl border border-stone-200 bg-white p-5">
       <h2 className="text-lg font-bold text-stone-900">{form.id ? 'Sửa phân ca' : 'Phân ca mới'}</h2>

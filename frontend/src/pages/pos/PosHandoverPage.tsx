@@ -10,6 +10,8 @@ import './PosHandoverPage.css';
 
 interface Cashier { _id: string; fullName: string; phone: string; position: string }
 interface CodRemittance { _id: string; user: Cashier; endingCashSystem: number; endingCashActual: number; checkOutTime?: string; note?: string }
+interface CashTransferEvent { _id: string; user?: Cashier; startingCash?: number; cashTransferExpectedCash?: number; cashTransferAcceptedAt?: string; cashTransferDiscrepancy?: { expectedCash: number; countedCash: number; note: string; resolvedAt?: string } }
+interface CashReceiver { _id: string; user: Cashier; workDate: string; shiftName: string }
 interface ShiftInfo { code: string; name: string; startTime: string; endTime: string }
 interface ShiftRecord {
   _id: string;
@@ -38,6 +40,7 @@ interface HandoverSummary {
     BANK_TRANSFER: PaymentMethodSummary;
     VNPAY: PaymentMethodSummary;
     MOMO: PaymentMethodSummary;
+    COD: PaymentMethodSummary;
   };
 }
 interface HandoverDetail {
@@ -95,7 +98,6 @@ const shiftStatusClasses: Record<string, string> = {
   'Vắng mặt': 'bg-red-50 text-red-700 border-red-200',
   'Chưa vào ca': 'bg-slate-100 text-slate-600 border-slate-200'
 };
-const SYNC_INTERVAL_MS = 30000;
 const validMoney = (value: string) => /^\d+$/.test(value) && Number.isSafeInteger(Number(value));
 
 export default function PosHandoverPage() {
@@ -125,17 +127,12 @@ export default function PosHandoverPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [pendingCod, setPendingCod] = useState<CodRemittance[]>([]);
+  const [cashTransferEvents, setCashTransferEvents] = useState<CashTransferEvent[]>([]);
+  const [cashReceivers, setCashReceivers] = useState<CashReceiver[]>([]);
+  const [selectedCashReceiver, setSelectedCashReceiver] = useState('');
+  const [selectedReceiverName, setSelectedReceiverName] = useState('');
   const [codCash, setCodCash] = useState<Record<string, string>>({});
   const [codNote, setCodNote] = useState<Record<string, string>>({});
-
-  // Admin changes attendance elsewhere: re-read shifts periodically and when the tab regains focus.
-  useEffect(() => {
-    const sync = () => { if (document.visibilityState === 'visible') setReloadKey(key => key + 1); };
-    const timer = window.setInterval(sync, SYNC_INTERVAL_MS);
-    document.addEventListener('visibilitychange', sync);
-    window.addEventListener('focus', sync);
-    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', sync); window.removeEventListener('focus', sync); };
-  }, []);
 
   useEffect(() => {
     if (!token || !canConfirm) return;
@@ -143,6 +140,35 @@ export default function PosHandoverPage() {
     shopApi<CodRemittance[]>('/api/work-schedules/cod-remittances', { token })
       .then(rows => { if (active) setPendingCod(rows); })
       .catch((err: Error) => { if (active) setError(err.message); });
+    return () => { active = false; };
+  }, [token, canConfirm, reloadKey]);
+
+  useEffect(() => {
+    if (!token || !canConfirm || !detail?.handedOver || !detail.schedule.checkOutTime || detail.schedule.user?._id !== user?._id) { setCashReceivers([]); return; }
+    let active = true;
+    shopApi<{ selectedId: string | null; selectedReceiver?: { user?: Cashier; status: string }; candidates: CashReceiver[] }>(`/api/work-schedules/${detail.schedule._id}/cash-receivers`, { token })
+      .then(result => { if (active) { setCashReceivers(result.candidates); setSelectedCashReceiver(result.selectedId || ''); setSelectedReceiverName(result.selectedReceiver?.user?.fullName || ''); } })
+      .catch(() => { if (active) setCashReceivers([]); });
+    return () => { active = false; };
+  }, [token, canConfirm, detail?.schedule._id, detail?.handedOver, detail?.schedule.checkOutTime, detail?.schedule.user?._id, user?._id, reloadKey]);
+
+  const assignCashReceiver = async () => {
+    if (!token || !detail || !selectedCashReceiver || busy) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const result = await shopApi<{ message: string }>(`/api/work-schedules/${detail.schedule._id}/assign-cash-receiver`, { method: 'POST', token, body: { receiverScheduleId: selectedCashReceiver } });
+      setNotice(result.message);
+      setReloadKey(key => key + 1);
+    } catch (err) { setError((err as Error).message); }
+    finally { setBusy(false); }
+  };
+
+  useEffect(() => {
+    if (!token || !canConfirm) return;
+    let active = true;
+    shopApi<CashTransferEvent[]>('/api/work-schedules/cash-transfer-events', { token })
+      .then(rows => { if (active) setCashTransferEvents(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (active) setCashTransferEvents([]); });
     return () => { active = false; };
   }, [token, canConfirm, reloadKey]);
 
@@ -264,14 +290,18 @@ export default function PosHandoverPage() {
   // Breakdown numbers from detail.summary or fallback to cashRevenue
   const cashSales = detail?.summary?.cashSales ?? detail?.cashRevenue ?? 0;
   const nonCashSales = detail?.summary?.nonCashSales ?? 0;
-  const totalSales = detail?.summary?.totalSales ?? (cashSales + nonCashSales);
+  const totalSales = detail?.summary?.totalSales ?? (cashSales + nonCashSales + (detail?.codReceipts ?? 0));
+  const cashCollected = cashSales + (detail?.codReceipts ?? 0);
   const orderCount = detail?.summary?.successfulOrderCount ?? detail?.paymentCount ?? 0;
   const methods = detail?.summary?.methods ?? {
     CASH: { count: detail?.paymentCount ?? 0, sales: cashSales },
     BANK_TRANSFER: { count: 0, sales: 0 },
     VNPAY: { count: 0, sales: 0 },
-    MOMO: { count: 0, sales: 0 }
+    MOMO: { count: 0, sales: 0 },
+    COD: { count: 0, sales: detail?.codReceipts ?? 0 }
   };
+  const qrSales = methods.BANK_TRANSFER.sales;
+  const otherNonCashSales = nonCashSales - qrSales;
   const detailStatus = detail ? getShiftStatusLabel(detail.schedule) : '';
 
   return (
@@ -296,6 +326,27 @@ export default function PosHandoverPage() {
             <span>{notice}</span>
           </div>
         )}
+
+        {canConfirm && detail?.handedOver && detail.schedule.checkOutTime && detail.schedule.user?._id === user?._id && <section className="rounded-2xl border border-blue-200 bg-white p-4 text-sm">
+          <h2 className="font-bold text-slate-900">Giao két cho thu ngân kế tiếp</h2>
+          <p className="mt-1 text-slate-600">Bạn đã chốt {formatVnd(detail.actualCash || 0)}. Chỉ người được chọn mới có thể đếm và xác nhận nhận két trên tài khoản của mình.</p>
+          {selectedReceiverName && <p className="mt-2 font-semibold text-blue-800">Đã chỉ định {selectedReceiverName} nhận két.</p>}
+          {cashReceivers.length ? <div className="mt-3 flex flex-wrap items-center gap-2">
+            <select aria-label="Thu ngân nhận két" value={selectedCashReceiver} onChange={event => setSelectedCashReceiver(event.target.value)} className="rounded-lg border border-slate-200 p-2">
+              <option value="">Chọn người nhận</option>
+              {cashReceivers.map(row => <option key={row._id} value={row._id}>{row.user.fullName} · {displayDay(row.workDate)} · {row.shiftName}</option>)}
+            </select>
+            <button type="button" disabled={busy || !selectedCashReceiver} onClick={() => void assignCashReceiver()} className="rounded-lg bg-primary px-4 py-2 font-bold text-white disabled:opacity-50">Gửi yêu cầu nhận két</button>
+          </div> : !selectedReceiverName && <p className="mt-2 text-amber-800">Chưa có thu ngân kế tiếp được phân ca. Admin cần phân ca trước.</p>}
+        </section>}
+
+        {cashTransferEvents.length > 0 && <section className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+          <h2 className="font-bold">Kết quả nhận két của thu ngân kế tiếp</h2>
+          <div className="mt-2 space-y-1">{cashTransferEvents.slice(0, 5).map(row => {
+            const discrepancy = row.cashTransferDiscrepancy && !row.cashTransferDiscrepancy.resolvedAt ? row.cashTransferDiscrepancy : null;
+            return <p key={row._id}>{row.user?.fullName || 'Thu ngân kế tiếp'}: {discrepancy ? `báo chênh lệch, đếm ${formatVnd(discrepancy.countedCash)} so với ${formatVnd(discrepancy.expectedCash)}. ${discrepancy.note}` : `đã nhận khớp ${formatVnd(row.startingCash ?? row.cashTransferExpectedCash ?? 0)}.${row.cashTransferDiscrepancy?.resolvedAt ? ` Trước đó báo chênh lệch: đếm ${formatVnd(row.cashTransferDiscrepancy.countedCash)}. ${row.cashTransferDiscrepancy.note}` : ''}`}</p>;
+          })}</div>
+        </section>}
 
         {canConfirm && pendingCod.length > 0 && (
           <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-3">
@@ -443,10 +494,29 @@ export default function PosHandoverPage() {
                         <h3 className="text-base font-extrabold text-slate-900">Doanh thu theo phương thức thanh toán</h3>
                       </div>
 
-                      {/* Big Highlight Revenue Banner */}
-                      <div className="rounded-xl bg-gradient-to-br from-red-50 to-orange-50 border border-red-100 p-5 text-center">
-                        <div className="text-xs font-bold uppercase tracking-wider text-primary">TỔNG DOANH THU ĐÃ THU</div>
-                        <div className="mt-1 text-3xl font-black text-primary">{formatVnd(totalSales)}</div>
+                      {/* Keep cash in the drawer separate from bank transfers. */}
+                      <div className="space-y-3">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                            <div className="text-xs font-bold text-emerald-800">Tiền mặt thu trong ca (gồm COD)</div>
+                            <div className="mt-1 text-2xl font-black text-emerald-800">{formatVnd(cashCollected)}</div>
+                            <div className="mt-1 text-xs text-emerald-700">Chưa cộng tiền két đầu ca</div>
+                          </div>
+                          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                            <div className="text-xs font-bold text-blue-800">Chuyển khoản QR</div>
+                            <div className="mt-1 text-2xl font-black text-blue-800">{formatVnd(qrSales)}</div>
+                            <div className="mt-1 text-xs text-blue-700">Vào tài khoản ngân hàng, không vào két</div>
+                          </div>
+                        </div>
+                        {otherNonCashSales > 0 && (
+                          <div className="flex justify-between rounded-lg bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
+                            <span>Thanh toán không tiền mặt khác</span><span>{formatVnd(otherNonCashSales)}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between rounded-xl border border-red-100 bg-red-50 px-4 py-3">
+                          <span className="text-xs font-bold uppercase tracking-wider text-primary">Tổng đã thu trong ca</span>
+                          <strong className="text-xl font-black text-primary">{formatVnd(totalSales)}</strong>
+                        </div>
                       </div>
 
                       {/* Payment Breakdown Table */}
@@ -490,6 +560,14 @@ export default function PosHandoverPage() {
                             </td>
                             <td className="py-3 text-center font-bold text-slate-600">{methods.MOMO.count}</td>
                             <td className="py-3 text-right font-extrabold text-slate-800">{formatVnd(methods.MOMO.sales)}</td>
+                          </tr>
+                          <tr>
+                            <td className="py-3 flex items-center gap-2 font-semibold text-slate-700">
+                              <span className="material-symbols-outlined text-amber-600 text-[18px]">local_shipping</span>
+                              <span>COD shipper nộp</span>
+                            </td>
+                            <td className="py-3 text-center font-bold text-slate-600">{methods.COD.count}</td>
+                            <td className="py-3 text-right font-extrabold text-slate-800">{formatVnd(methods.COD.sales)}</td>
                           </tr>
                         </tbody>
                       </table>
@@ -786,12 +864,13 @@ export default function PosHandoverPage() {
                         <strong className="mt-1 block text-base font-extrabold text-emerald-700">{formatVnd(detail.codReceipts || 0)}</strong>
                       </div>
                       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">DOANH THU KHÔNG TIỀN MẶT</span>
-                        <strong className="mt-1 block text-base font-extrabold text-blue-700">{formatVnd(nonCashSales)}</strong>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">CHUYỂN KHOẢN QR</span>
+                        <strong className="mt-1 block text-base font-extrabold text-blue-700">{formatVnd(qrSales)}</strong>
                       </div>
                       <div className="rounded-xl border border-red-100 bg-red-50/50 p-4 shadow-2xs">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-primary block">TỔNG DOANH THU</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-primary block">TỔNG ĐÃ THU (GỒM COD)</span>
                         <strong className="mt-1 block text-base font-black text-primary">{formatVnd(totalSales)}</strong>
+                        <span className="mt-1 block text-[10px] font-semibold text-primary">{formatVnd(cashCollected)} tiền mặt · {formatVnd(qrSales)} QR{otherNonCashSales > 0 ? ` · ${formatVnd(otherNonCashSales)} khác` : ''}</span>
                       </div>
                       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs col-span-2 sm:col-span-1">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">ĐƠN HOÀN THÀNH</span>
@@ -868,6 +947,14 @@ export default function PosHandoverPage() {
                                 <td className="py-2.5 text-center text-slate-500">{methods.MOMO.count} giao dịch</td>
                                 <td className="py-2.5 text-right font-extrabold text-slate-800">{formatVnd(methods.MOMO.sales)}</td>
                               </tr>
+                              <tr className="py-2.5">
+                                <td className="py-2.5 font-semibold text-slate-700 flex items-center gap-1.5">
+                                  <span className="material-symbols-outlined text-amber-600 text-[16px]">local_shipping</span>
+                                  <span>COD shipper nộp</span>
+                                </td>
+                                <td className="py-2.5 text-center text-slate-500">{methods.COD.count} đơn</td>
+                                <td className="py-2.5 text-right font-extrabold text-slate-800">{formatVnd(methods.COD.sales)}</td>
+                              </tr>
                             </tbody>
                           </table>
                         </div>
@@ -913,6 +1000,8 @@ export default function PosHandoverPage() {
                             <div className="flex justify-between"><span>Tiền đầu ca</span><strong>{formatVnd(detail.openingCash || 0)}</strong></div>
                             <div className="flex justify-between"><span>Thu tiền mặt ({methods.CASH.count})</span><strong>{formatVnd(cashSales)}</strong></div>
                             <div className="flex justify-between"><span>Nhận COD từ shipper</span><strong>{formatVnd(detail.codReceipts || 0)}</strong></div>
+                            <div className="flex justify-between"><span>Chuyển khoản QR (ngoài két)</span><strong>{formatVnd(qrSales)}</strong></div>
+                            {otherNonCashSales > 0 && <div className="flex justify-between"><span>Không tiền mặt khác (ngoài két)</span><strong>{formatVnd(otherNonCashSales)}</strong></div>}
                             <div className="flex justify-between"><span>Hoàn tiền mặt</span><strong>−{formatVnd(detail.cashRefunds || 0)}</strong></div>
                             <div className="flex justify-between"><span>Theo hệ thống</span><strong>{formatVnd(detail.expectedCash || 0)}</strong></div>
                             <div className="flex justify-between"><span>Thực tế trong két</span><strong>{formatVnd(detail.actualCash || 0)}</strong></div>

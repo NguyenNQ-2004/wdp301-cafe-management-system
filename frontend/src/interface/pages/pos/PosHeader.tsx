@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { PageRoute } from '../../types';
 import { useDb } from '../../data/DbContext';
-import { POSITION_LABEL, SHIFT_LABEL, initials, shiftTimeRange } from '../../data/dbUtils';
+import { POSITION_LABEL, SHIFT_LABEL, fmtDate, initials, shiftTimeRange } from '../../data/dbUtils';
 
 import useAuthStore from '../../../store/authStore';
 
@@ -46,7 +46,9 @@ export const PosHeader: React.FC<PosHeaderProps> = ({ currentRoute, onNavigate }
               <span className="material-symbols-outlined text-[15px] text-primary">schedule</span>
               {schedule ? (
                 <span className="font-semibold">
-                  {SHIFT_LABEL[schedule.shift_name]} ({shiftTimeRange(db, schedule.shift_name)}) • {schedule.work_date}
+                  {SHIFT_LABEL[schedule.shift_name] || schedule.shift_name}
+                  {shiftTimeRange(db, schedule.shift_name) ? ` (${shiftTimeRange(db, schedule.shift_name)})` : ''}
+                  {' • '}{fmtDate(schedule.work_date)}
                 </span>
               ) : (
                 <span className="font-semibold text-amber-700">Chưa vào ca</span>

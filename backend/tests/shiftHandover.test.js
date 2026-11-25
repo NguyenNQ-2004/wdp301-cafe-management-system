@@ -48,6 +48,7 @@ test('UC27 reconciles only cashier cash payments and saves one printable snapsho
   const admin = await User.create({ fullName: 'Admin', phone: '0999000061', email: 'test-0999000061@example.com', passwordHash: hash, role: 'ADMIN' });
   const cashierA = await User.create({ fullName: 'Cashier A', phone: '0999000062', email: 'test-0999000062@example.com', passwordHash: hash, role: 'STAFF', position: 'CASHIER' });
   const cashierB = await User.create({ fullName: 'Cashier B', phone: '0999000063', email: 'test-0999000063@example.com', passwordHash: hash, role: 'STAFF', position: 'CASHIER' });
+  const shipper = await User.create({ fullName: 'Shipper', phone: '0999000066', email: 'test-0999000066@example.com', passwordHash: hash, role: 'STAFF', position: 'SHIPPER' });
   const barista = await User.create({ fullName: 'Barista', phone: '0999000064', email: 'test-0999000064@example.com', passwordHash: hash, role: 'STAFF', position: 'BARISTA' });
   const customer = await User.create({ fullName: 'Customer', phone: '0999000065', email: 'test-0999000065@example.com', passwordHash: hash, role: 'CUSTOMER' });
   const tokenFor = async (user) => (await request('POST', '/api/auth/login', { email: user.email, password: 'test-password' })).data.token;
@@ -75,6 +76,9 @@ test('UC27 reconciles only cashier cash payments and saves one printable snapsho
   assert.equal((await request('POST', `/api/payments/${bankA._id}/counter-confirm`, { paymentMethod: 'BANK_TRANSFER', transactionCode: 'BANK-UC27' }, aToken)).status, 409);
   await Payment.create({ order: (await makeOrder('UC27-OLD', 7000))._id, paymentMethod: 'CASH', amount: 7000, status: 'SUCCESS', paidAt: new Date() });
   await Payment.create({ order: (await makeOrder('UC27-ONLINE', 90000, 'ONLINE'))._id, paymentMethod: 'CASH', amount: 90000, status: 'SUCCESS', paidAt: new Date(), receivedBy: cashierA._id });
+  await Payment.create({ order: (await makeOrder('UC27-SEPAY', 23000))._id, paymentMethod: 'BANK_TRANSFER', amount: 23000, status: 'SUCCESS', paidAt: new Date() });
+  const codPayment = await Payment.create({ order: (await makeOrder('UC27-COD', 73000, 'ONLINE'))._id, paymentMethod: 'CASH', amount: 73000, status: 'SUCCESS', paidAt: new Date(), receivedBy: shipper._id });
+  await WorkSchedule.create({ user: shipper._id, workDate: new Date(today), shiftName: 'MORNING', status: 'COMPLETED', codPaymentIds: [codPayment._id], codReceivedAmount: 73000, codReceivedAt: new Date(), codReceivedBy: cashierA._id, codReceivingSchedule: shiftA._id });
 
   const end = new Date();
   await WorkSchedule.updateMany({ _id: { $in: [shiftA._id, shiftB._id] } }, { $set: { status: 'COMPLETED', checkOutTime: end } });
@@ -94,16 +98,26 @@ test('UC27 reconciles only cashier cash payments and saves one printable snapsho
   assert.equal(preview.data.openingCash, 100000);
   assert.equal(preview.data.cashRevenue, 50000);
   assert.equal(preview.data.paymentCount, 1);
+  assert.equal(preview.data.summary.methods.BANK_TRANSFER.sales, 23000);
+  assert.equal(preview.data.summary.methods.BANK_TRANSFER.count, 1);
+  assert.equal(preview.data.summary.nonCashSales, 23000);
+  assert.equal(preview.data.codReceipts, 73000);
+  assert.equal(preview.data.summary.methods.COD.count, 1);
+  assert.equal(preview.data.summary.methods.COD.sales, 73000);
+  assert.equal(preview.data.summary.totalSales, 146000);
   assert.equal(preview.data.unattributedCash, 7000);
-  assert.equal(preview.data.expectedCash, 150000);
+  assert.equal(preview.data.expectedCash, 223000);
+  const otherCashierPreview = await request('GET', `/api/shift-handovers/${shiftB._id}`, null, bToken);
+  assert.equal(otherCashierPreview.data.summary.methods.BANK_TRANSFER.sales, 0);
   assert.equal((await request('POST', `/api/shift-handovers/${shiftA._id}/confirm`, { actualCash: -1 }, aToken)).status, 400);
-  assert.equal((await request('POST', `/api/shift-handovers/${shiftA._id}/confirm`, { actualCash: 149000, openingCash: 0 }, aToken)).status, 400);
-  assert.equal((await request('POST', `/api/shift-handovers/${shiftA._id}/confirm`, { actualCash: 149000 }, aToken)).status, 400);
-  const closed = await request('POST', `/api/shift-handovers/${shiftA._id}/confirm`, { actualCash: 149000, note: 'Thiếu 1.000đ' }, aToken);
+  assert.equal((await request('POST', `/api/shift-handovers/${shiftA._id}/confirm`, { actualCash: 222000, openingCash: 0 }, aToken)).status, 400);
+  assert.equal((await request('POST', `/api/shift-handovers/${shiftA._id}/confirm`, { actualCash: 222000 }, aToken)).status, 400);
+  const closed = await request('POST', `/api/shift-handovers/${shiftA._id}/confirm`, { actualCash: 222000, note: 'Thiếu 1.000đ' }, aToken);
   assert.equal(closed.status, 200);
   assert.equal(closed.data.difference, -1000);
   assert.equal(closed.data.handedOver, true);
   assert.ok(closed.data.handoverAt);
+  assert.equal(closed.data.summary.totalSales, 146000);
   assert.equal((await request('POST', `/api/shift-handovers/${shiftA._id}/confirm`, { actualCash: 150000 }, aToken)).status, 409);
   await Payment.create({ order: (await makeOrder('UC27-LATE', 10000))._id, paymentMethod: 'CASH', amount: 10000, status: 'SUCCESS', paidAt: new Date(start.getTime() + 1000), receivedBy: cashierA._id });
   const saved = await request('GET', `/api/shift-handovers/${shiftA._id}`, null, adminToken);

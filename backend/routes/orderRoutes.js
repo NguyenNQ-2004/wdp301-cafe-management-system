@@ -341,7 +341,7 @@ router.post('/', async (req, res) => {
       amount: finalAmount,
       status: 'PENDING',
       paymentNote: finalPaymentMethod === 'DEMO_ONLINE' ? 'Giao dịch mô phỏng, không thu tiền thật' : orderType === 'ONLINE' ? 'Đơn đặt online' : 'Thanh toán tại quầy',
-      ...(finalPaymentMethod === 'BANK_TRANSFER' ? orderType === 'ONLINE'
+      ...(finalPaymentMethod === 'BANK_TRANSFER' ? orderType === 'ONLINE' || paymentGateway.enabled()
         ? { confirmationMode: 'GATEWAY', transactionCode: `QR-${randomBytes(12).toString('hex').toUpperCase()}` }
         : { confirmationMode: 'CASHIER' } : {})
     });

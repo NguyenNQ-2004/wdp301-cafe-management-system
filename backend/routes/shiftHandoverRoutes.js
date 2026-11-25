@@ -37,7 +37,8 @@ const cashLedger = async (schedule) => {
     CASH: { count: 0, sales: 0 },
     BANK_TRANSFER: { count: 0, sales: 0 },
     VNPAY: { count: 0, sales: 0 },
-    MOMO: { count: 0, sales: 0 }
+    MOMO: { count: 0, sales: 0 },
+    COD: { count: 0, sales: 0 }
   };
   const result = {
     cashRevenue: 0,
@@ -55,8 +56,12 @@ const cashLedger = async (schedule) => {
   for (const payment of payments) {
     if (!payment.order || !['TAKEAWAY', 'DINE_IN'].includes(payment.order.orderType)) continue;
     if (!Number.isSafeInteger(payment.amount) || payment.amount < 0) throw Object.assign(new Error('Có giao dịch tiền mặt không hợp lệ; cần kiểm tra trước khi bàn giao.'), { status: 409 });
+    // Cash belongs to its collector. A gateway transfer has no collector, so
+    // attribute it to the cashier who created the counter order in this shift.
     // A later refund does not remove the original physical cash receipt.
-    const isShiftUser = String(payment.receivedBy) === String(schedule.user);
+    const isShiftUser = payment.paymentMethod === 'CASH' || payment.receivedBy
+      ? String(payment.receivedBy) === String(schedule.user)
+      : String(payment.order.cashier) === String(schedule.user);
     if (isShiftUser) {
       orderIds.add(String(payment.order._id || payment.order));
       const methodKey = ['CASH', 'BANK_TRANSFER', 'VNPAY', 'MOMO'].includes(payment.paymentMethod) ? payment.paymentMethod : 'CASH';
@@ -78,9 +83,13 @@ const cashLedger = async (schedule) => {
   const refunds = await Payment.find({ status: 'REFUNDED', refundMethod: 'CASH', refundSchedule: schedule._id }).select('refundAmount');
   result.cashRefunds = refunds.reduce((sum, payment) => sum + payment.refundAmount, 0);
   if (!Number.isSafeInteger(result.cashRefunds) || result.cashRefunds < 0) throw Object.assign(new Error('Số tiền hoàn trong ca không hợp lệ.'), { status: 409 });
-  const codShifts = await WorkSchedule.find({ codReceivingSchedule: schedule._id, codReceivedBy: schedule.user, codReceivedAt: { $gte: startTime, $lte: endTime } }).select('codReceivedAmount');
+  const codShifts = await WorkSchedule.find({ codReceivingSchedule: schedule._id, codReceivedBy: schedule.user, codReceivedAt: { $gte: startTime, $lte: endTime } }).select('codReceivedAmount codPaymentIds');
   result.codReceipts = codShifts.reduce((total, shift) => total + shift.codReceivedAmount, 0);
   if (!Number.isSafeInteger(result.codReceipts) || result.codReceipts < 0) throw Object.assign(new Error('Tiền COD nhận trong ca không hợp lệ.'), { status: 409 });
+  methods.COD.sales = result.codReceipts;
+  methods.COD.count = codShifts.reduce((count, shift) => count + (shift.codPaymentIds?.length || (shift.codReceivedAmount > 0 ? 1 : 0)), 0);
+  result.totalSales += result.codReceipts;
+  result.orderCount += methods.COD.count;
   if (!Number.isSafeInteger(result.cashRevenue) || !Number.isSafeInteger(result.unattributedCash)) throw Object.assign(new Error('Tổng giao dịch tiền mặt vượt giới hạn cho phép.'), { status: 409 });
   return result;
 };
@@ -127,13 +136,14 @@ const detail = (schedule, ledger, handover = null) => {
       codReceipts,
       paymentCount: saved ? schedule.handoverPaymentCount : ledger?.paymentCount ?? 0,
       nonCashSales: ledger?.nonCashSales ?? 0,
-      totalSales: (saved ? schedule.handoverCashSales : (ledger?.cashRevenue ?? 0)) + (ledger?.nonCashSales ?? 0),
+      totalSales: (saved ? schedule.handoverCashSales : (ledger?.cashRevenue ?? 0)) + (ledger?.nonCashSales ?? 0) + codReceipts,
       successfulOrderCount: ledger?.orderCount ?? (saved ? schedule.handoverPaymentCount : 0),
       methods: ledger?.methods ?? {
         CASH: { count: saved ? schedule.handoverPaymentCount : 0, sales: cashRevenue },
         BANK_TRANSFER: { count: 0, sales: 0 },
         VNPAY: { count: 0, sales: 0 },
-        MOMO: { count: 0, sales: 0 }
+        MOMO: { count: 0, sales: 0 },
+        COD: { count: 0, sales: codReceipts }
       }
     }
   };

@@ -48,6 +48,19 @@ const handleError = (error, res) => {
 const populateUser = (query) => query.populate('user', 'fullName phone position status').sort({ workDate: 1, shiftName: 1 });
 const vietnamDay = (date) => new Date(date.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
 const getShiftTime = resolveShift;
+const cashHandoverQuery = (schedule, now) => ({
+  _id: { $ne: schedule._id },
+  workDate: { $lte: schedule.workDate },
+  handoverAt: { $exists: true, $lte: now },
+  endingCashActual: { $gte: 0 }
+});
+const latestCashHandover = async (schedule, now = new Date()) => {
+  const fields = 'user workDate shiftName status handoverAt checkOutTime endingCashActual cashTransferTo';
+  const assigned = await WorkSchedule.findOne({ ...cashHandoverQuery(schedule, now), cashTransferTo: schedule._id })
+    .select(fields).populate('user', 'fullName phone position').sort({ handoverAt: -1 });
+  return assigned || WorkSchedule.findOne(cashHandoverQuery(schedule, now))
+    .select(fields).populate('user', 'fullName phone position').sort({ handoverAt: -1 });
+};
 
 router.get('/cod-remittances', async (req, res) => {
   try {
@@ -103,7 +116,7 @@ router.get('/attendance', adminOnly, async (req, res) => {
       filter.user = req.query.userId;
     }
     const records = await WorkSchedule.find(filter)
-      .select('user workDate shiftName shiftStartTime shiftEndTime checkInTime checkOutTime status note')
+      .select('user workDate shiftName shiftStartTime shiftEndTime checkInTime checkOutTime status note startingCash cashTransferFrom cashTransferExpectedCash cashTransferAcceptedAt cashTransferDiscrepancy')
       .populate('user', 'fullName phone position status')
       .sort({ workDate: -1, shiftName: 1 });
     res.json(await attachShiftInfo(records));
@@ -193,6 +206,145 @@ router.patch('/:id/absence', adminOnly, async (req, res) => {
   } catch (error) { handleError(error, res); }
 });
 
+router.get('/cash-transfer-events', async (req, res) => {
+  try {
+    if (req.user.role !== 'ADMIN' && !['CASHIER', 'MANAGER'].includes(req.user.position)) return res.status(403).json({ message: 'Chỉ Admin và thu ngân được xem đối chiếu két.' });
+    let sourceIds = null;
+    if (req.user.role !== 'ADMIN') sourceIds = (await WorkSchedule.find({ user: req.user._id }).select('_id')).map(row => row._id);
+    const sourceFilter = sourceIds ? { $in: sourceIds } : { $exists: true };
+    const rows = await WorkSchedule.find({ $or: [
+      { cashTransferFrom: sourceFilter },
+      { 'cashTransferDiscrepancy.sourceSchedule': sourceFilter }
+    ] }).select('user workDate shiftName startingCash cashTransferFrom cashTransferExpectedCash cashTransferAcceptedAt cashTransferDiscrepancy')
+      .populate('user', 'fullName phone position')
+      .populate({ path: 'cashTransferFrom', select: 'user endingCashActual checkOutTime', populate: { path: 'user', select: 'fullName phone' } })
+      .populate({ path: 'cashTransferDiscrepancy.sourceSchedule', select: 'user endingCashActual checkOutTime', populate: { path: 'user', select: 'fullName phone' } })
+      .sort({ updatedAt: -1 }).limit(30);
+    res.json(rows);
+  } catch (error) { handleError(error, res); }
+});
+
+router.get('/:id/cash-receivers', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) throw badRequest('Mã ca bàn giao không hợp lệ.');
+    const source = await WorkSchedule.findById(req.params.id);
+    if (!source) return res.status(404).json({ message: 'Không tìm thấy ca bàn giao.' });
+    if (req.user.role !== 'STAFF' || String(source.user) !== String(req.user._id) || !['CASHIER', 'MANAGER'].includes(req.user.position)) return res.status(403).json({ message: 'Chỉ thu ngân giao két được chỉ định người nhận.' });
+    if (!source.handoverAt || !source.checkOutTime || source.status !== 'COMPLETED') return res.status(409).json({ message: 'Cần chốt két và ra ca trước khi chỉ định người nhận.' });
+    const nextDay = new Date(source.workDate.getTime() + 86400000);
+    const candidates = await WorkSchedule.find({ _id: { $ne: source._id }, user: { $ne: source.user }, workDate: { $gte: source.workDate, $lte: nextDay }, status: 'SCHEDULED', checkInTime: { $exists: false } })
+      .select('user workDate shiftName status').populate('user', 'fullName phone position').sort({ workDate: 1, shiftName: 1 });
+    const selectedReceiver = source.cashTransferTo ? await WorkSchedule.findById(source.cashTransferTo).select('user status cashTransferAcceptedAt').populate('user', 'fullName phone position') : null;
+    res.json({ selectedId: source.cashTransferTo || null, selectedReceiver, candidates: candidates.filter(row => ['CASHIER', 'MANAGER'].includes(row.user?.position)) });
+  } catch (error) { handleError(error, res); }
+});
+
+router.post('/:id/assign-cash-receiver', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) throw badRequest('Mã ca bàn giao không hợp lệ.');
+    if (req.user.role !== 'STAFF' || !['CASHIER', 'MANAGER'].includes(req.user.position)) return res.status(403).json({ message: 'Chỉ thu ngân giao két được chỉ định người nhận.' });
+    const source = await WorkSchedule.findById(req.params.id);
+    if (!source) return res.status(404).json({ message: 'Không tìm thấy ca bàn giao.' });
+    if (String(source.user) !== String(req.user._id) || !source.handoverAt || !source.checkOutTime || source.status !== 'COMPLETED') return res.status(409).json({ message: 'Ca của bạn chưa chốt két và ra ca.' });
+    const { receiverScheduleId } = req.body || {};
+    if (Object.keys(req.body || {}).some(key => key !== 'receiverScheduleId') || !mongoose.isValidObjectId(receiverScheduleId)) throw badRequest('Chọn ca của thu ngân nhận két.');
+    const receiver = await WorkSchedule.findById(receiverScheduleId).populate('user', 'fullName position');
+    if (!receiver || receiver.status !== 'SCHEDULED' || receiver.checkInTime || !['CASHIER', 'MANAGER'].includes(receiver.user?.position) || String(receiver.user._id) === String(source.user) || receiver.workDate < source.workDate || receiver.workDate > new Date(source.workDate.getTime() + 86400000)) return res.status(409).json({ message: 'Ca nhận két không còn phù hợp.' });
+    if (source.cashTransferTo && String(source.cashTransferTo) !== String(receiver._id)) {
+      const oldReceiver = await WorkSchedule.findById(source.cashTransferTo);
+      if (oldReceiver?.checkInTime || oldReceiver?.cashTransferDiscrepancy?.reportedAt) return res.status(409).json({ message: 'Người được chỉ định đã xác nhận hoặc báo chênh lệch; không thể đổi người nhận.' });
+    }
+    const alreadyAssigned = await WorkSchedule.exists({ _id: { $ne: source._id }, cashTransferTo: receiver._id });
+    if (alreadyAssigned) return res.status(409).json({ message: 'Thu ngân này đã được chỉ định nhận két từ ca khác.' });
+    const updated = await WorkSchedule.findOneAndUpdate(
+      { _id: source._id, user: req.user._id, status: 'COMPLETED', handoverAt: { $exists: true }, checkOutTime: { $exists: true }, cashTransferTo: source.cashTransferTo || { $exists: false } },
+      { $set: { cashTransferTo: receiver._id, cashTransferAssignedAt: new Date() } },
+      { returnDocument: 'after', runValidators: true }
+    );
+    if (!updated) return res.status(409).json({ message: 'Người nhận két vừa thay đổi. Hãy tải lại.' });
+    res.json({ message: `Đã giao két ${source.endingCashActual}đ cho ${receiver.user.fullName} xác nhận trên tài khoản của mình.`, receiverScheduleId: receiver._id });
+  } catch (error) { handleError(error, res); }
+});
+
+router.get('/:id/cash-transfer', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) throw badRequest('Mã ca làm không hợp lệ.');
+    const schedule = await WorkSchedule.findById(req.params.id).select('user workDate status checkInTime cashTransferDiscrepancy cashTransferFrom cashTransferExpectedCash');
+    if (!schedule) return res.status(404).json({ message: 'Không tìm thấy ca làm.' });
+    if (req.user.role !== 'ADMIN' && String(schedule.user) !== String(req.user._id)) return res.status(403).json({ message: 'Bạn chỉ được xem ca của mình.' });
+    const source = !schedule.checkInTime ? await latestCashHandover(schedule) : null;
+    res.json({
+      required: !!source,
+      ready: !source || (source.status === 'COMPLETED' && !!source.checkOutTime),
+      assignedToMe: !!source && String(source.cashTransferTo) === String(schedule._id),
+      expectedCash: source?.endingCashActual ?? schedule.cashTransferExpectedCash ?? null,
+      source: source ? { _id: source._id, cashier: source.user?.fullName || 'Thu ngân trước', checkOutTime: source.checkOutTime } : null,
+      discrepancy: schedule.cashTransferDiscrepancy || null
+    });
+  } catch (error) { handleError(error, res); }
+});
+
+router.post('/:id/cash-discrepancy', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) throw badRequest('Mã ca làm không hợp lệ.');
+    const schedule = await WorkSchedule.findById(req.params.id);
+    if (!schedule) return res.status(404).json({ message: 'Không tìm thấy ca làm.' });
+    if (req.user.role !== 'STAFF' || String(schedule.user) !== String(req.user._id) || !['CASHIER', 'MANAGER'].includes(req.user.position)) return res.status(403).json({ message: 'Chỉ thu ngân nhận két được báo chênh lệch ca của mình.' });
+    if (schedule.checkInTime || !['SCHEDULED', 'ABSENT'].includes(schedule.status)) return res.status(409).json({ message: 'Ca đã vào làm, không thể báo chênh lệch tiền đầu ca.' });
+    const employee = await User.findById(schedule.user).select('position');
+    if (!['CASHIER', 'MANAGER'].includes(employee?.position)) return res.status(403).json({ message: 'Chỉ ca thu ngân hoặc quản lý mới nhận két.' });
+    const { countedCash, note } = req.body || {};
+    if (Object.keys(req.body || {}).some(key => !['countedCash', 'note'].includes(key)) || !Number.isSafeInteger(countedCash) || countedCash < 0 || typeof note !== 'string' || !note.trim() || note.trim().length > 500) throw badRequest('Cần nhập số tiền đã đếm và lý do chênh lệch.');
+    const source = await latestCashHandover(schedule);
+    if (!source) return res.status(409).json({ message: 'Chưa có biên bản két trước để đối chiếu.' });
+    if (source.status !== 'COMPLETED' || !source.checkOutTime) return res.status(409).json({ message: 'Thu ngân trước cần được ghi nhận ra ca trước khi báo chênh lệch nhận két.' });
+    if (String(source.cashTransferTo) !== String(schedule._id)) return res.status(409).json({ message: 'Thu ngân giao két chưa chỉ định ca của bạn là người nhận.' });
+    if (countedCash === source.endingCashActual) return res.status(400).json({ message: 'Số đếm đã khớp; không cần báo chênh lệch.' });
+    const discrepancy = { sourceSchedule: source._id, expectedCash: source.endingCashActual, countedCash, note: note.trim(), reportedBy: req.user._id, reportedAt: new Date() };
+    const updated = await WorkSchedule.findOneAndUpdate(
+      { _id: schedule._id, status: schedule.status, checkInTime: { $exists: false } },
+      { $set: { cashTransferDiscrepancy: discrepancy } },
+      { returnDocument: 'after', runValidators: true }
+    );
+    if (!updated) return res.status(409).json({ message: 'Ca vừa được ghi nhận vào làm. Hãy tải lại.' });
+    res.json({ message: 'Đã báo chênh lệch cho thu ngân giao két và Admin. Chưa ghi nhận vào ca.', discrepancy: updated.cashTransferDiscrepancy });
+  } catch (error) { handleError(error, res); }
+});
+
+router.post('/:id/accept-cash-transfer', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) throw badRequest('Mã ca làm không hợp lệ.');
+    if (req.user.role !== 'STAFF' || !['CASHIER', 'MANAGER'].includes(req.user.position)) return res.status(403).json({ message: 'Chỉ thu ngân nhận két được xác nhận.' });
+    const schedule = await WorkSchedule.findById(req.params.id);
+    if (!schedule) return res.status(404).json({ message: 'Không tìm thấy ca làm.' });
+    if (String(schedule.user) !== String(req.user._id)) return res.status(403).json({ message: 'Bạn chỉ được nhận két của ca mình.' });
+    if (!['SCHEDULED', 'ABSENT'].includes(schedule.status) || schedule.checkInTime) return res.status(409).json({ message: 'Ca đã vào làm hoặc không còn chờ nhận két.' });
+    const { countedCash } = req.body || {};
+    if (Object.keys(req.body || {}).some(key => key !== 'countedCash') || !Number.isSafeInteger(countedCash) || countedCash < 0) throw badRequest('Cần nhập số tiền thực đếm hợp lệ.');
+    const now = new Date();
+    if (schedule.workDate.toISOString().slice(0, 10) !== vietnamDay(now)) return res.status(409).json({ message: 'Chỉ nhận két vào ngày làm việc được phân.' });
+    const [shiftStart] = (await getShiftTime(schedule)).split('-');
+    const [hour, minute] = shiftStart.split(':').map(Number);
+    const workDay = schedule.workDate.toISOString().slice(0, 10);
+    const [year, month, day] = workDay.split('-').map(Number);
+    if (now < new Date(Date.UTC(year, month - 1, day, hour - 7, minute))) return res.status(409).json({ message: 'Chưa đến giờ ca được phân. Admin cần đổi ca nếu bạn làm sớm hơn.' });
+    const source = await latestCashHandover(schedule, now);
+    if (!source) return res.status(409).json({ message: 'Chưa có biên bản két của thu ngân trước. Admin cần ghi nhận ca đầu tiên.' });
+    if (source.status !== 'COMPLETED' || !source.checkOutTime) return res.status(409).json({ message: 'Thu ngân trước cần được ghi nhận ra ca trước khi nhận két.' });
+    if (String(source.cashTransferTo) !== String(schedule._id)) return res.status(409).json({ message: 'Thu ngân giao két chưa chỉ định ca của bạn là người nhận.' });
+    if (countedCash !== source.endingCashActual) return res.status(409).json({ message: 'Số tiền không khớp biên bản. Hãy đếm lại hoặc gửi báo cáo chênh lệch.' });
+    if (await WorkSchedule.exists({ cashTransferFrom: source._id })) return res.status(409).json({ message: 'Két này đã được người khác nhận.' });
+    const changes = { status: 'PRESENT', checkInTime: now, startingCash: countedCash, cashTransferFrom: source._id, cashTransferExpectedCash: source.endingCashActual, cashTransferAcceptedAt: now };
+    if (schedule.cashTransferDiscrepancy && !schedule.cashTransferDiscrepancy.resolvedAt) changes['cashTransferDiscrepancy.resolvedAt'] = now;
+    const updated = await WorkSchedule.findOneAndUpdate(
+      { _id: schedule._id, user: req.user._id, status: schedule.status, checkInTime: { $exists: false } },
+      { $set: changes }, { returnDocument: 'after', runValidators: true }
+    ).select('user workDate shiftName status checkInTime startingCash cashTransferFrom cashTransferAcceptedAt');
+    if (!updated) return res.status(409).json({ message: 'Ca đã được ghi nhận. Hãy tải lại.' });
+    res.json({ message: 'Đã xác nhận nhận két và vào ca. Admin đã có kết quả đối chiếu.', schedule: updated });
+  } catch (error) { handleError(error, res); }
+});
+
 router.put('/:id/shift-action', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) throw badRequest('Mã lịch làm việc không hợp lệ.');
@@ -243,6 +395,13 @@ router.put('/:id/shift-action', async (req, res) => {
     }
     if (action === 'CHECK_IN') {
       if (workDay > today) return res.status(409).json({ message: 'Chỉ Admin được ghi nhận vào ca trong ngày được phân hoặc ngày đã qua.' });
+      const employee = await User.findById(schedule.user).select('position');
+      if (['CASHIER', 'MANAGER'].includes(employee?.position) && workDay === today) {
+        const source = await latestCashHandover(schedule, now);
+        if (source) {
+          return res.status(409).json({ message: 'Thu ngân nhận két phải tự đăng nhập và xác nhận số tiền trên tài khoản của mình.' });
+        }
+      }
       if (workDay < today) {
         const [year, month, day] = workDay.split('-').map(Number);
         const [hour, minute] = shiftStart.split(':').map(Number);

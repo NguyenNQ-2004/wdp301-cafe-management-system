@@ -9,6 +9,20 @@ const workScheduleSchema = new mongoose.Schema({
   checkInTime: { type: Date },
   checkOutTime: { type: Date },
   startingCash: { type: Number },
+  cashTransferFrom: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkSchedule' },
+  cashTransferExpectedCash: { type: Number, min: 0 },
+  cashTransferAcceptedAt: Date,
+  cashTransferTo: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkSchedule' },
+  cashTransferAssignedAt: Date,
+  cashTransferDiscrepancy: {
+    sourceSchedule: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkSchedule' },
+    expectedCash: { type: Number, min: 0 },
+    countedCash: { type: Number, min: 0 },
+    note: { type: String, maxlength: 500 },
+    reportedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    reportedAt: Date,
+    resolvedAt: Date
+  },
   endingCashSystem: { type: Number },
   endingCashActual: { type: Number },
   handoverCashSales: { type: Number, min: 0 },
@@ -32,5 +46,7 @@ const workScheduleSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 workScheduleSchema.index({ user: 1, workDate: 1, shiftName: 1 }, { unique: true });
+workScheduleSchema.index({ cashTransferFrom: 1 }, { unique: true, partialFilterExpression: { cashTransferFrom: { $type: 'objectId' } } });
+workScheduleSchema.index({ cashTransferTo: 1 }, { unique: true, partialFilterExpression: { cashTransferTo: { $type: 'objectId' } } });
 
 module.exports = mongoose.model('WorkSchedule', workScheduleSchema);
