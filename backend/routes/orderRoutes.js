@@ -249,6 +249,7 @@ router.post('/', async (req, res) => {
     }
     const deliveryFee = orderType === 'ONLINE' && totalAmount < threshold ? areaFee : 0;
     const finalAmount = totalAmount + deliveryFee - discountAmount;
+    if (!Number.isSafeInteger(finalAmount) || finalAmount < 0) throw orderError('Tổng tiền đơn hàng vượt quá giới hạn số hợp lệ. Vui lòng giảm số lượng món.');
     if (req.user.role === 'CUSTOMER' && (!Number.isInteger(req.body.expectedTotal) || req.body.expectedTotal !== finalAmount)) return res.status(409).json({ message: 'Giá món, ưu đãi điểm hoặc phí giao hàng đã thay đổi. Vui lòng kiểm tra lại giỏ hàng trước khi đặt.', finalAmount });
     if (orderType === 'ONLINE' && !await hasShipperOnShift()) {
       throw orderError('Hiện không có shipper đã check-in trong ca để nhận đơn giao. Vui lòng thử lại sau.', 409);

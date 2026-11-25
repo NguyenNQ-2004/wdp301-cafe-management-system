@@ -101,12 +101,12 @@ export const Field: React.FC<{ label: string; column?: string; children: React.R
 export const inputCls =
   'w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:border-primary text-sm';
 
-export const FormActions: React.FC<{ onCancel: () => void; submitLabel: string }> = ({ onCancel, submitLabel }) => (
+export const FormActions: React.FC<{ onCancel: () => void; submitLabel: string; loading?: boolean }> = ({ onCancel, submitLabel, loading = false }) => (
   <div className="pt-4 flex gap-3">
-    <button type="button" onClick={onCancel} className="flex-1 px-4 py-2.5 bg-stone-100 text-stone-700 font-bold rounded-xl text-xs hover:bg-stone-200">
+    <button type="button" disabled={loading} onClick={onCancel} className="flex-1 px-4 py-2.5 bg-stone-100 text-stone-700 font-bold rounded-xl text-xs hover:bg-stone-200 disabled:opacity-50">
       Hủy bỏ
     </button>
-    <button type="submit" className="flex-1 px-4 py-2.5 bg-primary text-white font-bold rounded-xl text-xs hover:bg-primary-container">
+    <button type="submit" disabled={loading} className="flex-1 px-4 py-2.5 bg-primary text-white font-bold rounded-xl text-xs hover:bg-primary-container disabled:opacity-50">
       {submitLabel}
     </button>
   </div>

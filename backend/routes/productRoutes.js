@@ -49,8 +49,13 @@ async function parse(body, creating, id) {
       if (!Number.isSafeInteger(price)) throw invalid('Giá size phải là số nguyên.');
     }
     if (config.toppings !== undefined && !Array.isArray(config.toppings)) throw invalid('Topping không hợp lệ.');
-    const toppings = (config.toppings || []).map(topping => ({ name: text(topping.name, 'Tên topping'), price: nonnegative(topping.price, 'Giá topping') }));
+    const toppings = (config.toppings || []).map((raw, index) => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw invalid(`Topping dòng ${index + 1} phải có tên và giá hợp lệ.`);
+      const topping = objectBody(raw);
+      return { name: text(topping.name, `Tên topping dòng ${index + 1}`), price: nonnegative(topping.price, `Giá topping dòng ${index + 1}`) };
+    });
     if (toppings.some(topping => !Number.isSafeInteger(topping.price))) throw invalid('Giá topping phải là số nguyên.');
+    if (new Set(toppings.map(topping => topping.name.toLocaleLowerCase('vi'))).size !== toppings.length) throw invalid('Tên topping bị trùng. Mỗi topping chỉ được xuất hiện một lần.');
     fields.variantsConfig = { sizes, toppings };
   }
   return fields;

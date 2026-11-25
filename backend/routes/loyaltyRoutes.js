@@ -189,6 +189,7 @@ router.post('/adjust', adminOrStaff, async (req, res) => {
     if (!Number.isSafeInteger(change) || change === 0) {
       return res.status(400).json({ message: 'Số điểm thay đổi phải khác 0.' });
     }
+    if (!Number.isSafeInteger(user.totalPoints + change)) throw invalid('Tổng điểm sau điều chỉnh vượt quá giới hạn số hợp lệ. Vui lòng giảm số điểm cộng hoặc trừ.');
 
     if (user.totalPoints + change < 0) {
       return res.status(400).json({

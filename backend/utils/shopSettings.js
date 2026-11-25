@@ -1,6 +1,7 @@
 const { invalid, objectBody } = require('./adminValidation');
 const SHIFT_DEFAULTS = { shift_morning: '07:00-12:00', shift_afternoon: '12:00-17:00', shift_evening: '17:00-22:00' };
 const MINIMUMS = { freeship_threshold: 0, delivery_fee: 0, delivery_minutes: 1, points_step: 1, points_step_value: 0, points_earn_unit: 1 };
+const LABELS = { freeship_threshold: 'Ngưỡng miễn phí giao hàng', delivery_fee: 'Phí giao hàng', delivery_minutes: 'Thời gian giao hàng', points_step: 'Bậc đổi điểm', points_step_value: 'Giá trị mỗi bậc', points_earn_unit: 'Chi tiêu để được 1 điểm' };
 const isPublicSettingKey = key => typeof key === 'string' && key !== 'membership_tiers' && !/(password|secret|token|smtp|jwt|payment_|mongo|credential|private|api_key|database_uri)/i.test(key);
 function validateSettings(body, current = {}) {
   objectBody(body);
@@ -12,7 +13,7 @@ function validateSettings(body, current = {}) {
     if (!/^[a-z][a-z0-9_]{1,49}$/.test(key) || !['string', 'number'].includes(typeof raw)) throw invalid('Mã hoặc giá trị cài đặt không hợp lệ.');
     const value = key in SHIFT_DEFAULTS ? String(raw).replace(/\s/g, '') : String(raw).trim();
     if (!value || value.length > 1000) throw invalid('Giá trị cài đặt không hợp lệ.');
-    if (key in MINIMUMS && (!Number.isSafeInteger(Number(value)) || Number(value) < MINIMUMS[key])) throw invalid(`${key} phải là số nguyên từ ${MINIMUMS[key]}.`);
+    if (key in MINIMUMS && (!Number.isSafeInteger(Number(value)) || Number(value) < MINIMUMS[key])) throw invalid(`${LABELS[key]} phải là số nguyên từ ${MINIMUMS[key]} và nằm trong giới hạn số hợp lệ.`);
     changes[key] = value;
   }
   if (Object.keys(body).some(key => key in SHIFT_DEFAULTS)) {

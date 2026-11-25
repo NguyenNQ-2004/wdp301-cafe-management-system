@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const DeliveryArea = require('../models/DeliveryArea');
 const { protect } = require('../middlewares/authMiddleware');
+const { numberInput, fieldError, sendError } = require('../utils/adminValidation');
 
 const router = express.Router();
 
@@ -71,11 +72,12 @@ router.post('/', requireAdmin, async (req, res) => {
     if (!district || typeof district !== 'string' || district.trim().length < 2 || district.trim().length > 100) {
       return res.status(400).json({ message: 'Tên quận/huyện phải từ 2 đến 100 ký tự.' });
     }
-    const feeNum = Number(deliveryFee);
+    const feeNum = numberInput(deliveryFee, 'Phí giao hàng', 'deliveryFee');
     if (!Number.isSafeInteger(feeNum) || feeNum < 0 || feeNum > 1000000) {
       return res.status(400).json({ message: 'Phí giao hàng phải là số nguyên từ 0 đến 1.000.000 VNĐ.' });
     }
 
+    if (typeof isActive !== 'boolean') throw fieldError('isActive', 'Trạng thái khu vực giao hàng phải là bật hoặc tắt.');
     const trimmed = district.trim();
     const existing = await DeliveryArea.findOne({
       district: { $regex: new RegExp(`^${trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
@@ -87,12 +89,12 @@ router.post('/', requireAdmin, async (req, res) => {
     const area = await DeliveryArea.create({
       district: trimmed,
       deliveryFee: feeNum,
-      isActive: Boolean(isActive)
+      isActive
     });
 
     res.status(201).json(area);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    sendError(res, error);
   }
 });
 
@@ -125,7 +127,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
     }
 
     if (deliveryFee !== undefined) {
-      const feeNum = Number(deliveryFee);
+      const feeNum = numberInput(deliveryFee, 'Phí giao hàng', 'deliveryFee');
       if (!Number.isSafeInteger(feeNum) || feeNum < 0 || feeNum > 1000000) {
         return res.status(400).json({ message: 'Phí giao hàng phải là số nguyên từ 0 đến 1.000.000 VNĐ.' });
       }
@@ -133,13 +135,14 @@ router.put('/:id', requireAdmin, async (req, res) => {
     }
 
     if (isActive !== undefined) {
-      area.isActive = Boolean(isActive);
+      if (typeof isActive !== 'boolean') throw fieldError('isActive', 'Trạng thái khu vực giao hàng phải là bật hoặc tắt.');
+      area.isActive = isActive;
     }
 
     await area.save();
     res.json(area);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    sendError(res, error);
   }
 });
 

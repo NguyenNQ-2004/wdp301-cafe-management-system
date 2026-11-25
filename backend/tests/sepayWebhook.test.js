@@ -84,4 +84,37 @@ test('SePay credits a matching transfer once and rejects forged or mismatched tr
   assert.equal(await send(counterPayload), 200);
   assert.equal((await Payment.findById(counterPayment._id)).status, 'SUCCESS');
   assert.equal((await Order.findById(counterOrder._id)).status, 'CONFIRMED');
+
+  await t.test('concurrent duplicate webhook deliveries award points once', async () => {
+    const concurrentOrder = await Order.create({ orderCode: 'SEPAY-CONCURRENT', customer: customer._id, orderType: 'ONLINE', paymentMethod: 'BANK_TRANSFER', totalAmount: 10000, finalAmount: 10000 });
+    const concurrentPayment = await Payment.create({ order: concurrentOrder._id, paymentMethod: 'BANK_TRANSFER', amount: 10000 });
+    const concurrentCode = `AU${String(concurrentPayment._id).toUpperCase()}`;
+    const body = { ...payload, id: 1234570, code: concurrentCode, content: concurrentCode, transferAmount: 10000 };
+    const outcomes = await Promise.all([send(body), send(body)]);
+    assert.ok(outcomes.includes(200), JSON.stringify(outcomes));
+    assert.ok(outcomes.every(status => [200, 409].includes(status)), JSON.stringify(outcomes));
+    assert.equal(await send(body), 200, 'A retry must acknowledge the committed transfer');
+    assert.equal((await User.findById(customer._id)).totalPoints, 50);
+    assert.equal(await require('../models/LoyaltyTransaction').countDocuments({ order: concurrentOrder._id, transactionType: 'EARN' }), 1);
+  });
+
+  await t.test('a failed loyalty write rolls back payment and order; retry completes once', async () => {
+    const failedOrder = await Order.create({ orderCode: 'SEPAY-ROLLBACK', customer: customer._id, orderType: 'ONLINE', paymentMethod: 'BANK_TRANSFER', totalAmount: 10000, finalAmount: 10000 });
+    const failedPayment = await Payment.create({ order: failedOrder._id, paymentMethod: 'BANK_TRANSFER', amount: 10000 });
+    const failedCode = `AU${String(failedPayment._id).toUpperCase()}`;
+    const body = { ...payload, id: 1234571, code: failedCode, content: failedCode, transferAmount: 10000 };
+    const originalUpdate = User.findOneAndUpdate;
+    User.findOneAndUpdate = function (filter, update, ...args) {
+      if (String(filter._id) === String(customer._id) && update.$inc?.totalPoints) throw new Error('Injected loyalty write failure');
+      return originalUpdate.call(this, filter, update, ...args);
+    };
+    try { assert.equal(await send(body), 500); }
+    finally { User.findOneAndUpdate = originalUpdate; }
+    assert.equal((await Payment.findById(failedPayment._id)).status, 'PENDING');
+    assert.equal((await Order.findById(failedOrder._id)).status, 'PENDING');
+    assert.equal((await User.findById(customer._id)).totalPoints, 50);
+    assert.equal(await require('../models/LoyaltyTransaction').countDocuments({ order: failedOrder._id }), 0);
+    assert.equal(await send(body), 200);
+    assert.equal((await User.findById(customer._id)).totalPoints, 60);
+  });
 });

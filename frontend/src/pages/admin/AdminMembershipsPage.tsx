@@ -111,7 +111,7 @@ export const AdminMembershipsPage: React.FC = () => {
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
+    if (type === 'success') setTimeout(() => setToast(current => current?.msg === msg && current.type === type ? null : current), 3500);
   };
 
   // 1. Fetch Rules
@@ -220,8 +220,13 @@ export const AdminMembershipsPage: React.FC = () => {
     // [DT04] ... Gửi PUT /api/loyalty-transactions/rules để Admin lưu cấu hình. [DT05]
     e.preventDefault();
     if (!user?.token) return;
-    if (rules.points_earn_unit <= 0 || rules.points_step <= 0 || rules.points_step_value < 0) {
-      showToast('Giá trị quy tắc tích & đổi điểm không hợp lệ.', 'error');
+    const invalidRules = [
+      (!Number.isSafeInteger(rules.points_earn_unit) || rules.points_earn_unit <= 0) && 'Chi tiêu để được 1 điểm phải là số nguyên lớn hơn 0.',
+      (!Number.isSafeInteger(rules.points_step) || rules.points_step <= 0) && 'Bậc đổi điểm phải là số nguyên lớn hơn 0.',
+      (!Number.isSafeInteger(rules.points_step_value) || rules.points_step_value < 0) && 'Giá trị mỗi bậc phải là số nguyên không âm.'
+    ].filter(Boolean);
+    if (invalidRules.length) {
+      showToast(invalidRules.join(' '), 'error');
       return;
     }
     setSavingRules(true);
@@ -252,8 +257,8 @@ export const AdminMembershipsPage: React.FC = () => {
     // [CD02] . Nhận form xác nhận; cần có khách đã tra cứu, phiên đăng nhập và số điểm lớn hơn 0.
     e.preventDefault();
     if (!adjustModal || !lookupResult || !user?.token) return;
-    if (adjustModal.points <= 0) {
-      showToast('Số điểm thay đổi phải lớn hơn 0.', 'error');
+    if (!Number.isSafeInteger(adjustModal.points) || adjustModal.points <= 0) {
+      showToast('Số điểm điều chỉnh phải là số nguyên lớn hơn 0 và nằm trong giới hạn số hợp lệ.', 'error');
       return;
     }
 
@@ -671,7 +676,8 @@ export const AdminMembershipsPage: React.FC = () => {
           onClose={() => setAdjustModal(null)}
         >
           {/* [CD02] . Form nối thao tác xác nhận với handleAdjustPoints(); ô số điểm và lý do cập nhật adjustModal. */}
-          <form onSubmit={handleAdjustPoints} className="space-y-3.5 text-xs">
+          <form noValidate onSubmit={handleAdjustPoints} onChangeCapture={() => setToast(null)} className="space-y-3.5 text-xs">
+            {toast?.type === 'error' && <p role="alert" className="whitespace-pre-line rounded-lg bg-red-50 p-3 text-red-700">{toast.msg}</p>}
             <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-1">
               <div className="flex justify-between">
                 <span className="text-stone-500">Khách hàng:</span>
@@ -696,7 +702,7 @@ export const AdminMembershipsPage: React.FC = () => {
                 min={1}
                 required
                 value={adjustModal.points}
-                onChange={(e) => setAdjustModal({ ...adjustModal, points: Math.max(1, parseInt(e.target.value) || 0) })}
+                onChange={(e) => setAdjustModal({ ...adjustModal, points: Number(e.target.value) })}
                 className={inputCls}
               />
             </Field>

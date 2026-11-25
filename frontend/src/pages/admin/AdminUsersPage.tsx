@@ -1,7 +1,8 @@
 import { NumberInput } from '../../components/NumberInput';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { formatVnd, shopApi } from '../../lib/shopApi';
+import { formatVnd, shopApi, ShopApiError } from '../../lib/shopApi';
+import { validateEmployeeForm, type FieldErrors } from '../../lib/formValidation';
 import useAuthStore from '../../store/authStore';
 import { AdminLayout } from './AdminUi';
 
@@ -28,6 +29,14 @@ export default function AdminUsersPage() {
   const [form, setForm] = useState<EmployeeForm>(blankForm);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const updateForm = <K extends keyof EmployeeForm>(field: K, value: EmployeeForm[K]) => {
+    setForm(current => ({ ...current, [field]: value }));
+    setFieldErrors(current => { const next = { ...current }; delete next[field]; return next; });
+    setError('');
+  };
+  const fieldProps = (field: string) => ({ 'aria-invalid': !!fieldErrors[field], 'aria-describedby': fieldErrors[field] ? `employee-${field}-error` : undefined });
+  const fieldMessage = (field: string) => fieldErrors[field] ? <span id={`employee-${field}-error`} role="alert" className="mt-1 block text-xs font-normal text-red-700">{fieldErrors[field]}</span> : null;
 
   const refresh = useCallback(async () => {
     if (!token) return;
@@ -53,19 +62,20 @@ export default function AdminUsersPage() {
       && (statusFilter === 'ALL' || employee.status === statusFilter);
   }), [employees, search, positionFilter, statusFilter]);
 
-  const startCreate = () => { setEditingId(null); setForm(blankForm()); setError(''); setFormOpen(true); };
+  const startCreate = () => { setEditingId(null); setForm(blankForm()); setError(''); setFieldErrors({}); setFormOpen(true); };
   const startEdit = (employee: Employee) => {
     setEditingId(employee._id);
     setForm({ fullName: employee.fullName, phone: employee.phone, email: employee.email || '', password: '', position: employee.position, status: employee.status, baseSalary: String(employee.baseSalary), hireDate: employee.hireDate?.slice(0, 10) || '' });
-    setError(''); setFormOpen(true);
+    setError(''); setFieldErrors({}); setFormOpen(true);
   };
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
     if (!token || saving) return;
+    const validation = validateEmployeeForm(form, !editingId);
+    setFieldErrors(validation);
+    if (Object.keys(validation).length) { setError(''); return; }
     const salary = Number(form.baseSalary);
-    if (!Number.isSafeInteger(salary) || salary < 0) { setError('Lương cơ bản phải là số nguyên không âm.'); return; }
-    if ((!editingId || form.password) && form.password.length < 8) { setError('Mật khẩu mới cần ít nhất 8 ký tự.'); return; }
     setSaving(true); setError(''); setNotice('');
     try {
       const employee = await shopApi<Employee>(editingId ? `/api/employees/${editingId}` : '/api/employees', {
@@ -76,7 +86,10 @@ export default function AdminUsersPage() {
       setEmployees((current) => editingId ? current.map((item) => item._id === employee._id ? employee : item) : [employee, ...current]);
       setNotice(editingId ? 'Đã cập nhật nhân viên.' : 'Đã tạo tài khoản nhân viên.');
       setFormOpen(false); setEditingId(null); setForm(blankForm());
-    } catch (err) { setError((err as Error).message); }
+    } catch (err) {
+      if (err instanceof ShopApiError && err.data?.errors && typeof err.data.errors === 'object') setFieldErrors(err.data.errors as FieldErrors);
+      setError((err as Error).message);
+    }
     finally { setSaving(false); }
   };
 
@@ -95,20 +108,20 @@ export default function AdminUsersPage() {
   return <AdminLayout route="admin-employees" table="users" title="23. Quản lý nhân viên" subtitle="Tài khoản, vị trí, lương cơ bản và trạng thái làm việc của nhân viên.">
     <div className="mx-auto max-w-7xl">
     <div className="flex justify-end"><button onClick={startCreate} className="rounded-lg bg-primary px-5 py-2.5 font-semibold text-white">+ Thêm nhân viên</button></div>
-    {error && <p role="alert" className="mt-5 rounded-lg bg-red-50 p-4 text-red-700">{error}</p>}
+    {error && <p role="alert" className="mt-5 whitespace-pre-line rounded-lg bg-red-50 p-4 text-red-700">{error}</p>}
     {notice && <p role="status" className="mt-5 rounded-lg bg-emerald-50 p-4 text-emerald-800">{notice}</p>}
 
-    {formOpen && <form onSubmit={save} className="mt-6 rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
+    {formOpen && <form noValidate onSubmit={save} className="mt-6 rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">{editingId ? 'Sửa nhân viên' : 'Thêm nhân viên'}</h2><button type="button" onClick={() => setFormOpen(false)} className="text-sm font-semibold text-slate-600">Đóng</button></div>
       <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <label className="text-sm font-semibold">Họ và tên<input value={form.fullName} onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))} required maxLength={100} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5" /></label>
-        <label className="text-sm font-semibold">Số điện thoại<input value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} required inputMode="numeric" pattern="[0-9]{9,15}" maxLength={15} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5" /></label>
-        <label className="text-sm font-semibold">Gmail / Email đăng nhập<input type="email" autoComplete="off" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} required maxLength={254} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5" /></label>
+        <label className="text-sm font-semibold">Họ và tên<input {...fieldProps('fullName')} value={form.fullName} onChange={event => updateForm('fullName', event.target.value)} required maxLength={100} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5 aria-invalid:border-red-500" />{fieldMessage('fullName')}</label>
+        <label className="text-sm font-semibold">Số điện thoại<input {...fieldProps('phone')} value={form.phone} onChange={event => updateForm('phone', event.target.value)} required inputMode="numeric" maxLength={15} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5 aria-invalid:border-red-500" />{fieldMessage('phone')}</label>
+        <label className="text-sm font-semibold">Gmail / Email đăng nhập<input {...fieldProps('email')} type="email" autoComplete="off" value={form.email} onChange={event => updateForm('email', event.target.value)} required maxLength={254} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5 aria-invalid:border-red-500" />{fieldMessage('email')}</label>
         <label className="text-sm font-semibold">Vị trí<select value={form.position} onChange={(event) => setForm((current) => ({ ...current, position: event.target.value as Position }))} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5">{Object.entries(positionNames).map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label>
-        <label className="text-sm font-semibold">Lương cơ bản (đ)<NumberInput type="number" min="0" step="1" value={form.baseSalary} onChange={(event) => setForm((current) => ({ ...current, baseSalary: event.target.value }))} required className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5" /></label>
-        <label className="text-sm font-semibold">Ngày vào làm<input type="date" value={form.hireDate} onChange={(event) => setForm((current) => ({ ...current, hireDate: event.target.value }))} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5" /></label>
+        <label className="text-sm font-semibold">Lương cơ bản (đ)<NumberInput {...fieldProps('baseSalary')} type="number" min="0" step="1" value={form.baseSalary} onChange={event => updateForm('baseSalary', event.target.value)} required className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5 aria-invalid:border-red-500" />{fieldMessage('baseSalary')}</label>
+        <label className="text-sm font-semibold">Ngày vào làm<input {...fieldProps('hireDate')} type="date" value={form.hireDate} onChange={event => updateForm('hireDate', event.target.value)} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5 aria-invalid:border-red-500" />{fieldMessage('hireDate')}</label>
         <label className="text-sm font-semibold">Trạng thái<select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as Status }))} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5">{Object.entries(statusNames).map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label>
-        <label className="text-sm font-semibold">{editingId ? 'Mật khẩu mới (để trống nếu giữ nguyên)' : 'Mật khẩu đăng nhập'}<input type="password" autoComplete="new-password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} required={!editingId} minLength={8} maxLength={72} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5" /></label>
+        <label className="text-sm font-semibold">{editingId ? 'Mật khẩu mới (để trống nếu giữ nguyên)' : 'Mật khẩu đăng nhập'}<input {...fieldProps('password')} type="password" autoComplete="new-password" value={form.password} onChange={event => updateForm('password', event.target.value)} required={!editingId} minLength={8} maxLength={72} className="mt-1 block w-full rounded-lg border border-blue-100 p-2.5 aria-invalid:border-red-500" /><span className="mt-1 block text-xs font-normal text-slate-500">Ít nhất 8 ký tự, có chữ và số, không có khoảng trắng; tối đa 72 byte.</span>{fieldMessage('password')}</label>
       </div>
       <div className="mt-5 flex justify-end gap-3"><button type="button" onClick={() => setFormOpen(false)} className="rounded-lg border border-blue-100 px-4 py-2.5 font-semibold">Hủy</button><button disabled={saving} className="rounded-lg bg-primary px-5 py-2.5 font-semibold text-white disabled:opacity-50">{saving ? 'Đang lưu...' : editingId ? 'Lưu thay đổi' : 'Tạo nhân viên'}</button></div>
     </form>}

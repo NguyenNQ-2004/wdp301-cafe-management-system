@@ -12,6 +12,7 @@ process.env.JWT_SECRET = 'customer-crm-isolated-test-secret';
 const User = require('../models/User');
 const Order = require('../models/Order');
 const LoyaltyTransaction = require('../models/LoyaltyTransaction');
+const Payment = require('../models/Payment');
 
 test('Screen 28: Customer CRM management flow and access control', async (t) => {
   const dbName = `aura_cafe_crm_test_${randomBytes(4).toString('hex')}`;
@@ -96,7 +97,7 @@ test('Screen 28: Customer CRM management flow and access control', async (t) => 
       fullName: 'Trần Khách VIP',
       phone: '0988111222',
       email: 'khachvip@example.com',
-      password: 'crm-test-pass',
+      password: 'crm-test-pass1',
       address: '123 Đường Cà Phê, Q1',
       birthday: '1995-05-20',
       initialPoints: 160
@@ -128,7 +129,7 @@ test('Screen 28: Customer CRM management flow and access control', async (t) => 
   assert.equal(duplicatePhone.status, 400);
 
   // Seed sample completed order for customer to verify aggregation
-  await Order.create({
+  const paidOrder = await Order.create({
     orderCode: 'ORD-CRM-01',
     customer: newCustomerId,
     totalAmount: 125000,
@@ -137,6 +138,7 @@ test('Screen 28: Customer CRM management flow and access control', async (t) => 
     orderType: 'DINE_IN'
   });
 
+  await Payment.create({ order: paidOrder._id, paymentMethod: 'CASH', amount: paidOrder.finalAmount, status: 'SUCCESS', paidAt: new Date() });
   // 3. List customers with search & order aggregation
   const listRes = await request('/api/users/customers?search=Trần', { token: adminToken });
   assert.equal(listRes.status, 200);

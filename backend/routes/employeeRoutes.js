@@ -5,6 +5,7 @@ const User = require('../models/User');
 const { protect, adminOnly } = require('../middlewares/authMiddleware');
 const { normalizeEmail, validEmail } = require('../utils/accountEmail');
 const { passwordError } = require('../utils/passwordPolicy');
+const { validFullName } = require('../utils/personName');
 
 const router = express.Router();
 router.use(protect, adminOnly);
@@ -23,11 +24,13 @@ function parseEmployee(body, creating) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw badRequest('Dữ liệu nhân viên không hợp lệ.');
   if (Object.keys(body).some((key) => !allowedFields.includes(key))) throw badRequest('Thông tin nhân viên không hợp lệ.');
   const data = {};
+  const labels = { fullName: 'họ tên', phone: 'số điện thoại', email: 'email đăng nhập', position: 'vị trí nhân viên' };
   for (const field of ['fullName', 'phone', 'email', 'position']) {
-    if (creating && body[field] === undefined) throw badRequest(`Thiếu thông tin ${field}.`);
+    if (creating && body[field] === undefined) throw badRequest(`Vui lòng nhập ${labels[field]}.`);
   }
   if (body.fullName !== undefined) {
     if (typeof body.fullName !== 'string' || !body.fullName.trim() || body.fullName.trim().length > 100) throw badRequest('Tên nhân viên phải có từ 1 đến 100 ký tự.');
+    if (!validFullName(body.fullName)) throw badRequest('Tên nhân viên chỉ được gồm chữ cái, khoảng trắng, dấu gạch nối hoặc dấu nháy.');
     data.fullName = body.fullName.trim();
   }
   if (body.phone !== undefined) {
@@ -71,7 +74,11 @@ function parseEmployee(body, creating) {
 }
 
 const handleError = (error, res) => {
-  if (error.code === 11000) return res.status(409).json({ message: error.keyPattern?.phone ? 'Số điện thoại này đã được sử dụng.' : 'Email này đã được sử dụng.' });
+  if (error.code === 11000) {
+    const field = error.keyPattern?.phone ? 'phone' : 'email';
+    const message = field === 'phone' ? 'Số điện thoại này đã được sử dụng.' : 'Email này đã được sử dụng.';
+    return res.status(409).json({ message, errors: { [field]: message } });
+  }
   return res.status(error.status || (error.name === 'ValidationError' ? 400 : 500)).json({ message: error.message });
 };
 
@@ -98,7 +105,10 @@ router.put('/:id', async (req, res) => {
     if (!employee) return res.status(404).json({ message: 'Không tìm thấy nhân viên.' });
     const { password, ...fields } = changes;
     Object.assign(employee, fields);
-    if (password) employee.passwordHash = await bcrypt.hash(password, 10);
+    if (password) {
+      employee.passwordHash = await bcrypt.hash(password, 10);
+      employee.passwordChangedAt = new Date(Math.max(Date.now(), (employee.passwordChangedAt?.getTime() || 0) + 1));
+    }
     await employee.save();
     res.json(publicEmployee(employee));
   } catch (error) { handleError(error, res); }

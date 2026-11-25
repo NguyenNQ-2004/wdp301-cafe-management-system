@@ -1,5 +1,6 @@
 import { NumberInput } from '../../components/NumberInput';
 import { API_BASE } from '../../lib/shopApi';
+import { apiErrorMessage, validateCustomerForm, type FieldErrors } from '../../lib/formValidation';
 import React, { useState, useEffect, useCallback } from 'react';
 import useAuthStore from '../../store/authStore';
 import { AdminLayout, Badge, Field, FormActions, Modal, PrimaryButton, GhostButton, StatCard, inputCls } from './AdminUi';
@@ -122,6 +123,9 @@ export const AdminCustomersPage: React.FC = () => {
   const [detailData, setDetailData] = useState<CustomerDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [customerErrors, setCustomerErrors] = useState<FieldErrors>({});
+  const [formError, setFormError] = useState('');
+  const customerField = (field: string) => ({ name: field, 'aria-invalid': !!customerErrors[field], 'aria-describedby': customerErrors[field] ? `customer-${field}-error` : undefined });
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -183,7 +187,11 @@ export const AdminCustomersPage: React.FC = () => {
     // [KH08] . Nút Tạo khách hàng gửi toàn bộ createForm bằng POST /api/users/customers, bao gồm mật khẩu và điểm tặng khởi tạo.
     // [KH08] ... Backend kiểm tra và tạo tài khoản CUSTOMER. [KH09]
     e.preventDefault();
-    if (!createForm || !user?.token) return;
+    if (!createForm || !user?.token || submitting) return;
+    const validation = validateCustomerForm(createForm);
+    setCustomerErrors(validation);
+    setFormError('');
+    if (Object.keys(validation).length) return;
     setSubmitting(true);
     try {
       const res = await fetch(`${API_BASE}/api/users/customers`, {
@@ -195,13 +203,13 @@ export const AdminCustomersPage: React.FC = () => {
         body: JSON.stringify(createForm)
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Lỗi thêm khách hàng');
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Không thể tạo khách hàng. Vui lòng thử lại.'));
       showToast(data.message || 'Đã thêm khách hàng thành công!');
       // [KH10] .. Tạo thành công thì báo kết quả, đóng form và gọi fetchCustomers() tải lại bảng.
       setCreateForm(null);
       fetchCustomers();
     } catch (err: any) {
-      showToast(err.message, 'error');
+      setFormError(err.message);
     } finally {
       setSubmitting(false);
     }
@@ -213,6 +221,7 @@ export const AdminCustomersPage: React.FC = () => {
     // [KH11] ... Backend cập nhật hồ sơ khách, không gửi hay thay đổi số điện thoại từ form sửa này. [KH12]
     e.preventDefault();
     if (!editCustomer || !user?.token) return;
+    setFormError('');
     setSubmitting(true);
     try {
       const res = await fetch(`${API_BASE}/api/users/customers/${editCustomer._id}`, {
@@ -231,13 +240,13 @@ export const AdminCustomersPage: React.FC = () => {
         })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Lỗi cập nhật');
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Không thể cập nhật khách hàng. Vui lòng thử lại.'));
       showToast(data.message || 'Cập nhật thành công!');
       // [KH13] .. Lưu thành công thì đóng form và tải lại danh sách; lỗi giữ form để sửa.
       setEditCustomer(null);
       fetchCustomers();
     } catch (err: any) {
-      showToast(err.message, 'error');
+      setFormError(err.message);
     } finally {
       setSubmitting(false);
     }
@@ -278,7 +287,9 @@ export const AdminCustomersPage: React.FC = () => {
           </GhostButton>
           <PrimaryButton
             icon="person_add"
-            onClick={() =>
+            onClick={() => {
+              setCustomerErrors({});
+              setFormError('');
               setCreateForm({
                 fullName: '',
                 phone: '',
@@ -287,8 +298,8 @@ export const AdminCustomersPage: React.FC = () => {
                 birthday: '',
                 address: '',
                 initialPoints: 0
-              })
-            }
+              });
+            }}
           >
             Thêm khách hàng
           </PrimaryButton>
@@ -453,7 +464,7 @@ export const AdminCustomersPage: React.FC = () => {
                           Lịch sử
                         </button>
                         <button
-                          onClick={() => setEditCustomer(c)}
+                          onClick={() => { setFormError(''); setEditCustomer(c); }}
                           className="px-2 py-1 rounded-lg hover:bg-stone-100 text-stone-600 font-semibold transition-colors"
                           title="Chỉnh sửa thông tin"
                         >
@@ -643,13 +654,20 @@ export const AdminCustomersPage: React.FC = () => {
         <Modal title="Thêm khách hàng thành viên mới" onClose={() => setCreateForm(null)}>
           {/* [KH07] . Thêm khách hàng mở createForm trống; Hủy hoặc X bỏ form, Tạo khách hàng gọi handleCreateCustomer(). */}
           {/* [KH07] ... Gửi các trường tạo khách sau khi người dùng xác nhận. [KH08] */}
-          <form onSubmit={handleCreateCustomer} className="space-y-3.5 text-xs">
+          <form noValidate onSubmit={handleCreateCustomer} onChangeCapture={event => {
+            const field = event.target.getAttribute('name') || '';
+            setCustomerErrors(current => { const next = { ...current }; delete next[field]; return next; });
+            setFormError('');
+          }} className="space-y-3.5 text-xs">
+            {!!Object.keys(customerErrors).length && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-700"><ul className="list-disc space-y-1 pl-4">{Object.entries(customerErrors).map(([field, message]) => <li key={field} id={`customer-${field}-error`}>{message}</li>)}</ul></div>}
+            {formError && <p role="alert" className="whitespace-pre-line rounded-lg border border-red-200 bg-red-50 p-3 text-red-700">{formError}</p>}
             {/* [KH07] . Họ tên cập nhật createForm.fullName, bắt buộc, tối đa 100 ký tự. */}
             <Field label="Họ và tên khách hàng *" column="users.fullName">
               <input
                 required
                 maxLength={100}
                 value={createForm.fullName}
+                {...customerField('fullName')}
                 onChange={(e) => setCreateForm({ ...createForm, fullName: e.target.value })}
                 placeholder="Nguyễn Văn A"
                 className={inputCls}
@@ -663,6 +681,7 @@ export const AdminCustomersPage: React.FC = () => {
                   required
                   maxLength={15}
                   value={createForm.phone}
+                  {...customerField('phone')}
                   onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
                   placeholder="0901234567"
                   className={inputCls}
@@ -673,6 +692,7 @@ export const AdminCustomersPage: React.FC = () => {
                 <input
                   type="date"
                   value={createForm.birthday}
+                  {...customerField('birthday')}
                   onChange={(e) => setCreateForm({ ...createForm, birthday: e.target.value })}
                   className={inputCls}
                 />
@@ -685,6 +705,7 @@ export const AdminCustomersPage: React.FC = () => {
                 type="email"
                 maxLength={120}
                 value={createForm.email}
+                {...customerField('email')}
                 onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
                 placeholder="khachhang@example.com"
                 className={inputCls}
@@ -700,16 +721,18 @@ export const AdminCustomersPage: React.FC = () => {
                 minLength={8}
                 maxLength={72}
                 value={createForm.password}
+                {...customerField('password')}
                 onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
                 className={inputCls}
               />
-              <span className="text-[10px] text-stone-500">Ít nhất 8 ký tự. Khách hàng dùng mật khẩu này để đăng nhập.</span>
+              <span className="text-[10px] text-stone-500">Ít nhất 8 ký tự, gồm chữ và số, không có khoảng trắng; tối đa 72 byte.</span>
             </Field>
 
             {/* [KH07] . Địa chỉ liên hệ cập nhật createForm.address, được gửi cùng hồ sơ khi tạo khách. */}
             <Field label="Địa chỉ liên hệ" column="users.address">
               <input
                 value={createForm.address}
+                {...customerField('address')}
                 onChange={(e) => setCreateForm({ ...createForm, address: e.target.value })}
                 placeholder="Số nhà, đường, phường, quận..."
                 className={inputCls}
@@ -722,8 +745,9 @@ export const AdminCustomersPage: React.FC = () => {
                 type="number"
                 min={0}
                 value={createForm.initialPoints}
+                {...customerField('initialPoints')}
                 onChange={(e) =>
-                  setCreateForm({ ...createForm, initialPoints: Math.max(0, parseInt(e.target.value) || 0) })
+                  setCreateForm({ ...createForm, initialPoints: Number(e.target.value) })
                 }
                 className={inputCls}
               />
@@ -742,6 +766,7 @@ export const AdminCustomersPage: React.FC = () => {
         <Modal title={`Chỉnh sửa: ${editCustomer.fullName}`} onClose={() => setEditCustomer(null)}>
           {/* [KH11] . Nút sửa lấy khách vào editCustomer; các ô sửa bản nháp, Lưu thông tin gọi handleEditCustomer(), Hủy/X không lưu. */}
           <form onSubmit={handleEditCustomer} className="space-y-3.5 text-xs">
+            {formError && <p role="alert" className="whitespace-pre-line rounded-lg border border-red-200 bg-red-50 p-3 text-red-700">{formError}</p>}
             {/* [KH11] . Họ tên cập nhật editCustomer.fullName. */}
             <Field label="Họ và tên *" column="users.fullName">
               <input

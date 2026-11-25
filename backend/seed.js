@@ -11796,6 +11796,125 @@ const seedData = {
       "documents": [
         {
           "_id": {
+            "$oid": "6af4bfd56c62c988a55af322"
+          },
+          "user": {
+            "$oid": "6af4b8350b44b941144fb48f"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794441600000"
+            }
+          },
+          "shiftName": "Ca đêm",
+          "codPaymentIds": [
+            {
+              "$oid": "6af4c0616c62c988a55af3bd"
+            }
+          ],
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "status": "COMPLETED",
+          "note": "Nộp COD 71000",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794424789163"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794673324261"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          },
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794424894356"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794425572653"
+            }
+          },
+          "endingCashActual": {
+            "$numberInt": "71000"
+          },
+          "endingCashSystem": {
+            "$numberInt": "71000"
+          },
+          "remittanceId": "9e370fe8-1d7f-403a-a39c-16eb489707e5",
+          "codReceivedAmount": {
+            "$numberInt": "71000"
+          },
+          "codReceivedAt": {
+            "$date": {
+              "$numberLong": "1794425714122"
+            }
+          },
+          "codReceivedBy": {
+            "$oid": "6aeb673031b031ff6bfab945"
+          },
+          "codReceivedNote": "",
+          "codReceivingSchedule": {
+            "$oid": "6af4c3046c62c988a55af491"
+          },
+          "shiftEndTime": "12:00",
+          "shiftStartTime": "01:00"
+        },
+        {
+          "_id": {
+            "$oid": "6af4c3046c62c988a55af491"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab945"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1794441600000"
+            }
+          },
+          "shiftName": "Ca đêm",
+          "codPaymentIds": [],
+          "codLedgerVersion": {
+            "$numberInt": "1"
+          },
+          "status": "COMPLETED",
+          "note": "",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1794425604567"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1794673324266"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          },
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1794425641242"
+            }
+          },
+          "startingCash": {
+            "$numberInt": "0"
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1794459600000"
+            }
+          },
+          "shiftEndTime": "12:00",
+          "shiftStartTime": "01:00"
+        },
+        {
+          "_id": {
             "$oid": "6af88872633d649bec85d1f5"
           },
           "user": {
@@ -12399,5 +12518,18 @@ async function importData() {
   console.log('Seed restored. Existing live database passwords were not exported; seeded accounts use SEED_USER_PASSWORD (default: AuraCafe123!).');
 }
 
-if (require.main === module) (process.argv.includes('--export') ? exportSeed() : importData()).catch(error => { console.error(error.message); process.exitCode = 1; }).finally(() => mongoose.disconnect());
-module.exports = { importData, getSnapshot };
+async function mergeData() {
+  const { mergeSnapshot } = require('./utils/seedMerge');
+  const { supplementSnapshot } = require('./utils/seedSupplement');
+  const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/aura_cafe_erp';
+  const parsed = new URL(uri);
+  if (!['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)) throw new Error('Additive seed is restricted to a local development database.');
+  await mongoose.connect(uri, { serverSelectionTimeoutMS: 8000, autoCreate: false, autoIndex: false });
+  const result = await mergeSnapshot(mongoose.connection.db, supplementSnapshot(getSnapshot()), {
+    dryRun: process.argv.includes('--dry-run')
+  });
+  console.log(JSON.stringify({ database: mongoose.connection.name, ...result }, null, 2));
+}
+
+if (require.main === module) (process.argv.includes('--export') ? exportSeed() : process.argv.includes('--merge') ? mergeData() : importData()).catch(error => { console.error(error.message); process.exitCode = 1; }).finally(() => mongoose.disconnect());
+module.exports = { importData, getSnapshot, mergeData };
