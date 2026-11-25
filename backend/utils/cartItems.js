@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const Category = require('../models/Category');
 const { optionText } = require('./optionText');
+const { numberInput } = require('./adminValidation');
 
 const normalizeCartItems = async (rawItems) => {
   if (!Array.isArray(rawItems) || rawItems.length > 50) {
@@ -18,17 +19,19 @@ const normalizeCartItems = async (rawItems) => {
   const byId = new Map(products.map((product) => [String(product._id), product]));
   const normalized = [];
   const seen = new Set();
+  let total = 0;
 
   for (const raw of rawItems) {
     const product = byId.get(String(raw.productId));
     if (!product) throw new Error('Một sản phẩm không còn được bán.');
-    const quantity = Number(raw.quantity);
+    const quantity = numberInput(raw.quantity, `Số lượng món ${product.name}`, 'quantity');
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
       throw new Error('Số lượng mỗi món phải từ 1 đến 99.');
     }
 
     const sizes = product.variantsConfig?.sizes;
-    const size = String(raw.size || 'M');
+    if (raw.size !== undefined && typeof raw.size !== 'string') throw new Error(`Size của ${product.name} phải là tên size hợp lệ.`);
+    const size = raw.size || 'M';
     if (sizes && !Object.prototype.hasOwnProperty.call(sizes, size)) {
       throw new Error(`Size ${size} không có cho ${product.name}.`);
     }
@@ -36,7 +39,7 @@ const normalizeCartItems = async (rawItems) => {
       throw new Error(`${product.name} không có lựa chọn size ${size}.`);
     }
 
-    const options = raw.customization || {};
+    const options = raw.customization ?? {};
     if (typeof options !== 'object' || Array.isArray(options)) throw new Error('Tùy chọn món không hợp lệ.');
     const customization = { size };
     for (const field of ['sugar', 'ice', 'note']) {
@@ -45,7 +48,7 @@ const normalizeCartItems = async (rawItems) => {
         customization[field] = options[field].trim();
       }
     }
-    const toppings = options.topping || [];
+    const toppings = options.topping ?? [];
     if (!Array.isArray(toppings) || toppings.length > 20 || new Set(toppings).size !== toppings.length) throw new Error('Topping không hợp lệ.');
     let toppingPrice = 0;
     const canonicalToppings = [];
@@ -65,18 +68,22 @@ const normalizeCartItems = async (rawItems) => {
     if (seen.has(key)) throw new Error('Giỏ hàng có món trùng lặp.');
     seen.add(key);
 
+    if (raw.checked !== undefined && typeof raw.checked !== 'boolean') throw new Error(`Lựa chọn đặt món ${product.name} phải là bật hoặc tắt.`);
     const modifier = sizes ? Number(sizes[size]) : 0;
     if (!Number.isFinite(modifier) || modifier < 0) throw new Error('Giá size không hợp lệ.');
     if (!Number.isInteger(product.basePrice) || product.basePrice < 0 || !Number.isInteger(modifier)) {
       throw new Error(`Giá của ${product.name} không hợp lệ.`);
     }
+    const unitPrice = product.basePrice + modifier + toppingPrice;
+    total += unitPrice * quantity;
+    if (!Number.isSafeInteger(unitPrice) || !Number.isSafeInteger(total)) throw new Error('Tổng tiền giỏ hàng vượt quá giới hạn số hợp lệ. Vui lòng giảm số lượng món.');
     normalized.push({
       product,
       quantity,
       size,
       customization,
       checked: raw.checked !== false,
-      unitPrice: product.basePrice + modifier + toppingPrice
+      unitPrice
     });
   }
 

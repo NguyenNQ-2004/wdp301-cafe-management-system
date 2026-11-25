@@ -72,12 +72,12 @@ export default function AdminDeliveryAreasPage() {
     e.preventDefault();
     if (!token || saving) return;
     const feeNum = Number(formFee);
-    if (!Number.isSafeInteger(feeNum) || feeNum < 0 || feeNum > 1000000) {
-      setError('Phí giao hàng phải từ 0 đến 1.000.000 VNĐ.');
+    if (!String(formFee).trim() || !Number.isSafeInteger(feeNum) || feeNum < 0 || feeNum > 1000000) {
+      setError('Phí giao hàng phải là số nguyên từ 0 đến 1.000.000 VNĐ, không được để trống.');
       return;
     }
-    if (!formDistrict.trim()) {
-      setError('Tên quận/huyện không được để trống.');
+    if (formDistrict.trim().length < 2 || formDistrict.trim().length > 100) {
+      setError('Tên quận/huyện phải có từ 2 đến 100 ký tự.');
       return;
     }
 

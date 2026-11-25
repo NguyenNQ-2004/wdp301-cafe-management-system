@@ -38,7 +38,7 @@ export default function AdminSuppliersPage() {
   useEffect(() => { void loadSuppliers(); }, [loadSuppliers]);
 
   // K-NCC: openCreate — Mở biểu mẫu trống để thêm nhà cung cấp.
-  const openCreate = () => { setEditing(null); setForm(EMPTY_FORM); setModalOpen(true); };
+  const openCreate = () => { setEditing(null); setForm(EMPTY_FORM); setMessage(''); setModalOpen(true); };
   // K-NCC: openEdit — Nạp hồ sơ đã chọn vào biểu mẫu sửa.
   const openEdit = (supplier: Supplier) => { setEditing(supplier); setForm({ name: supplier.name, phone: supplier.phone || '', address: supplier.address || '', status: supplier.status }); setModalOpen(true); };
   // K-NCC: Dùng chung biểu mẫu khi thêm hoặc sửa nhà cung cấp. Sau khi lưu, tải lại danh sách và số liệu tổng quan.
@@ -82,6 +82,7 @@ export default function AdminSuppliersPage() {
       <tbody className="divide-y divide-stone-100">{suppliers.map((supplier, index) => <tr key={supplier._id} className="hover:bg-stone-50/60"><td className="px-5 py-4 text-stone-500">#{index + 1}</td><td className="px-5 py-4 font-bold text-stone-900">{supplier.name}</td><td className="px-5 py-4 font-mono">{supplier.phone || '—'}</td><td className="px-5 py-4">{supplier.address || '—'}</td><td className="max-w-sm px-5 py-4 text-stone-600">{supplier.ingredients.join(', ') || '—'}</td><td className="px-5 py-4 text-center">{supplier.purchaseOrderCount}</td><td className="px-5 py-4"><Badge className={supplier.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-100 text-stone-600'}>{supplier.status === 'ACTIVE' ? 'Đang hợp tác' : 'Ngừng hợp tác'}</Badge></td><td className="px-5 py-4"><div className="flex gap-4 font-bold text-[#a8071f]"><button type="button" onClick={() => openEdit(supplier)} className="cursor-pointer hover:underline">Sửa</button><button type="button" onClick={() => void removeSupplier(supplier)} className="cursor-pointer hover:underline">Xóa</button></div></td></tr>)}</tbody>
     </table></div></section>}
     {modalOpen ? <Modal title={editing ? 'Sửa nhà cung cấp' : 'Thêm nhà cung cấp'} onClose={() => setModalOpen(false)}><form onSubmit={saveSupplier} className="space-y-4 text-xs">
+      {message && <p role="alert" className="whitespace-pre-line rounded-lg bg-red-50 p-3 text-red-700">{message}</p>}
       <Field label="Tên nhà cung cấp" column="name"><input required maxLength={120} className={inputCls} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></Field>
       <Field label="Số điện thoại" column="phone"><input required maxLength={20} pattern="[0-9+().\s-]{8,20}" className={inputCls} value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} /></Field>
       <Field label="Địa chỉ" column="address"><textarea required maxLength={300} rows={3} className={inputCls} value={form.address} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} /></Field>

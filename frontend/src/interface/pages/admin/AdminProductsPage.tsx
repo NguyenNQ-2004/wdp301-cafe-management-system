@@ -2,6 +2,7 @@ import { NumberInput } from '../../../components/NumberInput';
 import React, { useState } from 'react';
 import ImageInput from '../../../components/ImageInput';
 import { shopApi } from '../../../lib/shopApi';
+import { validateProductForm } from '../../../lib/formValidation';
 import useAuthStore from '../../../store/authStore';
 import { fmtMoney as formatCostMoney } from '../../../data/dbUtils';
 import type { PageRoute, Product } from '../../types';
@@ -17,14 +18,14 @@ interface AdminProductsPageProps {
 interface ProductForm {
   category_id: number;
   name: string;
-  base_price: number;
+  base_price: number | '';
   badge: string;
   subtitle: string;
   description: string;
   image_url: string;
   is_available: boolean;
-  sizes: { name: string; delta: number }[];
-  toppings: { name: string; price: number }[];
+  sizes: { name: string; delta: number | '' }[];
+  toppings: { name: string; price: number | '' }[];
 }
 
 const toForm = (p: Product | null, defaultCategory: number): ProductForm => ({
@@ -49,6 +50,8 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const handleDelete = async () => {
     // [SP07] . Nút thùng rác chọn sản phẩm và mở xác nhận; Hủy chỉ đóng cửa sổ, xác nhận mới gọi hàm này.
     // [SP07] ... Đổi ID giao diện sang MongoDB ID bằng rawId(), gửi DELETE /api/products/:id. [SP08]
@@ -80,49 +83,48 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
     onShowToast?.(`${p.name}: ${!p.is_available ? 'đang bán' : 'tạm ngưng bán'}.`);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     // [SP02] . Nút lưu lấy form đang mở, chuẩn hóa tên và kiểm tra trùng, kiểm tra giá không âm.
     // [SP02] . Size được gom thành tên và phụ thu; topping gồm tên và giá, lưu trong variants_config.
     // [SP02] ... Có editing.id thì cập nhật, chưa có thì tạo mới qua transact(). [SP03]
     e.preventDefault();
-    if (!editing) return;
+    if (!editing || !token || saving) return;
     const f = editing.form;
     const name = f.name.normalize('NFC').trim().replace(/\s+/gu, ' ');
     const nameKey = name.toLocaleLowerCase('vi');
-    if (db.products.some(product => product.id !== editing.id && product.name.normalize('NFC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('vi') === nameKey)) {
-      onShowToast?.('Tên sản phẩm đã tồn tại. Vui lòng chọn tên khác.');
-      return;
-    }
-    if (f.base_price < 0) {
-      onShowToast?.('Giá bán không được âm (chk_product_price).');
-      return;
-    }
-    const sizes = f.sizes.filter(s => s.name.trim());
+    const validation = validateProductForm(f);
+    if (db.products.some(product => product.id !== editing.id && product.name.normalize('NFC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('vi') === nameKey)) validation.push('Tên sản phẩm đã tồn tại. Vui lòng chọn tên khác.');
+    if (!db.categories.some(category => category.id === f.category_id)) validation.push('Vui lòng chọn danh mục sản phẩm hợp lệ.');
+    if (validation.length) { setSaveError(validation.join('\n')); return; }
+    const sizes = f.sizes;
     const row: Omit<Product, 'id'> = {
       category_id: f.category_id,
       name,
-      base_price: f.base_price,
+      base_price: Number(f.base_price),
       badge: f.badge.trim() || null,
       subtitle: f.subtitle.trim() || null,
       description: f.description.trim() || null,
       image_url: f.image_url.trim() || null,
       is_available: f.is_available,
       variants_config: {
-        sizes: Object.fromEntries(sizes.map(s => [s.name.trim(), Number(s.delta) || 0])),
-        toppings: f.toppings.filter(t => t.name.trim()).map(t => ({ name: t.name.trim(), price: Number(t.price) || 0 }))
+        sizes: Object.fromEntries(sizes.map(s => [s.name.trim(), Number(s.delta)])),
+        toppings: f.toppings.map(t => ({ name: t.name.trim(), price: Number(t.price) }))
       }
     };
-    if (editing.id) {
-      transact(tx => tx.update('products', editing.id!, row));
-      onShowToast?.(`Đã cập nhật "${row.name}".`);
-    } else {
-      transact(tx => tx.insert('products', row));
-      onShowToast?.(`Đã thêm món "${row.name}". Hãy khai báo công thức (BOM) cho món.`);
-    }
-    setEditing(null);
+    setSaving(true); setSaveError('');
+    try {
+      await shopApi(editing.id ? `/api/products/${rawId(editing.id)}` : '/api/products', {
+        method: editing.id ? 'PUT' : 'POST', token,
+        body: { name: row.name, category: rawId(row.category_id), basePrice: row.base_price, badge: row.badge, subtitle: row.subtitle, description: row.description, imageUrl: row.image_url, isAvailable: row.is_available, variantsConfig: row.variants_config }
+      });
+      await refresh();
+      setEditing(null);
+      onShowToast?.(editing.id ? `Đã cập nhật "${row.name}".` : `Đã thêm món "${row.name}". Hãy khai báo công thức cho món.`);
+    } catch (error) { setSaveError((error as Error).message); }
+    finally { setSaving(false); }
   };
 
-  const setForm = (patch: Partial<ProductForm>) => setEditing(prev => (prev ? { ...prev, form: { ...prev.form, ...patch } } : prev));
+  const setForm = (patch: Partial<ProductForm>) => { setSaveError(''); setEditing(prev => (prev ? { ...prev, form: { ...prev.form, ...patch } } : prev)); };
   // [SP01] . setForm() chỉ cập nhật bản nháp; Thêm món mới tạo form rỗng, Sửa dùng toForm() điền dữ liệu món đã chọn.
 
   const withCost = db.products.map(p => ({ p, cost: productCost(db, p.id) }));
@@ -136,7 +138,7 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
       title="Quản lý sản phẩm & giá bán"
       subtitle="Giá vốn được tính từ công thức (product_ingredients) × giá nhập gần nhất (purchase_order_items)."
       actions={
-        <PrimaryButton icon="add" onClick={() => setEditing({ id: null, form: toForm(null, db.categories[0]?.id ?? 1) })}>
+        <PrimaryButton icon="add" onClick={() => { setSaveError(''); setEditing({ id: null, form: toForm(null, db.categories[0]?.id ?? 1) }); }}>
           Thêm món mới
         </PrimaryButton>
       }
@@ -249,7 +251,8 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
         <Modal title={editing.id ? `Sửa sản phẩm #${editing.id}` : 'Thêm sản phẩm'} onClose={() => setEditing(null)} wide>
           {/* [SP01] . Hủy hoặc X đóng form, chưa ghi dữ liệu; Thêm sản phẩm/Lưu thay đổi gọi handleSave(). */}
           {/* [SP01] ... Gửi bản nháp để kiểm tra trước khi lưu. [SP02] */}
-          <form onSubmit={handleSave} className="space-y-3">
+          <form noValidate onSubmit={handleSave} className="space-y-3">
+            {saveError && <p role="alert" className="whitespace-pre-line rounded-lg border border-red-200 bg-red-50 p-3 text-red-700">{saveError}</p>}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* [SP01] . Tên món cập nhật name, bắt buộc và tối đa 150 ký tự; tên trùng bị chặn khi lưu. */}
               <Field label="Tên món *" column="name">
@@ -265,7 +268,7 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
               </Field>
               {/* [SP01] . Giá cơ bản cập nhật base_price dạng số; đây là giá chưa cộng size và topping. */}
               <Field label="Giá cơ bản (VNĐ) *" column="base_price">
-                <NumberInput type="number" min={0} required value={editing.form.base_price} onChange={e => setForm({ base_price: Number(e.target.value) })} className={inputCls} />
+                <NumberInput type="number" min={0} required value={editing.form.base_price} onChange={e => setForm({ base_price: e.target.value === '' ? '' : Number(e.target.value) })} className={inputCls} />
               </Field>
               {/* [SP01] . ImageInput nhận URL hoặc đọc tệp thành data URL và trả về image_url trên form. */}
               <Field label="Ảnh sản phẩm" column="image_url">
@@ -296,7 +299,7 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
                     type="number"
                     min={0}
                     value={s.delta}
-                    onChange={e => setForm({ sizes: editing.form.sizes.map((x, idx) => (idx === i ? { ...x, delta: Number(e.target.value) } : x)) })}
+                    onChange={e => setForm({ sizes: editing.form.sizes.map((x, idx) => (idx === i ? { ...x, delta: e.target.value === '' ? '' : Number(e.target.value) } : x)) })}
                     className={`${inputCls} w-32`}
                   />
                   <button type="button" onClick={() => setForm({ sizes: editing.form.sizes.filter((_, idx) => idx !== i) })} className="px-2 text-stone-400 hover:text-rose-600">
@@ -328,7 +331,7 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
                     type="number"
                     min={0}
                     value={t.price}
-                    onChange={e => setForm({ toppings: editing.form.toppings.map((x, idx) => (idx === i ? { ...x, price: Number(e.target.value) } : x)) })}
+                    onChange={e => setForm({ toppings: editing.form.toppings.map((x, idx) => (idx === i ? { ...x, price: e.target.value === '' ? '' : Number(e.target.value) } : x)) })}
                     className={`${inputCls} w-32`}
                   />
                   <button type="button" onClick={() => setForm({ toppings: editing.form.toppings.filter((_, idx) => idx !== i) })} className="px-2 text-stone-400 hover:text-rose-600">
@@ -347,7 +350,7 @@ export const AdminProductsPage: React.FC<AdminProductsPageProps> = ({ onNavigate
               Đang bán <span className="font-mono text-[10px] text-stone-400">is_available</span>
             </label>
 
-            <FormActions onCancel={() => setEditing(null)} submitLabel={editing.id ? 'Lưu thay đổi' : 'Thêm sản phẩm'} />
+            <FormActions loading={saving} onCancel={() => setEditing(null)} submitLabel={saving ? 'Đang lưu...' : editing.id ? 'Lưu thay đổi' : 'Thêm sản phẩm'} />
           </form>
         </Modal>
       )}

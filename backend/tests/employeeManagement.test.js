@@ -52,7 +52,8 @@ test('UC23 allows admin to manage staff without exposing credentials or affectin
   assert.equal((await request('GET', '/api/employees', null, customerToken)).status, 403);
   assert.equal((await request('POST', '/api/employees', { fullName: 'Blocked' }, customerToken)).status, 403);
 
-  const employeeData = { fullName: '  Thu ngân A  ', phone: '0999000023', email: 'test-0999000023@example.com', password: 'employee-password', position: 'CASHIER', baseSalary: 6500000, hireDate: '2026-10-01' };
+  const employeeData = { fullName: '  Thu ngân A  ', phone: '0999000023', email: 'test-0999000023@example.com', password: 'employee-password1', position: 'CASHIER', baseSalary: 6500000, hireDate: '2026-10-01' };
+  assert.equal((await request('POST', '/api/employees', { ...employeeData, password: 'employee-password' }, adminToken)).status, 400);
   assert.equal((await request('POST', '/api/employees', { ...employeeData, password: undefined }, adminToken)).status, 400);
   assert.equal((await request('POST', '/api/employees', { ...employeeData, role: 'ADMIN' }, adminToken)).status, 400);
   assert.equal((await request('POST', '/api/employees', { ...employeeData, baseSalary: -1 }, adminToken)).status, 400);
@@ -81,7 +82,10 @@ test('UC23 allows admin to manage staff without exposing credentials or affectin
   assert.equal(updated.data.hireDate, null);
   assert.equal((await request('POST', '/api/auth/login', { email: employeeData.email, password: employeeData.password })).status, 403);
   assert.equal((await request('GET', '/api/employees', null, staffToken)).status, 403);
-  assert.equal((await request('PUT', `/api/employees/${created.data._id}`, { status: 'ACTIVE', password: 'new-employee-password' }, adminToken)).status, 200);
-  assert.equal((await request('POST', '/api/auth/login', { email: employeeData.email, password: 'new-employee-password' })).status, 200);
+  assert.equal((await request('PUT', `/api/employees/${created.data._id}`, { status: 'ACTIVE', password: 'new-employee-password1' }, adminToken)).status, 200);
+  assert.equal((await request('GET', '/api/auth/me', null, staffToken)).status, 401, 'Admin reset must revoke previous employee sessions');
+  const replacementSession = await request('POST', '/api/auth/login', { email: employeeData.email, password: 'new-employee-password1' });
+  assert.equal(replacementSession.status, 200);
+  assert.equal((await request('GET', '/api/auth/me', null, replacementSession.data.token)).status, 200);
   assert.equal((await User.findById(customer._id)).role, 'CUSTOMER');
 });

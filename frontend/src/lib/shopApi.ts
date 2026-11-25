@@ -1,5 +1,6 @@
 import type { CartItem, CatalogProduct } from '../types/shop';
 import { repairDisplayData, repairDisplayText } from './displayText';
+import { apiErrorMessage } from './formValidation';
 
 export const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
 
@@ -25,7 +26,7 @@ export async function shopApi<T>(path: string, options: { method?: string; token
     body: options.body ? JSON.stringify(options.body) : undefined
   });
   const data = repairDisplayData(await response.json().catch(() => null));
-  if (!response.ok) throw new ShopApiError(data?.message || (response.status === 404 ? 'API cho chức năng này chưa được kết nối (404).' : 'Không kết nối được với máy chủ.'), response.status, data);
+  if (!response.ok) throw new ShopApiError(apiErrorMessage(data, response.status === 404 ? 'API cho chức năng này chưa được kết nối (404).' : 'Không kết nối được với máy chủ.'), response.status, data);
   return data as T;
 }
 

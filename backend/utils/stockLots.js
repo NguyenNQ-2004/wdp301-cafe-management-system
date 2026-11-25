@@ -51,9 +51,10 @@ async function mutateLots(id, mutate) {
 
 // K-XN: moveStock — Tạo lô khi tăng tồn hoặc phân bổ xuất theo FIFO khi giảm tồn.
 async function moveStock(id, delta, options = {}) {
-  if (!Number.isFinite(delta) || Math.abs(delta) < 0.001) throw invalid('Số lượng kho không hợp lệ.');
+  if (!Number.isFinite(delta) || Math.abs(delta) < 0.001 || Math.abs(delta) > Number.MAX_SAFE_INTEGER) throw invalid('Số lượng kho phải từ 0.001 và nằm trong giới hạn số hợp lệ.');
   return mutateLots(id, (ingredient, lots) => {
     const currentStock = quantity(ingredient.currentStock + delta);
+    if (!Number.isFinite(currentStock) || currentStock > Number.MAX_SAFE_INTEGER) throw invalid('Tồn kho sau điều chỉnh vượt quá giới hạn số hợp lệ. Vui lòng giảm số lượng nhập.');
     if (currentStock < -EPSILON) throw invalid('Số lượng xuất vượt quá tồn kho hiện tại.', 409);
     const allocations = [];
     if (delta > 0) {

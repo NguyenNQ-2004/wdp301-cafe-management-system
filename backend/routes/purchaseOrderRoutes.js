@@ -128,7 +128,7 @@ router.post('/', async (req, res) => {
     const populated = await populateOrder(PurchaseOrder.findById(order._id));
     res.status(201).json(populated);
   } catch (error) {
-    res.status(error.status || 500).json({ message: error.message });
+    res.status(error.status || 500).json({ message: error.message, ...(error.errors && error.status === 400 ? { errors: error.errors } : {}) });
   }
 });
 

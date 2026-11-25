@@ -10,6 +10,13 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '3mb' }));
+app.use('/api', (req, res, next) => {
+  if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+    if (Array.isArray(req.body)) return res.status(400).json({ message: 'Dữ liệu gửi lên phải là một đối tượng JSON, không phải danh sách.' });
+    req.body ??= {};
+  }
+  next();
+});
 
 app.get('/', (req, res) => {
   res.send('API của hệ thống Aura Cafe ERP đang hoạt động...');
@@ -65,6 +72,7 @@ app.get('/api/vouchers', async (req, res) => {
 
 // Middleware xử lý lỗi chung (JSON không hợp lệ, lỗi server)
 app.use((err, req, res, next) => {
+  if (err.type === 'entity.too.large') return res.status(413).json({ message: 'Dữ liệu gửi lên quá lớn. Vui lòng dùng ảnh nhỏ hơn hoặc giảm nội dung biểu mẫu (tối đa 3 MB).' });
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     return res.status(400).json({ message: 'Dữ liệu JSON không hợp lệ.' });
   }

@@ -5,7 +5,7 @@ const Ingredient = require('../models/Ingredient');
 const { latestPurchasePrices } = require('../utils/purchasePrices');
 const { protect, adminOnly } = require('../middlewares/authMiddleware');
 const { lockIngredients, moveStock, undoStockMove } = require('../utils/stockLots');
-const { invalid } = require('../utils/adminValidation');
+const { invalid, numberInput, sendError } = require('../utils/adminValidation');
 
 const { atomicRouter } = require('../utils/atomicRoute');
 const router = atomicRouter(express.Router());
@@ -95,9 +95,11 @@ router.post('/', adminOnly, async (req, res) => {
   try {
     const { ingredient, transactionType, referenceId, note } = req.body;
     if (!['ADJUSTMENT', 'SPOILAGE'].includes(transactionType)) return res.status(400).json({ message: 'Nhập hàng và xuất pha chế phải được tạo qua luồng phiếu nhập hoặc đơn hàng.' });
-    const quantity = Number(req.body.quantity);
+    const quantity = numberInput(req.body.quantity, 'Số lượng điều chỉnh kho', 'quantity');
+    if (referenceId !== undefined && referenceId !== null && !mongoose.isValidObjectId(referenceId)) throw invalid('Mã tham chiếu điều chỉnh kho không hợp lệ.');
+    if (note !== undefined && (typeof note !== 'string' || note.trim().length > 500)) throw invalid('Ghi chú điều chỉnh kho phải là văn bản có tối đa 500 ký tự.');
     if (!mongoose.isValidObjectId(ingredient) || !TRANSACTION_TYPES.includes(transactionType) || !Number.isFinite(quantity) || quantity <= 0) {
-      return res.status(400).json({ message: 'Thông tin biến động kho không hợp lệ.' });
+      return res.status(400).json({ message: !mongoose.isValidObjectId(ingredient) ? 'Vui lòng chọn nguyên liệu hợp lệ để điều chỉnh kho.' : 'Số lượng điều chỉnh kho phải lớn hơn 0.' });
     }
     if (transactionType === 'ADJUSTMENT' && typeof req.body.isAddition !== 'boolean') {
       return res.status(400).json({ message: 'Phiếu điều chỉnh phải xác định tăng hoặc giảm kho.' });
@@ -127,7 +129,7 @@ router.post('/', adminOnly, async (req, res) => {
     await transaction.populate([{ path: 'ingredient', select: 'name unit currentStock' }, { path: 'createdBy', select: 'fullName' }]);
     return res.status(201).json({ message: 'Ghi nhận biến động kho thành công!', transaction: transactionJson(transaction), updatedStock: movement.currentStock });
   } catch (error) {
-    res.status(error.status || 500).json({ message: error.message });
+    sendError(res, error);
   } finally { release?.(); }
 });
 

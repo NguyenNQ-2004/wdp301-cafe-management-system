@@ -55,7 +55,8 @@ test('restock overview and proposal approval flow', async (t) => {
   assert.equal(overview.data.ingredients.find((item) => item.name === 'Low ingredient').needsRestock, true);
 
   const mismatch = await request('/api/purchase-orders', { method: 'POST', token: adminToken, body: { supplier: supplier._id, items: [{ ingredient: safeIngredient._id, quantity: 2, unitPrice: 10 }] } });
-  assert.equal(mismatch.status, 400);
+  assert.equal(mismatch.status, 201, 'An ingredient can be purchased from another active supplier');
+  assert.equal((await Ingredient.findById(safeIngredient._id)).currentStock, 20, 'A draft must not add inventory');
   const created = await request('/api/purchase-orders', { method: 'POST', token: adminToken, body: { supplier: supplier._id, items: [{ ingredient: lowIngredient._id, quantity: 30, unitPrice: 50 }], note: 'Restock test' } });
   assert.equal(created.status, 201);
   assert.equal(created.data.status, 'DRAFT');

@@ -23,6 +23,7 @@ router.put('/profile', protect, async (req, res) => {
   // [HS03] ... Trả hồ sơ vừa lưu để cập nhật form và phiên trên giao diện. [HS04]
   try {
     if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) return res.status(400).json({ message: 'Thông tin hồ sơ không hợp lệ.' });
+    if (!Object.keys(req.body).length) return res.status(400).json({ message: 'Chưa có thông tin hồ sơ cần cập nhật.' });
     const { fullName, phone, email, birthday, address } = req.body;
     if (fullName !== undefined && (typeof fullName !== 'string' || !fullName.trim() || fullName.trim().length > 100)) return res.status(400).json({ message: 'Họ tên phải có từ 1 đến 100 ký tự.' });
     if (fullName !== undefined && !validFullName(fullName)) return res.status(400).json({ message: 'Họ tên không hợp lệ. Chỉ dùng chữ cái, khoảng trắng, dấu gạch nối hoặc dấu nháy.' });
