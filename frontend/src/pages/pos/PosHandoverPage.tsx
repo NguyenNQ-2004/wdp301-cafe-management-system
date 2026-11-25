@@ -199,7 +199,8 @@ export default function PosHandoverPage() {
         if (queryScheduleId && rows.some((row) => row._id === queryScheduleId)) {
           setSelectedId(queryScheduleId);
         } else {
-          setSelectedId((current) => rows.some((row) => row._id === current) ? current : rows[0]?._id || null);
+          const activeShift = rows.find((row) => row.status === 'PRESENT' && !!row.checkInTime && !row.checkOutTime && !row.handoverAt);
+          setSelectedId((current) => activeShift?._id ?? (rows.some((row) => row._id === current) ? current : rows[0]?._id || null));
         }
         setError('');
       })

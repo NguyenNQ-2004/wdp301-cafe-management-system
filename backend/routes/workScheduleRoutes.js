@@ -54,7 +54,9 @@ const assertFutureOrToday = (date) => {
 const getShiftTime = resolveShift;
 const cashHandoverQuery = (schedule, now) => ({
   _id: { $ne: schedule._id },
-  workDate: { $lte: schedule.workDate },
+  // A handover can continue into the next calendar day, but an older demo/closed shift
+  // must not block the first cashier of a new workday.
+  workDate: { $gte: new Date(schedule.workDate.getTime() - 86400000), $lte: schedule.workDate },
   handoverAt: { $exists: true, $lte: now },
   endingCashActual: { $gte: 0 }
 });
@@ -62,7 +64,7 @@ const latestCashHandover = async (schedule, now = new Date()) => {
   const fields = 'user workDate shiftName status handoverAt checkOutTime endingCashActual cashTransferTo';
   const assigned = await WorkSchedule.findOne({ ...cashHandoverQuery(schedule, now), cashTransferTo: schedule._id })
     .select(fields).populate('user', 'fullName phone position').sort({ handoverAt: -1 });
-  return assigned || WorkSchedule.findOne(cashHandoverQuery(schedule, now))
+  return assigned || WorkSchedule.findOne({ ...cashHandoverQuery(schedule, now), cashTransferTo: { $exists: false } })
     .select(fields).populate('user', 'fullName phone position').sort({ handoverAt: -1 });
 };
 

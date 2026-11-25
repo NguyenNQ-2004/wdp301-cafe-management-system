@@ -11,9 +11,9 @@ const seedData = {
   "formatVersion": {
     "$numberInt": "1"
   },
-  "exportedAt": "2026-11-25T15:51:59.470Z",
+  "exportedAt": "2026-11-25T18:17:43.089Z",
   "sourceDatabase": "aura_cafe_erp",
-  "notes": "Shared local demo fixture with staff, orders, inventory, purchase and handover states. Password hashes and reset tokens are excluded; seeded accounts use SEED_USER_PASSWORD.",
+  "notes": "Real password hashes and password recovery sessions are excluded. Seeded accounts use SEED_USER_PASSWORD.",
   "collections": [
     {
       "name": "carts",
@@ -37,7 +37,7 @@ const seedData = {
             "$oid": "6aeb673031b031ff6bfab946"
           },
           "__v": {
-            "$numberInt": "4"
+            "$numberInt": "6"
           },
           "createdAt": {
             "$date": {
@@ -47,7 +47,7 @@ const seedData = {
           "items": [],
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794684822570"
+              "$numberLong": "1795627470085"
             }
           }
         },
@@ -105,7 +105,7 @@ const seedData = {
           ],
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794468002376"
+              "$numberLong": "1795626127233"
             }
           }
         },
@@ -574,6 +574,38 @@ const seedData = {
           "updatedAt": {
             "$date": {
               "$numberLong": "1794679885163"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b0714e368660abe72e6fec1"
+          },
+          "customer": {
+            "$oid": "6aeb673031b031ff6bfab946"
+          },
+          "order": {
+            "$oid": "6b07129168660abe72e6f5f4"
+          },
+          "issueType": "RATING",
+          "rating": {
+            "$numberInt": "5"
+          },
+          "content": "okok",
+          "attachments": [],
+          "status": "PENDING",
+          "submissionKey": "6aeb673031b031ff6bfab946:6b07129168660abe72e6f5f4",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795626211507"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795626211507"
             }
           },
           "__v": {
@@ -1190,13 +1222,13 @@ const seedData = {
           "name": "Peach syrup",
           "unit": "ml",
           "currentStock": {
-            "$numberInt": "4910"
+            "$numberInt": "4850"
           },
           "minStockLevel": {
             "$numberInt": "1000"
           },
           "lotsVersion": {
-            "$numberInt": "2"
+            "$numberInt": "4"
           },
           "__v": {
             "$numberInt": "0"
@@ -1213,7 +1245,7 @@ const seedData = {
                 "$numberInt": "5000"
               },
               "remainingQuantity": {
-                "$numberInt": "4910"
+                "$numberInt": "4850"
               },
               "unitCost": null,
               "_id": {
@@ -1232,13 +1264,13 @@ const seedData = {
           "name": "Black tea",
           "unit": "gram",
           "currentStock": {
-            "$numberInt": "6970"
+            "$numberInt": "6050"
           },
           "minStockLevel": {
             "$numberInt": "1500"
           },
           "lotsVersion": {
-            "$numberInt": "4"
+            "$numberInt": "7"
           },
           "__v": {
             "$numberInt": "0"
@@ -1255,7 +1287,7 @@ const seedData = {
                 "$numberInt": "8000"
               },
               "remainingQuantity": {
-                "$numberInt": "6970"
+                "$numberInt": "6050"
               },
               "unitCost": {
                 "$numberDouble": "86.0832137733142"
@@ -1398,13 +1430,13 @@ const seedData = {
           "name": "Orange",
           "unit": "piece",
           "currentStock": {
-            "$numberInt": "97"
+            "$numberInt": "95"
           },
           "minStockLevel": {
             "$numberInt": "20"
           },
           "lotsVersion": {
-            "$numberInt": "2"
+            "$numberInt": "4"
           },
           "__v": {
             "$numberInt": "0"
@@ -1421,7 +1453,7 @@ const seedData = {
                 "$numberInt": "100"
               },
               "remainingQuantity": {
-                "$numberInt": "97"
+                "$numberInt": "95"
               },
               "unitCost": null,
               "_id": {
@@ -3573,6 +3605,382 @@ const seedData = {
         },
         {
           "_id": {
+            "$oid": "6b07132368660abe72e6f842"
+          },
+          "ingredient": {
+            "$oid": "6aeb673031b031ff6bfab965"
+          },
+          "transactionType": "OUT_ORDER",
+          "quantity": {
+            "$numberInt": "30"
+          },
+          "valueBefore": null,
+          "valueAfter": null,
+          "stockDelta": {
+            "$numberInt": "-30"
+          },
+          "referenceType": "ORDER",
+          "referenceId": {
+            "$oid": "6b07129168660abe72e6f5f4"
+          },
+          "createdBy": {
+            "$oid": "6aeb673031b031ff6bfab944"
+          },
+          "costTotal": null,
+          "lotAllocations": [
+            {
+              "lotId": {
+                "$oid": "6aef2649965dbc8f45a5c45a"
+              },
+              "quantity": {
+                "$numberInt": "30"
+              },
+              "unitCost": null,
+              "_id": {
+                "$oid": "6b07132368660abe72e6f846"
+              }
+            }
+          ],
+          "__v": {
+            "$numberInt": "0"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795625763685"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795625763685"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b07132368660abe72e6f843"
+          },
+          "ingredient": {
+            "$oid": "6aeb673031b031ff6bfab966"
+          },
+          "transactionType": "OUT_ORDER",
+          "quantity": {
+            "$numberInt": "310"
+          },
+          "valueBefore": null,
+          "valueAfter": null,
+          "stockDelta": {
+            "$numberInt": "-310"
+          },
+          "referenceType": "ORDER",
+          "referenceId": {
+            "$oid": "6b07129168660abe72e6f5f4"
+          },
+          "createdBy": {
+            "$oid": "6aeb673031b031ff6bfab944"
+          },
+          "costTotal": {
+            "$numberDouble": "26685.8"
+          },
+          "lotAllocations": [
+            {
+              "lotId": {
+                "$oid": "6aef2649965dbc8f45a5c45d"
+              },
+              "quantity": {
+                "$numberInt": "310"
+              },
+              "unitCost": {
+                "$numberDouble": "86.0832137733142"
+              },
+              "_id": {
+                "$oid": "6b07132368660abe72e6f848"
+              }
+            }
+          ],
+          "__v": {
+            "$numberInt": "0"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795625763686"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795625763686"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b07132368660abe72e6f844"
+          },
+          "ingredient": {
+            "$oid": "6aeb673031b031ff6bfab969"
+          },
+          "transactionType": "OUT_ORDER",
+          "quantity": {
+            "$numberInt": "1"
+          },
+          "valueBefore": null,
+          "valueAfter": null,
+          "stockDelta": {
+            "$numberInt": "-1"
+          },
+          "referenceType": "ORDER",
+          "referenceId": {
+            "$oid": "6b07129168660abe72e6f5f4"
+          },
+          "createdBy": {
+            "$oid": "6aeb673031b031ff6bfab944"
+          },
+          "costTotal": null,
+          "lotAllocations": [
+            {
+              "lotId": {
+                "$oid": "6aef2649965dbc8f45a5c460"
+              },
+              "quantity": {
+                "$numberInt": "1"
+              },
+              "unitCost": null,
+              "_id": {
+                "$oid": "6b07132368660abe72e6f84a"
+              }
+            }
+          ],
+          "__v": {
+            "$numberInt": "0"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795625763686"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795625763686"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b0719854392a7c74d7fbc7a"
+          },
+          "ingredient": {
+            "$oid": "6aeb673031b031ff6bfab965"
+          },
+          "transactionType": "OUT_ORDER",
+          "quantity": {
+            "$numberInt": "30"
+          },
+          "valueBefore": null,
+          "valueAfter": null,
+          "stockDelta": {
+            "$numberInt": "-30"
+          },
+          "referenceType": "ORDER",
+          "referenceId": {
+            "$oid": "6b0719624392a7c74d7fbb98"
+          },
+          "createdBy": {
+            "$oid": "a6592f80e4d4b7e262a58728"
+          },
+          "costTotal": null,
+          "lotAllocations": [
+            {
+              "lotId": {
+                "$oid": "6aef2649965dbc8f45a5c45a"
+              },
+              "quantity": {
+                "$numberInt": "30"
+              },
+              "unitCost": null,
+              "_id": {
+                "$oid": "6b0719854392a7c74d7fbc7e"
+              }
+            }
+          ],
+          "__v": {
+            "$numberInt": "0"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795627397541"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795627397541"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b0719854392a7c74d7fbc7b"
+          },
+          "ingredient": {
+            "$oid": "6aeb673031b031ff6bfab966"
+          },
+          "transactionType": "OUT_ORDER",
+          "quantity": {
+            "$numberInt": "310"
+          },
+          "valueBefore": null,
+          "valueAfter": null,
+          "stockDelta": {
+            "$numberInt": "-310"
+          },
+          "referenceType": "ORDER",
+          "referenceId": {
+            "$oid": "6b0719624392a7c74d7fbb98"
+          },
+          "createdBy": {
+            "$oid": "a6592f80e4d4b7e262a58728"
+          },
+          "costTotal": {
+            "$numberDouble": "26685.8"
+          },
+          "lotAllocations": [
+            {
+              "lotId": {
+                "$oid": "6aef2649965dbc8f45a5c45d"
+              },
+              "quantity": {
+                "$numberInt": "310"
+              },
+              "unitCost": {
+                "$numberDouble": "86.0832137733142"
+              },
+              "_id": {
+                "$oid": "6b0719854392a7c74d7fbc80"
+              }
+            }
+          ],
+          "__v": {
+            "$numberInt": "0"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795627397542"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795627397542"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b0719854392a7c74d7fbc7c"
+          },
+          "ingredient": {
+            "$oid": "6aeb673031b031ff6bfab969"
+          },
+          "transactionType": "OUT_ORDER",
+          "quantity": {
+            "$numberInt": "1"
+          },
+          "valueBefore": null,
+          "valueAfter": null,
+          "stockDelta": {
+            "$numberInt": "-1"
+          },
+          "referenceType": "ORDER",
+          "referenceId": {
+            "$oid": "6b0719624392a7c74d7fbb98"
+          },
+          "createdBy": {
+            "$oid": "a6592f80e4d4b7e262a58728"
+          },
+          "costTotal": null,
+          "lotAllocations": [
+            {
+              "lotId": {
+                "$oid": "6aef2649965dbc8f45a5c460"
+              },
+              "quantity": {
+                "$numberInt": "1"
+              },
+              "unitCost": null,
+              "_id": {
+                "$oid": "6b0719854392a7c74d7fbc82"
+              }
+            }
+          ],
+          "__v": {
+            "$numberInt": "0"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795627397542"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795627397542"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b071d09b68137d85fed4399"
+          },
+          "ingredient": {
+            "$oid": "6aeb673031b031ff6bfab966"
+          },
+          "transactionType": "OUT_ORDER",
+          "quantity": {
+            "$numberInt": "300"
+          },
+          "valueBefore": null,
+          "valueAfter": null,
+          "stockDelta": {
+            "$numberInt": "-300"
+          },
+          "referenceType": "ORDER",
+          "referenceId": {
+            "$oid": "6b071ce0b68137d85fed4244"
+          },
+          "createdBy": {
+            "$oid": "a6592f80e4d4b7e262a58728"
+          },
+          "costTotal": {
+            "$numberDouble": "25824.96"
+          },
+          "lotAllocations": [
+            {
+              "lotId": {
+                "$oid": "6aef2649965dbc8f45a5c45d"
+              },
+              "quantity": {
+                "$numberInt": "300"
+              },
+              "unitCost": {
+                "$numberDouble": "86.0832137733142"
+              },
+              "_id": {
+                "$oid": "6b071d09b68137d85fed439b"
+              }
+            }
+          ],
+          "__v": {
+            "$numberInt": "0"
+          },
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795628297956"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795628297956"
+            }
+          }
+        },
+        {
+          "_id": {
             "$oid": "7ebc5843876bca55df12b45e"
           },
           "ingredient": {
@@ -4553,6 +4961,111 @@ const seedData = {
           },
           "balanceAfter": {
             "$numberInt": "597"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b0714b868660abe72e6fd5f"
+          },
+          "customer": {
+            "$oid": "6aeb673031b031ff6bfab946"
+          },
+          "order": {
+            "$oid": "6b07129168660abe72e6f5f4"
+          },
+          "pointsChange": {
+            "$numberInt": "90"
+          },
+          "automatic": true,
+          "redemptionRefund": false,
+          "earningReversal": false,
+          "transactionType": "EARN",
+          "reason": "Tích điểm thanh toán, không bao gồm phí giao hàng",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795626168959"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795626168981"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          },
+          "balanceAfter": {
+            "$numberInt": "687"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b0719cb4392a7c74d7fbda5"
+          },
+          "customer": {
+            "$oid": "6aeb673031b031ff6bfab946"
+          },
+          "order": {
+            "$oid": "6b0719624392a7c74d7fbb98"
+          },
+          "pointsChange": {
+            "$numberInt": "90"
+          },
+          "automatic": true,
+          "redemptionRefund": false,
+          "earningReversal": false,
+          "transactionType": "EARN",
+          "reason": "Tích điểm thanh toán, không bao gồm phí giao hàng",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795627467314"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795627467320"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          },
+          "balanceAfter": {
+            "$numberInt": "777"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b071a384392a7c74d7fbeeb"
+          },
+          "customer": {
+            "$oid": "6aeb673031b031ff6bfab946"
+          },
+          "order": {
+            "$oid": "17dd10ba0c54b2d76f32116f"
+          },
+          "pointsChange": {
+            "$numberInt": "35"
+          },
+          "automatic": true,
+          "redemptionRefund": false,
+          "earningReversal": false,
+          "transactionType": "EARN",
+          "reason": "Tích điểm thanh toán, không bao gồm phí giao hàng",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795627576448"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795627576454"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          },
+          "balanceAfter": {
+            "$numberInt": "812"
           }
         }
       ]
@@ -5989,6 +6502,198 @@ const seedData = {
         },
         {
           "_id": {
+            "$oid": "6b07129168660abe72e6f5f5"
+          },
+          "order": {
+            "$oid": "6b07129168660abe72e6f5f4"
+          },
+          "product": {
+            "$oid": "6aeb673031b031ff6bfab958"
+          },
+          "productNameAtTime": "Trà Đào Cam Sả Tươi",
+          "unitPrice": {
+            "$numberInt": "45000"
+          },
+          "customization": {
+            "size": "M"
+          },
+          "quantity": {
+            "$numberInt": "1"
+          },
+          "subtotal": {
+            "$numberInt": "45000"
+          },
+          "isPrepared": true,
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795625617220"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795625779232"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b07129168660abe72e6f5f6"
+          },
+          "order": {
+            "$oid": "6b07129168660abe72e6f5f4"
+          },
+          "product": {
+            "$oid": "6aeb673031b031ff6bfab954"
+          },
+          "productNameAtTime": "Cà Phê Muối Aura Đặc Biệt",
+          "unitPrice": {
+            "$numberInt": "45000"
+          },
+          "customization": {
+            "size": "M"
+          },
+          "quantity": {
+            "$numberInt": "1"
+          },
+          "subtotal": {
+            "$numberInt": "45000"
+          },
+          "isPrepared": true,
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795625617225"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795625783557"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b0719624392a7c74d7fbb99"
+          },
+          "order": {
+            "$oid": "6b0719624392a7c74d7fbb98"
+          },
+          "product": {
+            "$oid": "6aeb673031b031ff6bfab958"
+          },
+          "productNameAtTime": "Trà Đào Cam Sả Tươi",
+          "unitPrice": {
+            "$numberInt": "45000"
+          },
+          "customization": {
+            "size": "M"
+          },
+          "quantity": {
+            "$numberInt": "1"
+          },
+          "subtotal": {
+            "$numberInt": "45000"
+          },
+          "isPrepared": true,
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795627362976"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795627401793"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b0719624392a7c74d7fbb9a"
+          },
+          "order": {
+            "$oid": "6b0719624392a7c74d7fbb98"
+          },
+          "product": {
+            "$oid": "6aeb673031b031ff6bfab954"
+          },
+          "productNameAtTime": "Cà Phê Muối Aura Đặc Biệt",
+          "unitPrice": {
+            "$numberInt": "45000"
+          },
+          "customization": {
+            "size": "M"
+          },
+          "quantity": {
+            "$numberInt": "1"
+          },
+          "subtotal": {
+            "$numberInt": "45000"
+          },
+          "isPrepared": true,
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795627362981"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795627402563"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b071ce0b68137d85fed4245"
+          },
+          "order": {
+            "$oid": "6b071ce0b68137d85fed4244"
+          },
+          "product": {
+            "$oid": "6aeb673031b031ff6bfab954"
+          },
+          "productNameAtTime": "Cà Phê Muối Aura Đặc Biệt",
+          "unitPrice": {
+            "$numberInt": "45000"
+          },
+          "customization": {
+            "size": "M",
+            "sugar": "50%",
+            "ice": "Đá chuẩn"
+          },
+          "quantity": {
+            "$numberInt": "1"
+          },
+          "subtotal": {
+            "$numberInt": "45000"
+          },
+          "isPrepared": true,
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795628256480"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795628300477"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          }
+        },
+        {
+          "_id": {
             "$oid": "a697258024679650433b5239"
           },
           "order": {
@@ -6045,7 +6750,7 @@ const seedData = {
           "subtotal": {
             "$numberInt": "35000"
           },
-          "isPrepared": false,
+          "isPrepared": true,
           "createdAt": {
             "$date": {
               "$numberLong": "1795572000000"
@@ -6053,7 +6758,7 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1795572000000"
+              "$numberLong": "1795625787031"
             }
           }
         }
@@ -6105,7 +6810,7 @@ const seedData = {
           "ward": "Thượng Đình",
           "addressDetail": "Số 12 Nguyễn Trãi",
           "orderType": "ONLINE",
-          "status": "DELIVERING",
+          "status": "COMPLETED",
           "items": [
             {
               "product": {
@@ -6168,7 +6873,7 @@ const seedData = {
             "$oid": "6aeb673031b031ff6bfab948"
           },
           "delivery": {
-            "status": "DELIVERING",
+            "status": "DELIVERED",
             "assignedAt": {
               "$date": {
                 "$numberLong": "1795575600000"
@@ -6184,7 +6889,30 @@ const seedData = {
                 "$numberLong": "1795577400000"
               }
             },
-            "history": []
+            "history": [
+              {
+                "action": "DELIVERED",
+                "actor": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "shipper": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "at": {
+                  "$date": {
+                    "$numberLong": "1795627576428"
+                  }
+                },
+                "_id": {
+                  "$oid": "6b071a384392a7c74d7fbee9"
+                }
+              }
+            ],
+            "deliveredAt": {
+              "$date": {
+                "$numberLong": "1795627576428"
+              }
+            }
           },
           "inventoryDeductedAt": {
             "$date": {
@@ -6207,8 +6935,16 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1795575600000"
+              "$numberLong": "1795627576431"
             }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "checkoutFlow": false,
+          "inventoryProcessing": false,
+          "pointsRedeemed": {
+            "$numberInt": "0"
           }
         },
         {
@@ -7368,7 +8104,7 @@ const seedData = {
             "$numberInt": "0"
           },
           "orderType": "ONLINE",
-          "status": "READY",
+          "status": "COMPLETED",
           "items": [
             {
               "product": {
@@ -7435,11 +8171,11 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794059063533"
+              "$numberLong": "1795627580139"
             }
           },
           "__v": {
-            "$numberInt": "4"
+            "$numberInt": "7"
           },
           "checkoutFlow": false,
           "costCapturedAt": {
@@ -7451,6 +8187,102 @@ const seedData = {
             "$date": {
               "$numberLong": "1794058268835"
             }
+          },
+          "delivery": {
+            "acceptedAt": {
+              "$date": {
+                "$numberLong": "1795627570789"
+              }
+            },
+            "assignedAt": {
+              "$date": {
+                "$numberLong": "1795627570788"
+              }
+            },
+            "history": [
+              {
+                "action": "ASSIGNED",
+                "actor": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "shipper": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "at": {
+                  "$date": {
+                    "$numberLong": "1795627570788"
+                  }
+                },
+                "_id": {
+                  "$oid": "6b071a324392a7c74d7fbee1"
+                }
+              },
+              {
+                "action": "ACCEPTED",
+                "actor": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "shipper": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "at": {
+                  "$date": {
+                    "$numberLong": "1795627570789"
+                  }
+                },
+                "_id": {
+                  "$oid": "6b071a324392a7c74d7fbee2"
+                }
+              },
+              {
+                "action": "DELIVERING",
+                "actor": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "shipper": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "at": {
+                  "$date": {
+                    "$numberLong": "1795627578739"
+                  }
+                },
+                "_id": {
+                  "$oid": "6b071a3a4392a7c74d7fbef7"
+                }
+              },
+              {
+                "action": "DELIVERED",
+                "actor": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "shipper": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "at": {
+                  "$date": {
+                    "$numberLong": "1795627580137"
+                  }
+                },
+                "_id": {
+                  "$oid": "6b071a3c4392a7c74d7fbf06"
+                }
+              }
+            ],
+            "status": "DELIVERED",
+            "pickedUpAt": {
+              "$date": {
+                "$numberLong": "1795627578739"
+              }
+            },
+            "deliveredAt": {
+              "$date": {
+                "$numberLong": "1795627580137"
+              }
+            }
+          },
+          "shipper": {
+            "$oid": "6aeb673031b031ff6bfab948"
           }
         },
         {
@@ -9014,6 +9846,666 @@ const seedData = {
         },
         {
           "_id": {
+            "$oid": "6b07129168660abe72e6f5f4"
+          },
+          "orderCode": "AURA-MWWD4PI8-3055DE7A",
+          "checkoutFlow": true,
+          "checkoutSessionId": "4c1792e0-e1bc-450d-80e3-688531f0705c",
+          "idempotencyKey": "bb7d7faa-0b6e-4da2-9f69-49bba2b21a62",
+          "requestHash": "a45fb6fc57632be839d7fbdb7847eb34c56056ad0db4126c647a1ad86c5b09c4",
+          "customer": {
+            "$oid": "6aeb673031b031ff6bfab946"
+          },
+          "pointsRedeemed": {
+            "$numberInt": "0"
+          },
+          "orderType": "ONLINE",
+          "status": "COMPLETED",
+          "items": [
+            {
+              "product": {
+                "$oid": "6aeb673031b031ff6bfab958"
+              },
+              "productNameAtTime": "Trà Đào Cam Sả Tươi",
+              "unitPrice": {
+                "$numberInt": "45000"
+              },
+              "customization": {
+                "size": "M"
+              },
+              "quantity": {
+                "$numberInt": "1"
+              },
+              "subtotal": {
+                "$numberInt": "45000"
+              },
+              "isPrepared": true,
+              "costTotal": null,
+              "costPerItem": null,
+              "costAllocations": [
+                {
+                  "ingredient": {
+                    "$oid": "6aeb673031b031ff6bfab965"
+                  },
+                  "ingredientName": "Peach syrup",
+                  "unit": "ml",
+                  "lotId": {
+                    "$oid": "6aef2649965dbc8f45a5c45a"
+                  },
+                  "quantity": {
+                    "$numberInt": "30"
+                  },
+                  "unitCost": null
+                },
+                {
+                  "ingredient": {
+                    "$oid": "6aeb673031b031ff6bfab966"
+                  },
+                  "ingredientName": "Black tea",
+                  "unit": "gram",
+                  "lotId": {
+                    "$oid": "6aef2649965dbc8f45a5c45d"
+                  },
+                  "quantity": {
+                    "$numberInt": "10"
+                  },
+                  "unitCost": {
+                    "$numberDouble": "86.0832137733142"
+                  }
+                },
+                {
+                  "ingredient": {
+                    "$oid": "6aeb673031b031ff6bfab969"
+                  },
+                  "ingredientName": "Orange",
+                  "unit": "piece",
+                  "lotId": {
+                    "$oid": "6aef2649965dbc8f45a5c460"
+                  },
+                  "quantity": {
+                    "$numberInt": "1"
+                  },
+                  "unitCost": null
+                }
+              ]
+            },
+            {
+              "product": {
+                "$oid": "6aeb673031b031ff6bfab954"
+              },
+              "productNameAtTime": "Cà Phê Muối Aura Đặc Biệt",
+              "unitPrice": {
+                "$numberInt": "45000"
+              },
+              "customization": {
+                "size": "M"
+              },
+              "quantity": {
+                "$numberInt": "1"
+              },
+              "subtotal": {
+                "$numberInt": "45000"
+              },
+              "isPrepared": true,
+              "costTotal": {
+                "$numberDouble": "25824.96"
+              },
+              "costPerItem": {
+                "$numberDouble": "25824.96"
+              },
+              "costAllocations": [
+                {
+                  "ingredient": {
+                    "$oid": "6aeb673031b031ff6bfab966"
+                  },
+                  "ingredientName": "Black tea",
+                  "unit": "gram",
+                  "lotId": {
+                    "$oid": "6aef2649965dbc8f45a5c45d"
+                  },
+                  "quantity": {
+                    "$numberInt": "300"
+                  },
+                  "unitCost": {
+                    "$numberDouble": "86.0832137733142"
+                  }
+                }
+              ]
+            }
+          ],
+          "totalAmount": {
+            "$numberInt": "90000"
+          },
+          "discountAmount": {
+            "$numberInt": "0"
+          },
+          "deliveryFee": {
+            "$numberInt": "22000"
+          },
+          "finalAmount": {
+            "$numberInt": "112000"
+          },
+          "paymentMethod": "COD",
+          "recipientName": "Le Minh Anh",
+          "recipientPhone": "0900000004",
+          "deliveryAddress": "sfdgsdfgsfh, fsdfgsg, Bắc Từ Liêm, Hà Nội",
+          "district": "Bắc Từ Liêm",
+          "ward": "fsdfgsg",
+          "addressDetail": "sfdgsdfgsfh",
+          "delivery": {
+            "history": [
+              {
+                "action": "ASSIGNED",
+                "actor": {
+                  "$oid": "6af4b8350b44b941144fb48f"
+                },
+                "shipper": {
+                  "$oid": "6af4b8350b44b941144fb48f"
+                },
+                "at": {
+                  "$date": {
+                    "$numberLong": "1795626157833"
+                  }
+                },
+                "_id": {
+                  "$oid": "6b0714ad68660abe72e6fd38"
+                }
+              },
+              {
+                "action": "ACCEPTED",
+                "actor": {
+                  "$oid": "6af4b8350b44b941144fb48f"
+                },
+                "shipper": {
+                  "$oid": "6af4b8350b44b941144fb48f"
+                },
+                "at": {
+                  "$date": {
+                    "$numberLong": "1795626157836"
+                  }
+                },
+                "_id": {
+                  "$oid": "6b0714ad68660abe72e6fd39"
+                }
+              },
+              {
+                "action": "DELIVERING",
+                "actor": {
+                  "$oid": "6af4b8350b44b941144fb48f"
+                },
+                "shipper": {
+                  "$oid": "6af4b8350b44b941144fb48f"
+                },
+                "at": {
+                  "$date": {
+                    "$numberLong": "1795626162130"
+                  }
+                },
+                "_id": {
+                  "$oid": "6b0714b268660abe72e6fd48"
+                }
+              },
+              {
+                "action": "DELIVERED",
+                "actor": {
+                  "$oid": "6af4b8350b44b941144fb48f"
+                },
+                "shipper": {
+                  "$oid": "6af4b8350b44b941144fb48f"
+                },
+                "at": {
+                  "$date": {
+                    "$numberLong": "1795626168925"
+                  }
+                },
+                "_id": {
+                  "$oid": "6b0714b868660abe72e6fd5a"
+                }
+              }
+            ],
+            "acceptedAt": {
+              "$date": {
+                "$numberLong": "1795626157836"
+              }
+            },
+            "assignedAt": {
+              "$date": {
+                "$numberLong": "1795626157833"
+              }
+            },
+            "status": "DELIVERED",
+            "pickedUpAt": {
+              "$date": {
+                "$numberLong": "1795626162130"
+              }
+            },
+            "deliveredAt": {
+              "$date": {
+                "$numberLong": "1795626168925"
+              }
+            }
+          },
+          "orderNote": "sdfgsdgsdffdg",
+          "inventoryProcessing": false,
+          "costTotal": null,
+          "costStatus": "MISSING_PRICE",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795625617203"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795626168928"
+            }
+          },
+          "__v": {
+            "$numberInt": "12"
+          },
+          "cartClearedAt": {
+            "$date": {
+              "$numberLong": "1795625633945"
+            }
+          },
+          "costCapturedAt": {
+            "$date": {
+              "$numberLong": "1795625763695"
+            }
+          },
+          "inventoryDeductedAt": {
+            "$date": {
+              "$numberLong": "1795625763695"
+            }
+          },
+          "shipper": {
+            "$oid": "6af4b8350b44b941144fb48f"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b0719624392a7c74d7fbb98"
+          },
+          "orderCode": "AURA-MWWE64JZ-5D2E1E1D",
+          "checkoutFlow": true,
+          "checkoutSessionId": "4c1792e0-e1bc-450d-80e3-688531f0705c",
+          "idempotencyKey": "787d8f26-28a2-468b-86ad-8e919ce32d5e",
+          "requestHash": "64acad623a6b4e699965643e5e673f1409fb2428e5791cacc7d7a8be35adac0f",
+          "customer": {
+            "$oid": "6aeb673031b031ff6bfab946"
+          },
+          "pointsRedeemed": {
+            "$numberInt": "0"
+          },
+          "orderType": "ONLINE",
+          "status": "COMPLETED",
+          "items": [
+            {
+              "product": {
+                "$oid": "6aeb673031b031ff6bfab958"
+              },
+              "productNameAtTime": "Trà Đào Cam Sả Tươi",
+              "unitPrice": {
+                "$numberInt": "45000"
+              },
+              "customization": {
+                "size": "M"
+              },
+              "quantity": {
+                "$numberInt": "1"
+              },
+              "subtotal": {
+                "$numberInt": "45000"
+              },
+              "isPrepared": true,
+              "costTotal": null,
+              "costPerItem": null,
+              "costAllocations": [
+                {
+                  "ingredient": {
+                    "$oid": "6aeb673031b031ff6bfab965"
+                  },
+                  "ingredientName": "Peach syrup",
+                  "unit": "ml",
+                  "lotId": {
+                    "$oid": "6aef2649965dbc8f45a5c45a"
+                  },
+                  "quantity": {
+                    "$numberInt": "30"
+                  },
+                  "unitCost": null
+                },
+                {
+                  "ingredient": {
+                    "$oid": "6aeb673031b031ff6bfab966"
+                  },
+                  "ingredientName": "Black tea",
+                  "unit": "gram",
+                  "lotId": {
+                    "$oid": "6aef2649965dbc8f45a5c45d"
+                  },
+                  "quantity": {
+                    "$numberInt": "10"
+                  },
+                  "unitCost": {
+                    "$numberDouble": "86.0832137733142"
+                  }
+                },
+                {
+                  "ingredient": {
+                    "$oid": "6aeb673031b031ff6bfab969"
+                  },
+                  "ingredientName": "Orange",
+                  "unit": "piece",
+                  "lotId": {
+                    "$oid": "6aef2649965dbc8f45a5c460"
+                  },
+                  "quantity": {
+                    "$numberInt": "1"
+                  },
+                  "unitCost": null
+                }
+              ]
+            },
+            {
+              "product": {
+                "$oid": "6aeb673031b031ff6bfab954"
+              },
+              "productNameAtTime": "Cà Phê Muối Aura Đặc Biệt",
+              "unitPrice": {
+                "$numberInt": "45000"
+              },
+              "customization": {
+                "size": "M"
+              },
+              "quantity": {
+                "$numberInt": "1"
+              },
+              "subtotal": {
+                "$numberInt": "45000"
+              },
+              "isPrepared": true,
+              "costTotal": {
+                "$numberDouble": "25824.96"
+              },
+              "costPerItem": {
+                "$numberDouble": "25824.96"
+              },
+              "costAllocations": [
+                {
+                  "ingredient": {
+                    "$oid": "6aeb673031b031ff6bfab966"
+                  },
+                  "ingredientName": "Black tea",
+                  "unit": "gram",
+                  "lotId": {
+                    "$oid": "6aef2649965dbc8f45a5c45d"
+                  },
+                  "quantity": {
+                    "$numberInt": "300"
+                  },
+                  "unitCost": {
+                    "$numberDouble": "86.0832137733142"
+                  }
+                }
+              ]
+            }
+          ],
+          "totalAmount": {
+            "$numberInt": "90000"
+          },
+          "discountAmount": {
+            "$numberInt": "0"
+          },
+          "deliveryFee": {
+            "$numberInt": "18000"
+          },
+          "finalAmount": {
+            "$numberInt": "108000"
+          },
+          "paymentMethod": "COD",
+          "recipientName": "Le Minh Anh",
+          "recipientPhone": "0900000004",
+          "deliveryAddress": "adsfa ăefadsf f, adfaewr f, Ba Đình, Hà Nội",
+          "district": "Ba Đình",
+          "ward": "adfaewr f",
+          "addressDetail": "adsfa ăefadsf f",
+          "delivery": {
+            "history": [
+              {
+                "action": "ASSIGNED",
+                "actor": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "shipper": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "at": {
+                  "$date": {
+                    "$numberLong": "1795627451245"
+                  }
+                },
+                "_id": {
+                  "$oid": "6b0719bb4392a7c74d7fbd8b"
+                }
+              },
+              {
+                "action": "ACCEPTED",
+                "actor": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "shipper": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "at": {
+                  "$date": {
+                    "$numberLong": "1795627451247"
+                  }
+                },
+                "_id": {
+                  "$oid": "6b0719bb4392a7c74d7fbd8c"
+                }
+              },
+              {
+                "action": "DELIVERING",
+                "actor": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "shipper": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "at": {
+                  "$date": {
+                    "$numberLong": "1795627459452"
+                  }
+                },
+                "_id": {
+                  "$oid": "6b0719c34392a7c74d7fbd93"
+                }
+              },
+              {
+                "action": "DELIVERED",
+                "actor": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "shipper": {
+                  "$oid": "6aeb673031b031ff6bfab948"
+                },
+                "at": {
+                  "$date": {
+                    "$numberLong": "1795627467292"
+                  }
+                },
+                "_id": {
+                  "$oid": "6b0719cb4392a7c74d7fbda0"
+                }
+              }
+            ],
+            "acceptedAt": {
+              "$date": {
+                "$numberLong": "1795627451247"
+              }
+            },
+            "assignedAt": {
+              "$date": {
+                "$numberLong": "1795627451245"
+              }
+            },
+            "status": "DELIVERED",
+            "pickedUpAt": {
+              "$date": {
+                "$numberLong": "1795627459452"
+              }
+            },
+            "deliveredAt": {
+              "$date": {
+                "$numberLong": "1795627467292"
+              }
+            }
+          },
+          "inventoryProcessing": false,
+          "costTotal": null,
+          "costStatus": "MISSING_PRICE",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795627362970"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795627467295"
+            }
+          },
+          "__v": {
+            "$numberInt": "8"
+          },
+          "cartClearedAt": {
+            "$date": {
+              "$numberLong": "1795627368676"
+            }
+          },
+          "costCapturedAt": {
+            "$date": {
+              "$numberLong": "1795627397546"
+            }
+          },
+          "inventoryDeductedAt": {
+            "$date": {
+              "$numberLong": "1795627397547"
+            }
+          },
+          "shipper": {
+            "$oid": "6aeb673031b031ff6bfab948"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b071ce0b68137d85fed4244"
+          },
+          "orderCode": "AURA-MWWEP9ZG-F18B31A0",
+          "checkoutFlow": false,
+          "cashier": {
+            "$oid": "6aeb673031b031ff6bfab945"
+          },
+          "pointsRedeemed": {
+            "$numberInt": "0"
+          },
+          "orderType": "DINE_IN",
+          "status": "COMPLETED",
+          "items": [
+            {
+              "product": {
+                "$oid": "6aeb673031b031ff6bfab954"
+              },
+              "productNameAtTime": "Cà Phê Muối Aura Đặc Biệt",
+              "unitPrice": {
+                "$numberInt": "45000"
+              },
+              "customization": {
+                "size": "M",
+                "sugar": "50%",
+                "ice": "Đá chuẩn"
+              },
+              "quantity": {
+                "$numberInt": "1"
+              },
+              "subtotal": {
+                "$numberInt": "45000"
+              },
+              "isPrepared": true,
+              "costTotal": {
+                "$numberDouble": "25824.96"
+              },
+              "costPerItem": {
+                "$numberDouble": "25824.96"
+              },
+              "costAllocations": [
+                {
+                  "ingredient": {
+                    "$oid": "6aeb673031b031ff6bfab966"
+                  },
+                  "ingredientName": "Black tea",
+                  "unit": "gram",
+                  "lotId": {
+                    "$oid": "6aef2649965dbc8f45a5c45d"
+                  },
+                  "quantity": {
+                    "$numberInt": "300"
+                  },
+                  "unitCost": {
+                    "$numberDouble": "86.0832137733142"
+                  }
+                }
+              ]
+            }
+          ],
+          "totalAmount": {
+            "$numberInt": "45000"
+          },
+          "discountAmount": {
+            "$numberInt": "0"
+          },
+          "deliveryFee": {
+            "$numberInt": "0"
+          },
+          "finalAmount": {
+            "$numberInt": "45000"
+          },
+          "paymentMethod": "CASH",
+          "delivery": {
+            "history": []
+          },
+          "tableNumber": "T01",
+          "inventoryProcessing": false,
+          "costTotal": {
+            "$numberDouble": "25824.96"
+          },
+          "costStatus": "COMPLETE",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795628256474"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795628329518"
+            }
+          },
+          "__v": {
+            "$numberInt": "5"
+          },
+          "costCapturedAt": {
+            "$date": {
+              "$numberLong": "1795628297969"
+            }
+          },
+          "inventoryDeductedAt": {
+            "$date": {
+              "$numberLong": "1795628297969"
+            }
+          }
+        },
+        {
+          "_id": {
             "$oid": "df1640b1d2e2c9b927aaac60"
           },
           "orderCode": "AURA-DEMO-PREPARING",
@@ -9025,7 +10517,7 @@ const seedData = {
           },
           "tableNumber": "T02",
           "orderType": "DINE_IN",
-          "status": "PREPARING",
+          "status": "READY",
           "items": [
             {
               "product": {
@@ -9044,7 +10536,7 @@ const seedData = {
               "subtotal": {
                 "$numberInt": "35000"
               },
-              "isPrepared": false,
+              "isPrepared": true,
               "costTotal": {
                 "$numberInt": "18000"
               },
@@ -9105,8 +10597,19 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1795572000000"
+              "$numberLong": "1795625790492"
             }
+          },
+          "__v": {
+            "$numberInt": "4"
+          },
+          "checkoutFlow": false,
+          "delivery": {
+            "history": []
+          },
+          "inventoryProcessing": false,
+          "pointsRedeemed": {
+            "$numberInt": "0"
           }
         }
       ]
@@ -9228,7 +10731,7 @@ const seedData = {
           "amount": {
             "$numberInt": "53000"
           },
-          "status": "PENDING",
+          "status": "SUCCESS",
           "createdAt": {
             "$date": {
               "$numberLong": "1795575600000"
@@ -9236,7 +10739,22 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1795575600000"
+              "$numberLong": "1795630327383"
+            }
+          },
+          "paidAt": {
+            "$date": {
+              "$numberLong": "1795627576434"
+            }
+          },
+          "paymentNote": "Thu tiền COD khi giao hàng hoàn tất",
+          "receivedBy": {
+            "$oid": "6aeb673031b031ff6bfab948"
+          },
+          "remittanceId": "fa49ba8a-15ab-4670-a405-1d66900ad4f1",
+          "remittedAt": {
+            "$date": {
+              "$numberLong": "1795627784356"
             }
           }
         },
@@ -9637,7 +11155,7 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794058425848"
+              "$numberLong": "1795630327383"
             }
           },
           "__v": {
@@ -9650,6 +11168,12 @@ const seedData = {
           },
           "receivedBy": {
             "$oid": "6aeb673031b031ff6bfab948"
+          },
+          "remittanceId": "fa49ba8a-15ab-4670-a405-1d66900ad4f1",
+          "remittedAt": {
+            "$date": {
+              "$numberLong": "1795627784356"
+            }
           }
         },
         {
@@ -9780,7 +11304,7 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794467933507"
+              "$numberLong": "1795630327383"
             }
           },
           "__v": {
@@ -9793,6 +11317,12 @@ const seedData = {
           },
           "receivedBy": {
             "$oid": "6aeb673031b031ff6bfab948"
+          },
+          "remittanceId": "fa49ba8a-15ab-4670-a405-1d66900ad4f1",
+          "remittedAt": {
+            "$date": {
+              "$numberLong": "1795627784356"
+            }
           }
         },
         {
@@ -10081,6 +11611,127 @@ const seedData = {
             "$date": {
               "$numberLong": "1794682866144"
             }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b07129168660abe72e6f5f7"
+          },
+          "order": {
+            "$oid": "6b07129168660abe72e6f5f4"
+          },
+          "paymentMethod": "CASH",
+          "transactionCode": "COD-AURA-MWWD4PI8-3055DE7A",
+          "confirmationMode": "GATEWAY",
+          "amount": {
+            "$numberInt": "112000"
+          },
+          "status": "SUCCESS",
+          "paymentNote": "Thu tiền COD khi giao hàng hoàn tất",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795625617230"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795626168934"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          },
+          "paidAt": {
+            "$date": {
+              "$numberLong": "1795626168934"
+            }
+          },
+          "receivedBy": {
+            "$oid": "6af4b8350b44b941144fb48f"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b0719624392a7c74d7fbb9b"
+          },
+          "order": {
+            "$oid": "6b0719624392a7c74d7fbb98"
+          },
+          "paymentMethod": "CASH",
+          "transactionCode": "COD-AURA-MWWE64JZ-5D2E1E1D",
+          "confirmationMode": "GATEWAY",
+          "amount": {
+            "$numberInt": "108000"
+          },
+          "status": "SUCCESS",
+          "paymentNote": "Thu tiền COD khi giao hàng hoàn tất",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795627362988"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795630327383"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          },
+          "paidAt": {
+            "$date": {
+              "$numberLong": "1795627467299"
+            }
+          },
+          "receivedBy": {
+            "$oid": "6aeb673031b031ff6bfab948"
+          },
+          "remittanceId": "fa49ba8a-15ab-4670-a405-1d66900ad4f1",
+          "remittedAt": {
+            "$date": {
+              "$numberLong": "1795627784356"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b071ce0b68137d85fed4246"
+          },
+          "order": {
+            "$oid": "6b071ce0b68137d85fed4244"
+          },
+          "paymentMethod": "CASH",
+          "amount": {
+            "$numberInt": "45000"
+          },
+          "status": "SUCCESS",
+          "paymentNote": "Thu ngân Tran Thi Binh xác nhận đã nhận tiền mặt tại quầy",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795628256483"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795628261085"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          },
+          "changeAmount": {
+            "$numberInt": "0"
+          },
+          "paidAt": {
+            "$date": {
+              "$numberLong": "1795628261085"
+            }
+          },
+          "receivedAmount": {
+            "$numberInt": "45000"
+          },
+          "receivedBy": {
+            "$oid": "6aeb673031b031ff6bfab945"
           }
         }
       ]
@@ -11009,7 +12660,16 @@ const seedData = {
           "description": "Bột ngàn lớp thủ công giòn rụm bên ngoài, mềm xốp ngậy hương bơ Elle & Vire hảo hạng bên trong.",
           "imageUrl": "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=600&auto=format&fit=crop&q=80",
           "isAvailable": true,
-          "recipe": [],
+          "recipe": [
+            {
+              "ingredient": {
+                "$oid": "058acaf05eed774b975fe1bc"
+              },
+              "quantityRequired": {
+                "$numberInt": "1"
+              }
+            }
+          ],
           "__v": {
             "$numberInt": "0"
           },
@@ -11064,7 +12724,24 @@ const seedData = {
           "description": "Bột trà xanh Uji trứ danh cố đô Kyoto xay cùng sữa hạt và kem whipping bông xốp béo mịn thượng hạng.",
           "imageUrl": "https://images.unsplash.com/photo-1536256263959-770b48d82b0a?w=600&auto=format&fit=crop&q=80",
           "isAvailable": true,
-          "recipe": [],
+          "recipe": [
+            {
+              "ingredient": {
+                "$oid": "fadf568441a051bcd8a1ee84"
+              },
+              "quantityRequired": {
+                "$numberInt": "8"
+              }
+            },
+            {
+              "ingredient": {
+                "$oid": "6aeb673031b031ff6bfab964"
+              },
+              "quantityRequired": {
+                "$numberInt": "150"
+              }
+            }
+          ],
           "__v": {
             "$numberInt": "0"
           },
@@ -11322,7 +12999,32 @@ const seedData = {
           "description": "Bột cacao nguyên chất nhập khẩu Bỉ xay nhuyễn cùng sữa đặc, rắc hạnh nhân nướng giòn tan.",
           "imageUrl": "https://images.unsplash.com/photo-1572490122747-3968b75cc699?w=600&auto=format&fit=crop&q=80",
           "isAvailable": true,
-          "recipe": [],
+          "recipe": [
+            {
+              "ingredient": {
+                "$oid": "3661198b623f59b138dc83e6"
+              },
+              "quantityRequired": {
+                "$numberInt": "5"
+              }
+            },
+            {
+              "ingredient": {
+                "$oid": "6aeb673031b031ff6bfab964"
+              },
+              "quantityRequired": {
+                "$numberInt": "120"
+              }
+            },
+            {
+              "ingredient": {
+                "$oid": "6cbbe4ef97fbd0710a9f6373"
+              },
+              "quantityRequired": {
+                "$numberInt": "25"
+              }
+            }
+          ],
           "__v": {
             "$numberInt": "0"
           },
@@ -13417,7 +15119,7 @@ const seedData = {
           },
           "hireDate": null,
           "totalPoints": {
-            "$numberInt": "597"
+            "$numberInt": "812"
           },
           "emailKey": "anh@gmail.com",
           "__v": {
@@ -13430,11 +15132,11 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794682837959"
+              "$numberLong": "1795627576451"
             }
           },
           "checkoutRevision": {
-            "$numberInt": "2"
+            "$numberInt": "4"
           }
         },
         {
@@ -14163,9 +15865,16 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794686733611"
+              "$numberLong": "1795621173454"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -14237,7 +15946,14 @@ const seedData = {
             "$date": {
               "$numberLong": "1795420800000"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -14307,9 +16023,16 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794686733611"
+              "$numberLong": "1795621173459"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -14669,13 +16392,10 @@ const seedData = {
               "$numberLong": "1794902400000"
             }
           },
-          "startingCash": {
+          "endingCashActual": {
             "$numberInt": "100000"
           },
           "endingCashSystem": {
-            "$numberInt": "100000"
-          },
-          "endingCashActual": {
             "$numberInt": "100000"
           },
           "handoverAt": {
@@ -14683,7 +16403,10 @@ const seedData = {
               "$numberLong": "1794902880000"
             }
           },
-          "handoverNote": ""
+          "handoverNote": "",
+          "startingCash": {
+            "$numberInt": "100000"
+          }
         },
         {
           "_id": {
@@ -14794,9 +16517,16 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794686733611"
+              "$numberLong": "1795621173461"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -14825,9 +16555,16 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794686733611"
+              "$numberLong": "1795621173462"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -14899,7 +16636,14 @@ const seedData = {
             "$date": {
               "$numberLong": "1795507200000"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -14928,9 +16672,16 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794686733611"
+              "$numberLong": "1795621173468"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -15126,21 +16877,21 @@ const seedData = {
               "$numberLong": "1794929400000"
             }
           },
-          "startingCash": {
-            "$numberInt": "100000"
+          "endingCashActual": {
+            "$numberInt": "90000"
           },
           "endingCashSystem": {
             "$numberInt": "100000"
-          },
-          "endingCashActual": {
-            "$numberInt": "90000"
           },
           "handoverAt": {
             "$date": {
               "$numberLong": "1794930300000"
             }
           },
-          "handoverNote": "Két thiếu 10.000đ, cần kiểm tra lại."
+          "handoverNote": "Két thiếu 10.000đ, cần kiểm tra lại.",
+          "startingCash": {
+            "$numberInt": "100000"
+          }
         },
         {
           "_id": {
@@ -15376,7 +17127,14 @@ const seedData = {
             "$date": {
               "$numberLong": "1795420800000"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -15405,9 +17163,16 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794686733611"
+              "$numberLong": "1795621173474"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -15580,9 +17345,16 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794686733611"
+              "$numberLong": "1795621173476"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -16147,30 +17919,157 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794686259746"
+              "$numberLong": "1795628075259"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b070e513aa292d6112e940a"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab945"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795564800000"
+            }
+          },
+          "shiftName": "ca đêm",
+          "shift": {
+            "$oid": "6b070e2f3aa292d6112e93a3"
+          },
+          "shiftStartTime": "22:31",
+          "shiftEndTime": "00:00",
+          "codPaymentIds": [],
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "status": "COMPLETED",
+          "note": "thu ngan",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795624529803"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795627038172"
             }
           },
           "__v": {
             "$numberInt": "0"
           },
-          "cashTransferDiscrepancy": {
-            "sourceSchedule": {
-              "$oid": "6af8a32d1dc7407ccb05ea57"
-            },
-            "expectedCash": {
-              "$numberInt": "228000"
-            },
-            "countedCash": {
-              "$numberInt": "227000"
-            },
-            "note": "thiếu 1k",
-            "reportedBy": {
-              "$oid": "6af8ad9afcfef0a0c28d486f"
-            },
-            "reportedAt": {
-              "$date": {
-                "$numberLong": "1794686259746"
-              }
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795625483826"
+            }
+          },
+          "startingCash": {
+            "$numberInt": "1000000"
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795626000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b070f5a3aa292d6112e96d5"
+          },
+          "user": {
+            "$oid": "6aeb673031b031ff6bfab944"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795564800000"
+            }
+          },
+          "shiftName": "ca đêm",
+          "shift": {
+            "$oid": "6b070e2f3aa292d6112e93a3"
+          },
+          "shiftStartTime": "22:31",
+          "shiftEndTime": "00:00",
+          "codPaymentIds": [],
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "status": "COMPLETED",
+          "note": "",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795624794439"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795627039280"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          },
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795624952619"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795626000000"
+            }
+          }
+        },
+        {
+          "_id": {
+            "$oid": "6b070fed3aa292d6112e986e"
+          },
+          "user": {
+            "$oid": "6af4b8350b44b941144fb48f"
+          },
+          "workDate": {
+            "$date": {
+              "$numberLong": "1795564800000"
+            }
+          },
+          "shiftName": "ca đêm",
+          "shift": {
+            "$oid": "6b070e2f3aa292d6112e93a3"
+          },
+          "shiftStartTime": "22:31",
+          "shiftEndTime": "00:00",
+          "codPaymentIds": [],
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "status": "COMPLETED",
+          "note": "",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795624941165"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795627040446"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          },
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795624951760"
+            }
+          },
+          "checkOutTime": {
+            "$date": {
+              "$numberLong": "1795626000000"
             }
           }
         },
@@ -16470,7 +18369,14 @@ const seedData = {
             "$date": {
               "$numberLong": "1795420800000"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -16540,9 +18446,16 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794686733611"
+              "$numberLong": "1795621173480"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -16624,7 +18537,14 @@ const seedData = {
             "$date": {
               "$numberLong": "1795507200000"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -16776,9 +18696,16 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794686733611"
+              "$numberLong": "1795621173484"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -16961,9 +18888,16 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794686733611"
+              "$numberLong": "1795621173486"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -17209,7 +19143,7 @@ const seedData = {
           },
           "shiftStartTime": "07:00",
           "shiftEndTime": "15:00",
-          "status": "SCHEDULED",
+          "status": "PRESENT",
           "note": "Lịch phân ca mẫu",
           "createdAt": {
             "$date": {
@@ -17218,7 +19152,19 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794686733611"
+              "$numberLong": "1795627240874"
+            }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": [],
+          "checkInTime": {
+            "$date": {
+              "$numberLong": "1795564800000"
             }
           }
         },
@@ -17372,9 +19318,16 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794686733611"
+              "$numberLong": "1795621173491"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -17528,7 +19481,14 @@ const seedData = {
             "$date": {
               "$numberLong": "1795507200000"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -17629,40 +19589,16 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794686733611"
-            }
-          }
-        },
-        {
-          "_id": {
-            "$oid": "e47fbed37ea3b8112b81af37"
-          },
-          "user": {
-            "$oid": "ddb1643cf10b2c39c11d7488"
-          },
-          "workDate": {
-            "$date": {
-              "$numberLong": "1795564800000"
+              "$numberLong": "1795621173496"
             }
           },
-          "shiftName": "Ca sáng",
-          "shift": {
-            "$oid": "86bc4942711693768d2ffadf"
+          "__v": {
+            "$numberInt": "1"
           },
-          "shiftStartTime": "07:00",
-          "shiftEndTime": "15:00",
-          "status": "SCHEDULED",
-          "note": "Lịch phân ca mẫu",
-          "createdAt": {
-            "$date": {
-              "$numberLong": "1794686733611"
-            }
+          "codLedgerVersion": {
+            "$numberInt": "0"
           },
-          "updatedAt": {
-            "$date": {
-              "$numberLong": "1794686733611"
-            }
-          }
+          "codPaymentIds": []
         },
         {
           "_id": {
@@ -17814,9 +19750,16 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794686733611"
+              "$numberLong": "1795621173503"
             }
-          }
+          },
+          "__v": {
+            "$numberInt": "1"
+          },
+          "codLedgerVersion": {
+            "$numberInt": "0"
+          },
+          "codPaymentIds": []
         }
       ]
     },
@@ -17940,6 +19883,32 @@ const seedData = {
         },
         {
           "_id": {
+            "$oid": "6b070e2f3aa292d6112e93a3"
+          },
+          "weekStart": {
+            "$date": {
+              "$numberLong": "1795392000000"
+            }
+          },
+          "shiftName": "ca đêm",
+          "startTime": "22:31",
+          "endTime": "00:00",
+          "createdAt": {
+            "$date": {
+              "$numberLong": "1795624495118"
+            }
+          },
+          "updatedAt": {
+            "$date": {
+              "$numberLong": "1795624495118"
+            }
+          },
+          "__v": {
+            "$numberInt": "0"
+          }
+        },
+        {
+          "_id": {
             "$oid": "86bc4942711693768d2ffadf"
           },
           "weekStart": {
@@ -17957,8 +19926,11 @@ const seedData = {
           },
           "updatedAt": {
             "$date": {
-              "$numberLong": "1794686733611"
+              "$numberLong": "1795621173505"
             }
+          },
+          "__v": {
+            "$numberInt": "2"
           }
         },
         {

@@ -25,9 +25,11 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
   const { db, session, remitCod, busy, rawId } = useDb();
   const me = session.shipperId;
   const schedules = db.work_schedules.filter(s => s.user_id === me).sort((a, b) => (a.work_date < b.work_date ? 1 : -1));
-  const [scheduleId, setScheduleId] = useState<number | null>(
-    schedules.find(s => s.status !== 'COMPLETED')?.id ?? schedules[0]?.id ?? null
-  );
+  const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
+  const currentSchedule = schedules.find(s => s.status === 'PRESENT' && !!s.check_in_time && !s.check_out_time);
+  const scheduleId = selectedScheduleId !== null && schedules.some(s => s.id === selectedScheduleId)
+    ? selectedScheduleId
+    : currentSchedule?.id ?? schedules[0]?.id ?? null;
   const [denoms, setDenoms] = useState<Record<number, number>>({});
   const [otherCash, setOtherCash] = useState('');
   const [note, setNote] = useState('');
@@ -85,7 +87,7 @@ export const DeliveryCodPage: React.FC<DeliveryCodPageProps> = ({ onNavigate, on
             <select
               value={scheduleId ?? ''}
               onChange={e => {
-                setScheduleId(Number(e.target.value) || null);
+                setSelectedScheduleId(Number(e.target.value) || null);
                 setDenoms({});
                 setOtherCash('');
                 setNote('');

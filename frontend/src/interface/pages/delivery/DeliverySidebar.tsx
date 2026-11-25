@@ -13,9 +13,12 @@ interface DeliverySidebarProps {
 export const DeliverySidebar: React.FC<DeliverySidebarProps> = ({ currentRoute, onNavigate }) => {
   const { db, session } = useDb();
   const shipper = db.users.find(u => u.id === session.shipperId);
-  const schedule = db.work_schedules
-    .filter(s => s.user_id === session.shipperId && s.status !== 'COMPLETED')
-    .sort((a, b) => (a.work_date < b.work_date ? -1 : 1))[0];
+  const schedules = db.work_schedules
+    .filter(s => s.user_id === session.shipperId)
+    .sort((a, b) => (a.work_date < b.work_date ? 1 : -1));
+  const schedule = schedules.find(s => s.status === 'PRESENT' && !!s.check_in_time && !s.check_out_time)
+    ?? schedules.find(s => s.status === 'SCHEDULED')
+    ?? schedules[0];
   const scheduleStatus = schedule
     ? getShiftStatusLabel({ status: schedule.status, checkInTime: schedule.check_in_time, checkOutTime: schedule.check_out_time })
     : 'Chưa được phân ca';

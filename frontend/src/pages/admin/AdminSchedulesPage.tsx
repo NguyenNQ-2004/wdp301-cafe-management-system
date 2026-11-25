@@ -23,6 +23,9 @@ const weekdays = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sá
 const statusNames: Record<ScheduleStatus, string> = {
   SCHEDULED: 'Đã phân công', PRESENT: 'Đang làm', ABSENT: 'Vắng mặt', COMPLETED: 'Đã hoàn thành'
 };
+const positionNames: Record<string, string> = {
+  MANAGER: 'Quản lý', BARISTA: 'Pha chế', CASHIER: 'Thu ngân', SHIPPER: 'Giao hàng'
+};
 const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const vietnamToday = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
 const mondayOf = (date: Date) => {
@@ -225,7 +228,7 @@ export default function AdminSchedulesPage() {
         {isAdmin && <button type="button" disabled={loading || busy || !removableSchedules.length} onClick={() => void removeUnstartedSchedules()} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50">Xóa ca chưa chấm công ({removableSchedules.length})</button>}
         {isAdmin && <select aria-label="Lọc nhân viên" value={employeeFilter} onChange={(event) => setEmployeeFilter(event.target.value)} className={inputCls}>
           <option value="">Tất cả nhân viên</option>
-          {employees.map((employee) => <option key={employee._id} value={employee._id}>{employee.fullName} · {employee.phone}</option>)}
+          {employees.map((employee) => <option key={employee._id} value={employee._id}>{employee.fullName} · {positionNames[employee.position] || employee.position}</option>)}
         </select>}
         <button type="button" onClick={() => setWeekStart(moveWeek(weekStart, -1))} className="rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold">← Tuần trước</button>
         <button type="button" onClick={() => setWeekStart(dateKey(mondayOf(new Date())))} className="rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold">Tuần này</button>
@@ -261,7 +264,14 @@ export default function AdminSchedulesPage() {
         <label className="text-xs font-semibold text-stone-700">Nhân viên
           <select required value={form.userId} onChange={(event) => setForm({ ...form, userId: event.target.value })} className={`mt-1 ${inputCls}`}>
             <option value="">Chọn nhân viên</option>
-            {options.map((employee) => <option key={employee._id} value={employee._id}>{employee.fullName} · {employee.phone}{employee.status !== 'ACTIVE' ? ' (ngừng hoạt động)' : ''}</option>)}
+            {options.map((employee) => {
+              const assignedToShift = schedules.some((schedule) =>
+                schedule.user?._id === employee._id
+                && schedule.workDate.slice(0, 10) === form.workDate
+                && schedule.shiftName === form.shiftName
+              );
+              return <option key={employee._id} value={employee._id}>{employee.fullName} · {positionNames[employee.position] || employee.position}{assignedToShift ? ' · Đã phân vào ca này' : ''}{employee.status !== 'ACTIVE' ? ' (ngừng hoạt động)' : ''}</option>;
+            })}
           </select>
         </label>
         <label className="text-xs font-semibold text-stone-700">Ngày làm việc<input type="date" required min={days[0].key > today ? days[0].key : today} max={days[6].key} value={form.workDate} onChange={(event) => setForm({ ...form, workDate: event.target.value })} className={`mt-1 ${inputCls}`} /></label>

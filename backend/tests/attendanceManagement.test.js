@@ -69,6 +69,13 @@ test('UC26 reserves attendance recording for admins while preserving staff COD r
   const other = await WorkSchedule.create({ user: staffB._id, workDate: new Date(today), shiftName: 'MORNING' });
   const missed = await WorkSchedule.create({ user: staffA._id, workDate: new Date(yesterday), shiftName: 'MORNING' });
   const future = await WorkSchedule.create({ user: staffA._id, workDate: new Date(tomorrow), shiftName: 'MORNING' });
+  const oldDate = new Date(`${today}T00:00:00.000Z`);
+  oldDate.setUTCDate(oldDate.getUTCDate() - 8);
+  await WorkSchedule.create({
+    user: staffB._id, workDate: oldDate, shiftName: 'OLD', status: 'COMPLETED',
+    checkInTime: oldDate, checkOutTime: new Date(oldDate.getTime() + 8 * 3600000),
+    handoverAt: new Date(oldDate.getTime() + 9 * 3600000), endingCashActual: 90000
+  });
   const query = `?from=${yesterday}&to=${tomorrow}`;
 
   assert.equal((await request('GET', `/api/work-schedules/attendance${query}`)).status, 401);
@@ -76,6 +83,9 @@ test('UC26 reserves attendance recording for admins while preserving staff COD r
   assert.equal((await request('GET', '/api/work-schedules/attendance?from=2026-01-01&to=2026-02-10', null, adminToken)).status, 400);
   assert.equal((await request('GET', `/api/work-schedules/attendance${query}&userId=${staffB._id}`, null, adminToken)).data.length, 1);
   assert.equal((await request('GET', `/api/work-schedules/attendance${query}`, null, adminToken)).data.length, 4);
+  const staleTransfer = await request('GET', `/api/work-schedules/${own._id}/cash-transfer`, null, adminToken);
+  assert.equal(staleTransfer.status, 200);
+  assert.equal(staleTransfer.data.required, false, 'an old handover must not block a new workday');
   assert.equal((await request('GET', `/api/work-schedules/attendance${query}&userId=${staffB._id}`, null, aToken)).status, 403);
   assert.equal((await request('PUT', `/api/work-schedules/${own._id}/shift-action`, { action: 'CHECK_OUT' }, aToken)).status, 403);
   assert.equal((await request('PUT', `/api/work-schedules/${own._id}/shift-action`, { action: 'CHECK_IN' }, aToken)).status, 403);
@@ -162,6 +172,12 @@ test('UC26 reserves attendance recording for admins while preserving staff COD r
   assert.equal(receivers.status, 200);
   assert.ok(receivers.data.candidates.some(row => row._id === String(incoming._id)));
   assert.equal((await request('POST', `/api/work-schedules/${own._id}/assign-cash-receiver`, { receiverScheduleId: String(incoming._id) }, aToken)).status, 200);
+  const parallelCashier = await User.create({ fullName: 'Parallel Cashier', phone: '0999000057', email: 'test-0999000057@example.com', passwordHash: hash, role: 'STAFF', position: 'CASHIER' });
+  const parallelShift = await WorkSchedule.create({ user: parallelCashier._id, workDate: new Date(today), shiftName: 'TRANSFER', shift: transferShift._id });
+  const parallelTransfer = await request('GET', `/api/work-schedules/${parallelShift._id}/cash-transfer`, null, adminToken);
+  assert.equal(parallelTransfer.status, 200);
+  assert.equal(parallelTransfer.data.required, false, 'a till assigned to another cashier must not block this shift');
+  assert.equal((await request('PUT', `/api/work-schedules/${parallelShift._id}/shift-action`, { action: 'CHECK_IN', cash: 0 }, adminToken)).status, 200);
   assert.equal((await request('PUT', `/api/work-schedules/${incoming._id}/shift-action`, { action: 'CHECK_IN', cash: 218000 }, adminToken)).status, 409);
   assert.equal((await WorkSchedule.findById(incoming._id)).status, 'SCHEDULED');
   assert.equal((await request('POST', `/api/work-schedules/${incoming._id}/cash-discrepancy`, { countedCash: 218000, note: 'Thiếu tiền' }, aToken)).status, 403);
